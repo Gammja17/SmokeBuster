@@ -1,7 +1,7 @@
 [gd_scene load_steps=3 format=3]
 
 [ext_resource type="Script" path="res://scripts/ui/result.gd" id="1_result"]
-[ext_resource type="FontFile" path="res://assets/fonts/BlackHanSans-Regular.ttf" id="2_title"]
+[ext_resource type="FontFile" path="res://assets/fonts/Pretendard-ExtraBold.otf" id="2_title"]
 
 [node name="Result" type="CanvasLayer"]
 process_mode = 3

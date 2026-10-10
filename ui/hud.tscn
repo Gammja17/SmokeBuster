@@ -3,7 +3,7 @@
 [ext_resource type="Script" path="res://scripts/ui/hud.gd" id="1_hud"]
 [ext_resource type="Script" path="res://scripts/ui/radar.gd" id="2_radar"]
 [ext_resource type="Script" path="res://scripts/ui/indicators.gd" id="3_ind"]
-[ext_resource type="FontFile" path="res://assets/fonts/BlackHanSans-Regular.ttf" id="4_title"]
+[ext_resource type="FontFile" path="res://assets/fonts/Pretendard-ExtraBold.otf" id="4_title"]
 
 [sub_resource type="StyleBoxFlat" id="ammo_fill"]
 bg_color = Color(0.35, 0.78, 1, 1)

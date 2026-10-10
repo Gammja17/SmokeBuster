@@ -37,6 +37,8 @@ func _ready() -> void:
 	m.scale = Vector3.ONE * 1.6
 	m.rotation.y = PI
 	add_child(m)
+	for mi in m.find_children("*", "MeshInstance3D", true, false):
+		mi.visibility_range_end = 110.0
 	var col := CollisionShape3D.new()
 	var box := BoxShape3D.new()
 	box.size = Vector3(2.4, 2.0, 4.6)

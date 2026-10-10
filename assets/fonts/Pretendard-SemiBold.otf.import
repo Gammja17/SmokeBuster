@@ -2,13 +2,13 @@
 
 importer="font_data_dynamic"
 type="FontFile"
-uid="uid://c1axc3opp1wt3"
-path="res://.godot/imported/BlackHanSans-Regular.ttf-1aadef84ee9c9c93ebae8596f7a99b67.fontdata"
+uid="uid://bpkv0luivmxob"
+path="res://.godot/imported/Pretendard-SemiBold.otf-b18e006bb23af1cf92c966e372cc15da.fontdata"
 
 [deps]
 
-source_file="res://assets/fonts/BlackHanSans-Regular.ttf"
-dest_files=["res://.godot/imported/BlackHanSans-Regular.ttf-1aadef84ee9c9c93ebae8596f7a99b67.fontdata"]
+source_file="res://assets/fonts/Pretendard-SemiBold.otf"
+dest_files=["res://.godot/imported/Pretendard-SemiBold.otf-b18e006bb23af1cf92c966e372cc15da.fontdata"]
 
 [params]
 

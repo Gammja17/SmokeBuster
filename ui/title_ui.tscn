@@ -1,6 +1,6 @@
 [gd_scene load_steps=2 format=3]
 
-[ext_resource type="FontFile" path="res://assets/fonts/BlackHanSans-Regular.ttf" id="1_title"]
+[ext_resource type="FontFile" path="res://assets/fonts/Pretendard-ExtraBold.otf" id="1_title"]
 
 [node name="TitleUI" type="CanvasLayer"]
 
@@ -81,5 +81,5 @@ grow_horizontal = 0
 grow_vertical = 0
 theme_override_colors/font_color = Color(1, 1, 1, 0.6)
 theme_override_font_sizes/font_size = 16
-text = "에셋: Kenney (CC0) · 글꼴: 도현, 검은고딕 (OFL)"
+text = "에셋: Kenney (CC0) · 글꼴: Pretendard (OFL)"
 horizontal_alignment = 2

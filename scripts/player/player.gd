@@ -56,7 +56,7 @@ func _ready() -> void:
 	camera.position.y = 1.62
 	camera.fov = 78
 	camera.near = 0.03
-	camera.far = 400
+	camera.far = 170
 	add_child(camera)
 
 	_view = Node3D.new()

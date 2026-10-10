@@ -14,7 +14,8 @@ environment = ExtResource("2_env")
 light_color = Color(1, 0.95, 0.85, 1)
 light_energy = 1.3
 shadow_enabled = true
-directional_shadow_max_distance = 120.0
+directional_shadow_max_distance = 60.0
+directional_shadow_mode = 0
 
 [node name="Pivot" type="Node3D" parent="."]
 

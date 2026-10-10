@@ -31,6 +31,8 @@ var run_speed := 5.2
 var _model: Node3D
 var _anim: AnimationPlayer
 var _overlay: StandardMaterial3D
+var _meshes: Array = []
+var _overlay_on := false
 var _cig: Node3D
 var _smoke: CPUParticles3D
 var _puff: CPUParticles3D
@@ -95,8 +97,10 @@ func _ready() -> void:
 	_overlay.albedo_color = Color(0.3, 0.55, 1.0, 0.0)
 	_overlay.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
 	_overlay.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
-	for m in _model.find_children("*", "MeshInstance3D", true, false):
-		m.material_overlay = _overlay
+	_meshes = _model.find_children("*", "MeshInstance3D", true, false)
+	for m in _meshes:
+		# 멀리 있는 사람은 그리지 않는다
+		m.visibility_range_end = 75.0
 
 	_say = _make_label(Color.WHITE, 40)
 	_say.position.y = 2.25 * _scale / 0.65
@@ -409,13 +413,14 @@ func _play(anim: String, blend := 0.2) -> void:
 
 func _make_label(color: Color, size: int) -> Label3D:
 	var l := Label3D.new()
-	l.font = load("res://assets/fonts/BlackHanSans-Regular.ttf")
+	l.font = load("res://assets/fonts/Pretendard-ExtraBold.otf")
 	l.font_size = size
 	l.outline_size = 10
 	l.pixel_size = 0.006
 	l.modulate = color
 	l.billboard = BaseMaterial3D.BILLBOARD_ENABLED
 	l.no_depth_test = false
+	l.visibility_range_end = 60.0
 	add_child(l)
 	return l
 
@@ -535,6 +540,11 @@ func _build_bar() -> void:
 func _update_wet_visual() -> void:
 	var r: float = clamp(wet / need, 0.0, 1.0)
 	_overlay.albedo_color.a = r * 0.45
+	# 젖었을 때만 덧칠 (덧칠은 메시마다 한 번 더 그리는 비용이 든다)
+	if (r > 0.0) != _overlay_on:
+		_overlay_on = r > 0.0
+		for m in _meshes:
+			m.material_overlay = _overlay if _overlay_on else null
 	if _bar_bg:
 		_bar_bg.visible = r > 0.0
 		var w: float = 0.9 * (_scale / 0.65)

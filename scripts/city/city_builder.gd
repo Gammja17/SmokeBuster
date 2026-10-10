@@ -27,6 +27,7 @@ var park_center := Vector2.ZERO
 var ring_lanes: Array = []   # 자동차가 도는 사각 경로 [half, clockwise]
 
 var _aabb_cache := {}
+var _tex_hash := {}
 var _mats := {}
 var rng := RandomNumberGenerator.new()
 
@@ -54,6 +55,92 @@ func build(parent: Node3D, seed_value := 1234) -> void:
 	_parked_cars()
 	_nav_graph()
 	ring_lanes = [[PITCH - 2.5, true], [PITCH + 2.5, false]]
+	_merge_static()
+
+
+# ---------------------------------------------------------------- 최적화
+
+const MERGE_CELL := 60.0
+
+
+func _merge_static() -> void:
+	## 움직이지 않는 메시를 (구역, 재질) 별로 하나로 합친다. 그리는 횟수가 수백 → 수십으로 준다.
+	## 구역으로 나누는 건 화면 밖 구역을 통째로 건너뛰게 하려고.
+	var groups := {}
+	var originals: Array = root.find_children("*", "MeshInstance3D", true, false)
+	for mi in originals:
+		var mesh: Mesh = mi.mesh
+		if mesh == null:
+			continue
+		var xf: Transform3D = mi.global_transform
+		var center: Vector3 = xf * mesh.get_aabb().get_center()
+		var cell := Vector2i(floori(center.x / MERGE_CELL), floori(center.z / MERGE_CELL))
+		for si in mesh.get_surface_count():
+			var mat: Material = mi.get_active_material(si)
+			var plain := _is_plain(mat)
+			var key := "%d_%d_%s" % [cell.x, cell.y, "plain" if plain else _mat_key(mat)]
+			if not groups.has(key):
+				var st := SurfaceTool.new()
+				st.begin(Mesh.PRIMITIVE_TRIANGLES)
+				groups[key] = {"st": st, "mat": _plain_mat() if plain else mat}
+			if plain:
+				_append_colored(groups[key].st, mesh, si, xf, mat.albedo_color)
+			else:
+				groups[key].st.append_from(mesh, si, xf)
+	for mi in originals:
+		mi.get_parent().remove_child(mi)
+		mi.queue_free()
+	var merged := Node3D.new()
+	merged.name = "Merged"
+	root.add_child(merged)
+	for key in groups:
+		var g: Dictionary = groups[key]
+		var mi := MeshInstance3D.new()
+		mi.mesh = g.st.commit()
+		mi.material_override = g.mat
+		merged.add_child(mi)
+
+
+func _is_plain(mat: Material) -> bool:
+	## 텍스처 없는 불투명 단색 재질 (상자, 원기둥 소품)
+	return mat is StandardMaterial3D and mat.albedo_texture == null and mat.transparency == BaseMaterial3D.TRANSPARENCY_DISABLED 		and not mat.emission_enabled and mat.metallic == 0.0
+
+
+var _plain: StandardMaterial3D
+
+
+func _plain_mat() -> StandardMaterial3D:
+	if _plain == null:
+		_plain = StandardMaterial3D.new()
+		_plain.vertex_color_use_as_albedo = true
+	return _plain
+
+
+func _append_colored(st: SurfaceTool, mesh: Mesh, si: int, xf: Transform3D, color: Color) -> void:
+	## 단색 재질 메시를 정점 색으로 바꿔 넣는다 → 색이 달라도 한 번에 그린다
+	var arr := mesh.surface_get_arrays(si)
+	var verts: PackedVector3Array = arr[Mesh.ARRAY_VERTEX]
+	var normals: PackedVector3Array = arr[Mesh.ARRAY_NORMAL]
+	var idx: PackedInt32Array = arr[Mesh.ARRAY_INDEX] if arr[Mesh.ARRAY_INDEX] else PackedInt32Array()
+	var nb := xf.basis.inverse().transposed()
+	var order: PackedInt32Array = idx if idx.size() > 0 else PackedInt32Array(range(verts.size()))
+	for i in order:
+		st.set_color(color)
+		if normals.size() > i:
+			st.set_normal((nb * normals[i]).normalized())
+		st.add_vertex(xf * verts[i])
+
+
+func _mat_key(mat: Material) -> String:
+	# Kenney 모델은 파일마다 같은 colormap 텍스처를 따로 품고 있다 → 텍스처 내용으로 묶는다
+	if mat is StandardMaterial3D and mat.albedo_texture:
+		var tex: Texture2D = mat.albedo_texture
+		var id := tex.get_rid().get_id()
+		if not _tex_hash.has(id):
+			var img := tex.get_image()
+			_tex_hash[id] = str(hash(img.get_data())) if img else str(id)
+		return "%s_%s_%d" % [_tex_hash[id], mat.albedo_color.to_html(), mat.transparency]
+	return str(mat.get_instance_id()) if mat else "none"
 
 
 # ---------------------------------------------------------------- 기본 바닥/도로
@@ -255,7 +342,7 @@ func _bus_stop(p: Vector3, ang: float) -> void:
 	_bench(b, Vector3(0, 0, -0.95), 180.0)
 	var sign := Label3D.new()
 	sign.text = "버스 정류장"
-	sign.font = load("res://assets/fonts/BlackHanSans-Regular.ttf")
+	sign.font = load("res://assets/fonts/Pretendard-ExtraBold.otf")
 	sign.font_size = 48
 	sign.pixel_size = 0.006
 	sign.position = Vector3(0, 2.82, -0.6)
@@ -295,7 +382,7 @@ func _no_smoking_sign(parent: Node3D, p: Vector3, rot: float) -> void:
 	_box_in(s, Vector3(1.4, 0.7, 0.05), Vector3(0, 2.2, 0), Color(0.95, 0.95, 0.95), false)
 	var l := Label3D.new()
 	l.text = "금연구역"
-	l.font = load("res://assets/fonts/BlackHanSans-Regular.ttf")
+	l.font = load("res://assets/fonts/Pretendard-ExtraBold.otf")
 	l.font_size = 64
 	l.pixel_size = 0.005
 	l.modulate = Color(0.85, 0.1, 0.1)
@@ -485,12 +572,13 @@ func _box_in(parent: Node3D, size: Vector3, pos: Vector3, color: Color, collide:
 	parent.add_child(mesh)
 	if collide:
 		var body := StaticBody3D.new()
+		body.position = pos
 		var shape := CollisionShape3D.new()
 		var bs := BoxShape3D.new()
 		bs.size = size
 		shape.shape = bs
 		body.add_child(shape)
-		mesh.add_child(body)
+		parent.add_child(body)
 	return mesh
 
 
@@ -511,13 +599,14 @@ func _cyl_in(parent: Node3D, radius: float, height: float, pos: Vector3, color: 
 	parent.add_child(mesh)
 	if collide:
 		var body := StaticBody3D.new()
+		body.position = pos
 		var shape := CollisionShape3D.new()
 		var cs := CylinderShape3D.new()
 		cs.radius = radius
 		cs.height = height
 		shape.shape = cs
 		body.add_child(shape)
-		mesh.add_child(body)
+		parent.add_child(body)
 	return mesh
 
 
