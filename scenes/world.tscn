@@ -1,0 +1,35 @@
+[gd_scene load_steps=8 format=3]
+
+[ext_resource type="Script" path="res://scripts/world/world.gd" id="1_world"]
+[ext_resource type="Environment" path="res://scenes/world_env.tres" id="2_env"]
+[ext_resource type="Script" path="res://scripts/water/water_system.gd" id="3_water"]
+[ext_resource type="Script" path="res://scripts/player/player.gd" id="4_player"]
+[ext_resource type="PackedScene" path="res://ui/hud.tscn" id="5_hud"]
+[ext_resource type="PackedScene" path="res://ui/pause.tscn" id="6_pause"]
+[ext_resource type="PackedScene" path="res://ui/result.tscn" id="7_result"]
+
+[node name="World" type="Node3D"]
+script = ExtResource("1_world")
+
+[node name="Env" type="WorldEnvironment" parent="."]
+environment = ExtResource("2_env")
+
+[node name="Sun" type="DirectionalLight3D" parent="."]
+light_color = Color(1, 0.95, 0.85, 1)
+light_energy = 1.3
+shadow_enabled = true
+directional_shadow_max_distance = 90.0
+
+[node name="Water" type="Node3D" parent="."]
+script = ExtResource("3_water")
+
+[node name="Npcs" type="Node3D" parent="."]
+
+[node name="Player" type="CharacterBody3D" parent="."]
+script = ExtResource("4_player")
+
+[node name="HUD" parent="." instance=ExtResource("5_hud")]
+
+[node name="Pause" parent="." instance=ExtResource("6_pause")]
+
+[node name="Result" parent="." instance=ExtResource("7_result")]

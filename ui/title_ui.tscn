@@ -1,0 +1,85 @@
+[gd_scene load_steps=2 format=3]
+
+[ext_resource type="FontFile" path="res://assets/fonts/BlackHanSans-Regular.ttf" id="1_title"]
+
+[node name="TitleUI" type="CanvasLayer"]
+
+[node name="Shade" type="ColorRect" parent="."]
+anchors_preset = 9
+anchor_bottom = 1.0
+offset_right = 620.0
+grow_vertical = 2
+mouse_filter = 2
+color = Color(0.02, 0.06, 0.14, 0.55)
+
+[node name="Left" type="VBoxContainer" parent="."]
+anchors_preset = 4
+anchor_top = 0.5
+anchor_bottom = 0.5
+offset_left = 60.0
+offset_top = -270.0
+offset_right = 580.0
+offset_bottom = 290.0
+grow_vertical = 2
+theme_override_constants/separation = 14
+
+[node name="Kicker" type="Label" parent="Left"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.6, 0.85, 1, 1)
+theme_override_font_sizes/font_size = 24
+text = "길거리 무단 흡연, 이제 그만!"
+
+[node name="Logo" type="Label" parent="Left"]
+layout_mode = 2
+theme_override_colors/font_color = Color(1, 1, 1, 1)
+theme_override_colors/font_outline_color = Color(0.05, 0.3, 0.75, 1)
+theme_override_constants/outline_size = 22
+theme_override_fonts/font = ExtResource("1_title")
+theme_override_font_sizes/font_size = 92
+text = "물대포
+단속반"
+
+[node name="Save" type="Label" parent="Left"]
+layout_mode = 2
+theme_override_colors/font_color = Color(1, 0.88, 0.4, 1)
+theme_override_font_sizes/font_size = 22
+text = "이어하기: 3일차 · 1200원"
+
+[node name="Continue" type="Button" parent="Left"]
+custom_minimum_size = Vector2(340, 62)
+layout_mode = 2
+size_flags_horizontal = 0
+theme_override_font_sizes/font_size = 30
+text = "이어서 출근"
+
+[node name="New" type="Button" parent="Left"]
+custom_minimum_size = Vector2(340, 62)
+layout_mode = 2
+size_flags_horizontal = 0
+theme_override_font_sizes/font_size = 30
+text = "새로 시작"
+
+[node name="HowTo" type="Label" parent="Left"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.8, 0.88, 1, 1)
+theme_override_font_sizes/font_size = 19
+text = "WASD 이동 · Shift 달리기 · 마우스 조준 · 좌클릭 물 뿌리기
+1~5 / 휠 무기 교체 · E 소화전에서 물 채우기 · F 소방차 · Esc 일시정지
+흡연자만 적시세요! 행인에게 뿌리면 민원이 들어옵니다."
+
+[node name="Credit" type="Label" parent="."]
+anchors_preset = 3
+anchor_left = 1.0
+anchor_top = 1.0
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_left = -520.0
+offset_top = -40.0
+offset_right = -16.0
+offset_bottom = -10.0
+grow_horizontal = 0
+grow_vertical = 0
+theme_override_colors/font_color = Color(1, 1, 1, 0.6)
+theme_override_font_sizes/font_size = 16
+text = "에셋: Kenney (CC0) · 글꼴: 도현, 검은고딕 (OFL)"
+horizontal_alignment = 2

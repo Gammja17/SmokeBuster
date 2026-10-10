@@ -1,0 +1,71 @@
+[gd_scene load_steps=3 format=3]
+
+[ext_resource type="Script" path="res://scripts/ui/result.gd" id="1_result"]
+[ext_resource type="FontFile" path="res://assets/fonts/BlackHanSans-Regular.ttf" id="2_title"]
+
+[node name="Result" type="CanvasLayer"]
+process_mode = 3
+layer = 11
+visible = false
+script = ExtResource("1_result")
+
+[node name="Dim" type="ColorRect" parent="."]
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+color = Color(0, 0.02, 0.06, 0.7)
+
+[node name="Panel" type="PanelContainer" parent="."]
+anchors_preset = 8
+anchor_left = 0.5
+anchor_top = 0.5
+anchor_right = 0.5
+anchor_bottom = 0.5
+offset_left = -300.0
+offset_top = -270.0
+offset_right = 300.0
+offset_bottom = 270.0
+grow_horizontal = 2
+grow_vertical = 2
+
+[node name="V" type="VBoxContainer" parent="Panel"]
+layout_mode = 2
+theme_override_constants/separation = 12
+alignment = 1
+
+[node name="Title" type="Label" parent="Panel/V"]
+layout_mode = 2
+theme_override_colors/font_color = Color(1, 0.9, 0.35, 1)
+theme_override_fonts/font = ExtResource("2_title")
+theme_override_font_sizes/font_size = 56
+text = "근무 완료!"
+horizontal_alignment = 1
+
+[node name="Sub" type="Label" parent="Panel/V"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.75, 0.85, 1, 1)
+theme_override_font_sizes/font_size = 22
+text = "1일차 · 첫 출근"
+horizontal_alignment = 1
+
+[node name="Stats" type="Label" parent="Panel/V"]
+layout_mode = 2
+theme_override_font_sizes/font_size = 26
+text = "단속 5 / 5
+민원 0
+번 돈 300원"
+horizontal_alignment = 1
+
+[node name="Next" type="Button" parent="Panel/V"]
+layout_mode = 2
+text = "장비 사러 가기"
+
+[node name="Retry" type="Button" parent="Panel/V"]
+layout_mode = 2
+text = "다시 도전"
+
+[node name="ToTitle" type="Button" parent="Panel/V"]
+layout_mode = 2
+text = "타이틀로"

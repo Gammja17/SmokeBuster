@@ -1,0 +1,122 @@
+[gd_scene load_steps=3 format=3]
+
+[ext_resource type="Script" path="res://scripts/ui/shop.gd" id="1_shop"]
+[ext_resource type="FontFile" path="res://assets/fonts/BlackHanSans-Regular.ttf" id="2_title"]
+
+[node name="Shop" type="Control"]
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+script = ExtResource("1_shop")
+
+[node name="Bg" type="ColorRect" parent="."]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+color = Color(0.04, 0.09, 0.18, 1)
+
+[node name="M" type="MarginContainer" parent="."]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+theme_override_constants/margin_left = 40
+theme_override_constants/margin_top = 24
+theme_override_constants/margin_right = 40
+theme_override_constants/margin_bottom = 24
+
+[node name="V" type="VBoxContainer" parent="M"]
+layout_mode = 2
+theme_override_constants/separation = 12
+
+[node name="Header" type="HBoxContainer" parent="M/V"]
+layout_mode = 2
+
+[node name="Title" type="Label" parent="M/V/Header"]
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_colors/font_color = Color(0.55, 0.85, 1, 1)
+theme_override_fonts/font = ExtResource("2_title")
+theme_override_font_sizes/font_size = 52
+text = "단속반 장비실"
+
+[node name="Money" type="Label" parent="M/V/Header"]
+layout_mode = 2
+theme_override_colors/font_color = Color(1, 0.88, 0.35, 1)
+theme_override_fonts/font = ExtResource("2_title")
+theme_override_font_sizes/font_size = 42
+text = "0원"
+
+[node name="Brief" type="Label" parent="M/V"]
+layout_mode = 2
+theme_override_font_sizes/font_size = 24
+text = "다음 근무: 2일차"
+autowrap_mode = 3
+
+[node name="Cols" type="HBoxContainer" parent="M/V"]
+layout_mode = 2
+size_flags_vertical = 3
+theme_override_constants/separation = 24
+
+[node name="Weapons" type="VBoxContainer" parent="M/V/Cols"]
+layout_mode = 2
+size_flags_horizontal = 3
+
+[node name="Head" type="Label" parent="M/V/Cols/Weapons"]
+layout_mode = 2
+theme_override_fonts/font = ExtResource("2_title")
+theme_override_font_sizes/font_size = 30
+text = "물 무기"
+
+[node name="Scroll" type="ScrollContainer" parent="M/V/Cols/Weapons"]
+layout_mode = 2
+size_flags_vertical = 3
+horizontal_scroll_mode = 0
+
+[node name="List" type="VBoxContainer" parent="M/V/Cols/Weapons/Scroll"]
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_constants/separation = 8
+
+[node name="Upgrades" type="VBoxContainer" parent="M/V/Cols"]
+layout_mode = 2
+size_flags_horizontal = 3
+
+[node name="Head" type="Label" parent="M/V/Cols/Upgrades"]
+layout_mode = 2
+theme_override_fonts/font = ExtResource("2_title")
+theme_override_font_sizes/font_size = 30
+text = "강화"
+
+[node name="Scroll" type="ScrollContainer" parent="M/V/Cols/Upgrades"]
+layout_mode = 2
+size_flags_vertical = 3
+horizontal_scroll_mode = 0
+
+[node name="List" type="VBoxContainer" parent="M/V/Cols/Upgrades/Scroll"]
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_constants/separation = 8
+
+[node name="Footer" type="HBoxContainer" parent="M/V"]
+layout_mode = 2
+theme_override_constants/separation = 16
+alignment = 2
+
+[node name="ToTitle" type="Button" parent="M/V/Footer"]
+layout_mode = 2
+text = "타이틀로"
+
+[node name="Start" type="Button" parent="M/V/Footer"]
+custom_minimum_size = Vector2(320, 64)
+layout_mode = 2
+theme_override_font_sizes/font_size = 32
+text = "출근하기!"
