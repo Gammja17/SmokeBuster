@@ -185,3 +185,75 @@ for bar in range(bars):
 song = lowpass(song, 0.6)
 save(os.path.join(music, "bgm.wav"), norm(song, 0.7))
 print("done")
+
+
+# ---------------------------------------------------------------- 확장 사건용 소리
+
+# 카메라 셔터: 찰-칵 + 짧은 모터
+x = np.concatenate([
+    highpass(noise(0.02), 0.6) * env(int(SR * 0.02), 0.001, 3),
+    np.zeros(int(SR * 0.05)),
+    highpass(noise(0.03), 0.5) * env(int(SR * 0.03), 0.001, 2) * 1.2,
+    lowpass(noise(0.12), 0.3) * 0.25 * (1 + np.sign(np.sin(2 * np.pi * 90 * t(0.12)))) * 0.5,
+])
+save(os.path.join(sfx, "shutter.wav"), norm(x, 0.8))
+
+# 합선 스파크: 지지직 + 펑
+n = int(SR * 0.5)
+cr = (rng.random(n) > 0.97).astype(float) * rng.uniform(-1, 1, n)
+x = highpass(cr, 0.3) * 2 + highpass(noise(0.5), 0.6) * 0.3
+x *= env(n, 0.002, 1.2)
+save(os.path.join(sfx, "spark.wav"), norm(x, 0.7))
+
+
+def loop_track(bpm, bars, fn):
+    beat = 60 / bpm
+    total = int(SR * beat * 4 * bars)
+    out = np.zeros(total)
+
+    def put(b, x):
+        s = int(b * beat * SR)
+        e = min(total, s + len(x))
+        out[s:e] += x[: e - s]
+    fn(put, beat)
+    return out
+
+
+# 술집: 쿵쿵 클럽 비트
+def club(put, beat):
+    for bar in range(4):
+        for i in range(4):
+            kn = int(SR * 0.18)
+            kick = np.sin(2 * np.pi * np.cumsum(np.linspace(120, 40, kn)) / SR) * env(kn, 0.001, 2.5)
+            put(bar * 4 + i, kick)
+            put(bar * 4 + i + 0.5, highpass(noise(0.05), 0.7) * env(int(SR * 0.05), 0.001, 3) * 0.25)
+            m = [36, 36, 39, 34][bar]
+            put(bar * 4 + i + 0.5, tone(note(m), beat * 0.4, "square") * env(int(SR * beat * 0.4), 0.005, 1.5) * 0.3)
+save(os.path.join(music, "club.wav"), norm(lowpass(loop_track(124, 4, club), 0.35), 0.8))
+
+
+# 노래방: 뽕짝 반주
+def karaoke(put, beat):
+    mel = [64, 67, 69, 67, 64, 62, 60, 62, 64, 67, 72, 71, 69, 67, 64, 67]
+    for bar in range(4):
+        root = [48, 45, 41, 43][bar]
+        for i in range(4):
+            put(bar * 4 + i, tone(note(root if i % 2 == 0 else root + 7), beat * 0.45, "tri") * env(int(SR * beat * 0.45), 0.005, 1.5) * 0.4)
+            if i % 2 == 1:
+                put(bar * 4 + i, highpass(noise(0.1), 0.35) * env(int(SR * 0.1), 0.001, 3) * 0.3)
+        for i in range(4):
+            m = mel[bar * 4 + i]
+            put(bar * 4 + i, (tone(note(m), beat * 0.9, "square") * 0.5 + tone(note(m) * 1.01, beat * 0.9, "square") * 0.3) * env(int(SR * beat * 0.9), 0.01, 1.2) * 0.18)
+save(os.path.join(music, "karaoke.wav"), norm(lowpass(loop_track(118, 4, karaoke), 0.45), 0.75))
+
+
+# 마사지: 느끼한 라운지 패드
+def lounge(put, beat):
+    chords = [[57, 60, 64, 67], [53, 57, 60, 64], [55, 59, 62, 65], [52, 55, 59, 62]]
+    for bar in range(4):
+        pad = sum(tone(note(m), beat * 4, "sine") for m in chords[bar]) / 4
+        put(bar * 4, pad * env(int(SR * beat * 4), 0.3, 0.6) * 0.5)
+        for i in [0, 1.5, 3]:
+            put(bar * 4 + i, tone(note(chords[bar][0] + 24), 0.3) * env(int(SR * 0.3), 0.001, 3) * 0.2)
+save(os.path.join(music, "lounge.wav"), norm(lowpass(loop_track(80, 4, lounge), 0.4), 0.7))
+print("extra done")

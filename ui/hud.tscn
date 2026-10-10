@@ -1,9 +1,29 @@
-[gd_scene load_steps=8 format=3]
+[gd_scene load_steps=10 format=3]
 
 [ext_resource type="Script" path="res://scripts/ui/hud.gd" id="1_hud"]
 [ext_resource type="Script" path="res://scripts/ui/radar.gd" id="2_radar"]
 [ext_resource type="Script" path="res://scripts/ui/indicators.gd" id="3_ind"]
 [ext_resource type="FontFile" path="res://assets/fonts/Pretendard-ExtraBold.otf" id="4_title"]
+
+[sub_resource type="StyleBoxFlat" id="polaroid_bg"]
+content_margin_left = 10.0
+content_margin_top = 10.0
+content_margin_right = 10.0
+content_margin_bottom = 8.0
+bg_color = Color(0.97, 0.96, 0.92, 1)
+shadow_color = Color(0, 0, 0, 0.45)
+shadow_size = 10
+
+[sub_resource type="StyleBoxFlat" id="tasks_bg"]
+content_margin_left = 12.0
+content_margin_top = 8.0
+content_margin_right = 12.0
+content_margin_bottom = 8.0
+bg_color = Color(0.03, 0.07, 0.14, 0.72)
+corner_radius_top_left = 10
+corner_radius_top_right = 10
+corner_radius_bottom_right = 10
+corner_radius_bottom_left = 10
 
 [sub_resource type="StyleBoxFlat" id="ammo_fill"]
 bg_color = Color(0.35, 0.78, 1, 1)
@@ -158,7 +178,7 @@ show_percentage = false
 [node name="TopLeft" type="VBoxContainer" parent="."]
 offset_left = 20.0
 offset_top = 14.0
-offset_right = 360.0
+offset_right = 380.0
 offset_bottom = 120.0
 mouse_filter = 2
 
@@ -176,6 +196,26 @@ theme_override_colors/font_color = Color(1, 0.55, 0.3, 1)
 theme_override_fonts/font = ExtResource("4_title")
 theme_override_font_sizes/font_size = 26
 text = "콤보 x2"
+
+[node name="Tasks" type="PanelContainer" parent="TopLeft"]
+layout_mode = 2
+mouse_filter = 2
+theme_override_styles/panel = SubResource("tasks_bg")
+
+[node name="V" type="VBoxContainer" parent="TopLeft/Tasks"]
+layout_mode = 2
+theme_override_constants/separation = 2
+
+[node name="Head" type="Label" parent="TopLeft/Tasks/V"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.55, 0.85, 1, 1)
+theme_override_fonts/font = ExtResource("4_title")
+theme_override_font_sizes/font_size = 20
+text = "오늘의 업무"
+
+[node name="List" type="VBoxContainer" parent="TopLeft/Tasks/V"]
+layout_mode = 2
+theme_override_constants/separation = 0
 
 [node name="Feed" type="VBoxContainer" parent="TopLeft"]
 layout_mode = 2
@@ -331,6 +371,177 @@ grow_horizontal = 2
 grow_vertical = 0
 theme_override_font_sizes/font_size = 24
 horizontal_alignment = 1
+
+[node name="Viewfinder" type="Control" parent="."]
+visible = false
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+
+[node name="Tint" type="ColorRect" parent="Viewfinder"]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+mouse_filter = 2
+color = Color(0, 0, 0, 0.12)
+
+[node name="TL1" type="ColorRect" parent="Viewfinder"]
+anchor_left = 0.15
+anchor_top = 0.15
+anchor_right = 0.15
+anchor_bottom = 0.15
+offset_right = 60.0
+offset_bottom = 5.0
+mouse_filter = 2
+
+[node name="TL2" type="ColorRect" parent="Viewfinder"]
+anchor_left = 0.15
+anchor_top = 0.15
+anchor_right = 0.15
+anchor_bottom = 0.15
+offset_right = 5.0
+offset_bottom = 60.0
+mouse_filter = 2
+
+[node name="TR1" type="ColorRect" parent="Viewfinder"]
+anchor_left = 0.85
+anchor_top = 0.15
+anchor_right = 0.85
+anchor_bottom = 0.15
+offset_left = -60.0
+offset_bottom = 5.0
+mouse_filter = 2
+
+[node name="TR2" type="ColorRect" parent="Viewfinder"]
+anchor_left = 0.85
+anchor_top = 0.15
+anchor_right = 0.85
+anchor_bottom = 0.15
+offset_left = -5.0
+offset_bottom = 60.0
+mouse_filter = 2
+
+[node name="BL1" type="ColorRect" parent="Viewfinder"]
+anchor_left = 0.15
+anchor_top = 0.85
+anchor_right = 0.15
+anchor_bottom = 0.85
+offset_top = -5.0
+offset_right = 60.0
+mouse_filter = 2
+
+[node name="BL2" type="ColorRect" parent="Viewfinder"]
+anchor_left = 0.15
+anchor_top = 0.85
+anchor_right = 0.15
+anchor_bottom = 0.85
+offset_top = -60.0
+offset_right = 5.0
+mouse_filter = 2
+
+[node name="BR1" type="ColorRect" parent="Viewfinder"]
+anchor_left = 0.85
+anchor_top = 0.85
+anchor_right = 0.85
+anchor_bottom = 0.85
+offset_left = -60.0
+offset_top = -5.0
+mouse_filter = 2
+
+[node name="BR2" type="ColorRect" parent="Viewfinder"]
+anchor_left = 0.85
+anchor_top = 0.85
+anchor_right = 0.85
+anchor_bottom = 0.85
+offset_left = -5.0
+offset_top = -60.0
+mouse_filter = 2
+
+[node name="Rec" type="Label" parent="Viewfinder"]
+anchor_left = 0.15
+anchor_top = 0.15
+anchor_right = 0.15
+anchor_bottom = 0.15
+offset_left = 14.0
+offset_top = 14.0
+offset_right = 260.0
+offset_bottom = 44.0
+theme_override_colors/font_color = Color(1, 0.3, 0.3, 1)
+theme_override_font_sizes/font_size = 22
+text = "● 증거 촬영"
+
+[node name="Help" type="Label" parent="Viewfinder"]
+anchor_left = 0.5
+anchor_top = 0.85
+anchor_right = 0.5
+anchor_bottom = 0.85
+offset_left = -300.0
+offset_top = 12.0
+offset_right = 300.0
+offset_bottom = 44.0
+theme_override_font_sizes/font_size = 22
+text = "좌클릭 촬영 · 신고 대상을 네모 안에 담으세요"
+horizontal_alignment = 1
+
+[node name="Targets" type="Label" parent="Viewfinder"]
+anchor_left = 0.85
+anchor_top = 0.15
+anchor_right = 0.85
+anchor_bottom = 0.15
+offset_left = -320.0
+offset_top = 14.0
+offset_right = -14.0
+offset_bottom = 44.0
+theme_override_colors/font_color = Color(0.6, 1, 0.6, 1)
+theme_override_font_sizes/font_size = 22
+horizontal_alignment = 2
+
+[node name="Flash" type="ColorRect" parent="."]
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+color = Color(1, 1, 1, 0)
+
+[node name="Polaroid" type="PanelContainer" parent="."]
+visible = false
+anchors_preset = 6
+anchor_left = 1.0
+anchor_top = 0.5
+anchor_right = 1.0
+anchor_bottom = 0.5
+offset_left = -330.0
+offset_top = -110.0
+offset_right = -30.0
+offset_bottom = 110.0
+grow_horizontal = 0
+grow_vertical = 2
+mouse_filter = 2
+theme_override_styles/panel = SubResource("polaroid_bg")
+
+[node name="V" type="VBoxContainer" parent="Polaroid"]
+layout_mode = 2
+
+[node name="Photo" type="TextureRect" parent="Polaroid/V"]
+custom_minimum_size = Vector2(280, 158)
+layout_mode = 2
+expand_mode = 1
+stretch_mode = 6
+
+[node name="Caption" type="Label" parent="Polaroid/V"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.15, 0.15, 0.2, 1)
+theme_override_constants/outline_size = 0
+theme_override_font_sizes/font_size = 20
+text = "신고 완료"
+horizontal_alignment = 1
+autowrap_mode = 3
 
 [node name="Banner" type="VBoxContainer" parent="."]
 anchors_preset = 8

@@ -24,10 +24,22 @@ extends CanvasLayer
 @onready var truck_bar: ProgressBar = $BottomRight/V/Truck/TruckBar
 @onready var prompt: Label = $Prompt
 @onready var hint: Label = $Hint
+@onready var task_list: VBoxContainer = $TopLeft/Tasks/V/List
+@onready var viewfinder: Control = $Viewfinder
+@onready var vf_targets: Label = $Viewfinder/Targets
+@onready var flash: ColorRect = $Flash
+@onready var polaroid: PanelContainer = $Polaroid
+@onready var polaroid_photo: TextureRect = $Polaroid/V/Photo
+@onready var polaroid_caption: Label = $Polaroid/V/Caption
 @onready var banner_big: Label = $Banner/Big
 @onready var banner_small: Label = $Banner/Small
 
+const TASK_ROW := preload("res://ui/task_row.tscn")
+
 var _banner_tw: Tween
+var _polaroid_tw: Tween
+var _rows := {}
+var _player: Node3D
 var _money_shown := 0.0
 var _money_target := 0
 
@@ -36,6 +48,57 @@ func bind(world: Node, player: Node3D) -> void:
 	radar.world = world
 	radar.player = player
 	indicators.player = player
+	_player = player
+
+
+func setup_tasks(tasks: Dictionary) -> void:
+	for c in task_list.get_children():
+		c.queue_free()
+	_rows.clear()
+	for id in tasks:
+		var row := TASK_ROW.instantiate()
+		task_list.add_child(row)
+		row.setup(id)
+		row.set_count(0, tasks[id])
+		_rows[id] = row
+
+
+func set_task(id: String, cur: int, need: int) -> void:
+	if _rows.has(id):
+		_rows[id].set_count(cur, need)
+		if cur == need:
+			var r: Control = _rows[id]
+			r.pivot_offset = r.size / 2
+			r.scale = Vector2.ONE * 1.15
+			create_tween().tween_property(r, "scale", Vector2.ONE, 0.25)
+
+
+func set_camera_mode(on: bool) -> void:
+	viewfinder.visible = on
+	crosshair.visible = not on
+
+
+func camera_flash() -> void:
+	flash.color.a = 0.85
+	create_tween().tween_property(flash, "color:a", 0.0, 0.35)
+
+
+func show_polaroid(tex: Texture2D, caption: String, good: bool) -> void:
+	polaroid_photo.texture = tex
+	polaroid_caption.text = caption
+	polaroid_caption.add_theme_color_override("font_color", Color(0.1, 0.45, 0.15) if good else Color(0.45, 0.2, 0.2))
+	polaroid.visible = true
+	polaroid.pivot_offset = polaroid.size / 2
+	polaroid.rotation = deg_to_rad(randf_range(-6, 6))
+	polaroid.modulate.a = 1.0
+	polaroid.position.x = get_viewport().get_visible_rect().size.x
+	if _polaroid_tw:
+		_polaroid_tw.kill()
+	_polaroid_tw = create_tween()
+	_polaroid_tw.tween_property(polaroid, "position:x", get_viewport().get_visible_rect().size.x - 330.0, 0.25).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+	_polaroid_tw.tween_interval(2.6)
+	_polaroid_tw.tween_property(polaroid, "modulate:a", 0.0, 0.4)
+	_polaroid_tw.tween_callback(func(): polaroid.visible = false)
 
 
 func set_day(text: String) -> void:
@@ -61,6 +124,9 @@ func set_money(m: int) -> void:
 
 
 func _process(delta: float) -> void:
+	if viewfinder.visible and _player:
+		var n: int = _player.photo_targets().size()
+		vf_targets.text = ("신고 대상 %d 포착!" % n) if n > 0 else ""
 	_money_shown = move_toward(_money_shown, _money_target, max(abs(_money_target - _money_shown) * 8.0, 40.0) * delta)
 	money_label.text = "%d원" % int(_money_shown)
 

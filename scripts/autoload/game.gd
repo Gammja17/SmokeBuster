@@ -66,41 +66,86 @@ func _ready() -> void:
 	load_game()
 
 
+## 업무 종류. how: water(물로 해결), photo(카메라 신고), pickup(E로 줍기), break(물로 간판 합선)
+const TASKS := {
+	"smoke": {"name": "흡연자 단속", "short": "흡연", "reward": 50, "how": "water", "color": Color(1, 0.3, 0.2)},
+	"litter": {"name": "무단투기 단속", "short": "무단투기", "reward": 60, "how": "water", "color": Color(0.95, 0.6, 0.2)},
+	"trash": {"name": "쓰레기 줍기", "short": "쓰레기", "reward": 10, "how": "pickup", "color": Color(0.6, 0.85, 0.4)},
+	"jaywalk": {"name": "무단횡단 신고", "short": "무단횡단", "reward": 70, "how": "photo", "color": Color(1, 0.9, 0.2)},
+	"teen_smoke": {"name": "미성년 흡연 신고", "short": "미자 흡연", "reward": 80, "how": "photo", "color": Color(1, 0.45, 0.75)},
+	"teen_drink": {"name": "미성년 음주 신고", "short": "미자 음주", "reward": 80, "how": "photo", "color": Color(0.7, 0.45, 1)},
+	"bully": {"name": "학교폭력 신고", "short": "학폭", "reward": 200, "how": "photo", "color": Color(1, 0.2, 0.55)},
+	"drunk": {"name": "음주운전 신고", "short": "음주운전", "reward": 250, "how": "photo", "color": Color(0.3, 0.9, 1)},
+	"shop": {"name": "불법업소 철거", "short": "불법업소", "reward": 300, "how": "break", "color": Color(1, 0.35, 0.95)},
+}
+## 관할 구역 (x, z 사각형). 날이 갈수록 넓어진다.
+const ZONES := [
+	{"name": "1구역 · 첫 번째 블록", "rect": Rect2(-63, -63, 72, 72)},
+	{"name": "2구역 · 공원까지", "rect": Rect2(-63, -63, 126, 72)},
+	{"name": "3구역 · 동네 전체", "rect": Rect2(-63, -63, 126, 126)},
+]
+const HOW_TEXT := {"water": "물", "photo": "촬영", "pickup": "E 줍기", "break": "간판에 물"}
+
+
 func day_config(d: int) -> Dictionary:
-	## 날짜별 난이도. 5일차는 보스, 이후는 무한 모드처럼 계속 어려워진다.
+	## 날짜별 업무 목록과 등장하는 사건. 5일차는 보스, 이후는 무한 모드처럼 계속 어려워진다.
 	var cfg := {
-		"duration": 150.0,
-		"quota": 4 + d * 2,
-		"max_smokers": 3 + d,
-		"spawn_every": max(9.0 - d * 0.8, 3.0),
+		"duration": 180.0,
+		"tasks": {},
+		"max_smokers": 2 + d,
+		"spawn_every": max(9.0 - d * 0.8, 3.5),
 		"pedestrians": 12 + d * 2,
 		"weights": {"normal": 1.0},
+		"spawns": ["smoke", "trash"],
 		"boss": false,
 		"title": "",
+		"zone": zone_index(d),
 	}
 	match d:
 		1:
-			cfg.quota = 5
+			cfg.duration = 150.0
+			cfg.tasks = {"smoke": 3, "trash": 5}
 			cfg.title = "첫 출근"
 		2:
-			cfg.weights = {"normal": 1.0, "runner": 0.6}
-			cfg.title = "도망자들"
+			cfg.tasks = {"smoke": 3, "trash": 4, "litter": 2, "jaywalk": 2}
+			cfg.weights = {"normal": 1.0, "runner": 0.5}
+			cfg.spawns = ["smoke", "trash", "litter", "jaywalk"]
+			cfg.title = "길거리 질서"
 		3:
+			cfg.tasks = {"smoke": 3, "jaywalk": 2, "teen_smoke": 2, "shop": 1}
 			cfg.weights = {"normal": 1.0, "runner": 0.5, "angry": 0.5}
-			cfg.title = "성질 급한 사람들"
+			cfg.spawns = ["smoke", "trash", "litter", "jaywalk", "teen_smoke", "shop"]
+			cfg.title = "수상한 동네"
 		4:
+			cfg.tasks = {"smoke": 3, "litter": 2, "teen_drink": 3, "bully": 1, "drunk": 1, "shop": 1}
 			cfg.weights = {"normal": 1.0, "runner": 0.6, "angry": 0.5, "group": 0.4}
-			cfg.title = "흡연 모임"
+			cfg.spawns = ["smoke", "trash", "litter", "jaywalk", "teen_smoke", "teen_drink", "bully", "drunk", "shop"]
+			cfg.title = "골목의 그림자"
 		5:
+			cfg.tasks = {"smoke": 5, "trash": 6, "jaywalk": 2, "teen_smoke": 2, "bully": 1, "drunk": 1, "shop": 2}
 			cfg.weights = {"normal": 1.0, "runner": 0.6, "angry": 0.6, "group": 0.4}
+			cfg.spawns = ["smoke", "trash", "litter", "jaywalk", "teen_smoke", "teen_drink", "bully", "drunk", "shop"]
 			cfg.boss = true
-			cfg.quota = 12
 			cfg.title = "골초왕 등장"
 		_:
+			var n := d - 5
+			cfg.tasks = {"smoke": 5 + n, "trash": 6, "litter": 2, "jaywalk": 2 + n / 2, "teen_smoke": 2, "teen_drink": 2, "bully": 1, "drunk": 1 + n / 3, "shop": 2}
 			cfg.weights = {"normal": 1.0, "runner": 0.8, "angry": 0.8, "group": 0.6}
+			cfg.spawns = ["smoke", "trash", "litter", "jaywalk", "teen_smoke", "teen_drink", "bully", "drunk", "shop"]
 			cfg.boss = d % 3 == 0
-			cfg.title = "무한 단속 %d일차" % (d - 5)
+			cfg.title = "무한 근무 %d일차" % n
+	# 좁은 구역엔 사람도 적게
+	cfg.pedestrians = [7 + d, 12, 12 + d * 2][cfg.zone]
+	cfg.max_smokers = [2 + d, 4, 2 + d][cfg.zone]
 	return cfg
+
+
+func zone_index(d: int) -> int:
+	if d <= 2:
+		return 0
+	if d == 3:
+		return 1
+	return 2
 
 
 func weapon_stat(id: String, key: String) -> float:

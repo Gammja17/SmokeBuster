@@ -15,6 +15,7 @@ const BUILDINGS := [
 	"building-h", "building-i", "building-j", "building-k", "building-l", "building-m", "building-n",
 ]
 const TALL := ["building-skyscraper-a", "building-skyscraper-b", "building-skyscraper-c", "building-skyscraper-e"]
+const GRAFFITI := ["흡연금지", "CCTV 작동중", "쓰레기 버리지 마시오", "XX 참교육", "민지 사랑해", "여기서 담배 피면 벌금"]
 const PARKED := ["sedan", "suv", "taxi", "van", "hatchback-sports", "sedan-sports", "suv-luxury", "delivery", "truck"]
 
 var root: Node3D
@@ -25,6 +26,10 @@ var hydrants: Array[Vector3] = []
 var block_centers: Array[Vector2] = []
 var park_center := Vector2.ZERO
 var ring_lanes: Array = []   # 자동차가 도는 사각 경로 [half, clockwise]
+var shop_slots: Array = []   # 불법업소를 붙일 수 있는 건물 정면 {pos, normal, used}
+var zone := Rect2(-EDGE, -EDGE, EDGE * 2, EDGE * 2)   # 관할 구역 (x, z)
+var allowed_nodes: Array[int] = []
+var _block_turn := {}
 
 var _aabb_cache := {}
 var _tex_hash := {}
@@ -184,30 +189,183 @@ func _block_slab(c: Vector2) -> void:
 # ---------------------------------------------------------------- 건물 블록
 
 func _building_block(c: Vector2, turn: int) -> void:
-	## 북/남 줄에 3채씩, 서쪽 1채, 동쪽은 골목 입구. turn 만큼 90도씩 돌린다.
+	## 네 귀퉁이에 건물, 가운데를 T자 골목이 가른다 (남북으로 관통 + 동쪽 출구).
+	## turn 만큼 90도씩 돌려서 블록마다 골목 방향이 다르다.
 	var block := Node3D.new()
 	block.position = Vector3(c.x, 0.06, c.y)
 	block.rotation_degrees.y = turn * 90.0
 	root.add_child(block)
+	_block_turn[c] = turn
 
-	var slot := 12.0
-	for i in 3:
-		var x := -slot + i * slot
-		_building(block, Vector3(x, 0, -slot), 180.0, slot)   # 북쪽 줄, 정면이 -Z
-		_building(block, Vector3(x, 0, slot), 0.0, slot)      # 남쪽 줄, 정면이 +Z
-	_building(block, Vector3(-slot, 0, 0), -90.0, slot)
+	var slot := 15.0
+	for q in [Vector2(-1, -1), Vector2(1, -1), Vector2(-1, 1), Vector2(1, 1)]:
+		var pos := Vector3(q.x * 10.0, 0, q.y * 10.0)
+		var rot := 180.0 if q.y < 0 else 0.0
+		_building(block, pos, rot, slot)
+		_shop_slot(block, pos, rot, 16.0)
+	_alley(block)
 
-	# 안뜰 바닥과 소품
-	_box_in(block, Vector3(24, 0.05, 12), Vector3(6, 0.02, 0), Color(0.42, 0.4, 0.38), false)
-	_prop_in(block, "roads/dumpster", Vector3(-2.5, 0, -4.6), 0.0, 6.5, true)
-	_prop_in(block, "roads/dumpster", Vector3(1.0, 0, -4.6), 0.0, 6.5, true)
-	_prop_in(block, "cars/box", Vector3(-4.5, 0, 4.2), 20.0, 1.2, true)
-	_prop_in(block, "cars/box", Vector3(-4.0, 0.85, 4.5), -15.0, 1.0, true)
-	_prop_in(block, "roads/construction-light", Vector3(5.5, 0, 5.2), 0.0, 6.0, false)
-	_no_smoking_sign(block, Vector3(17.5, 0, -6.2), 0.0)
 
-	for p in [Vector3(-1.0, 0, -2.5), Vector3(3.0, 0, 1.5), Vector3(-3.5, 0, 1.8), Vector3(9.0, 0, -3.5)]:
+func _alley(block: Node3D) -> void:
+	var brick_colors := [Color(0.55, 0.33, 0.27), Color(0.5, 0.45, 0.4), Color(0.42, 0.38, 0.36), Color(0.6, 0.5, 0.42)]
+	var floor_col := Color(0.28, 0.28, 0.3)
+	# 바닥 (남북 골목 + 동쪽 가지)
+	_box_in(block, Vector3(4.0, 0.05, 36.0), Vector3(0, 0.03, 0), floor_col, false)
+	_box_in(block, Vector3(16.0, 0.05, 4.0), Vector3(10.0, 0.03, 0), floor_col, false)
+	# 배수구 줄
+	_box_in(block, Vector3(0.3, 0.06, 36.0), Vector3(0, 0.04, 0), Color(0.18, 0.18, 0.2), false)
+
+	# 골목 벽: [중심, 크기, 골목 쪽 방향]
+	var walls := [
+		[Vector3(-2.3, 0, 0), Vector3(0.6, 0, 36.0), Vector3.RIGHT],
+		[Vector3(2.3, 0, -10.0), Vector3(0.6, 0, 16.0), Vector3.LEFT],
+		[Vector3(2.3, 0, 10.0), Vector3(0.6, 0, 16.0), Vector3.LEFT],
+		[Vector3(10.15, 0, -2.3), Vector3(15.7, 0, 0.6), Vector3.BACK],
+		[Vector3(10.15, 0, 2.3), Vector3(15.7, 0, 0.6), Vector3.FORWARD],
+	]
+	for w in walls:
+		var h := rng.randf_range(8.0, 13.0)
+		var center: Vector3 = w[0]
+		var size: Vector3 = w[1]
+		var inward: Vector3 = w[2]
+		_box_in(block, Vector3(size.x, h, size.z), center + Vector3(0, h / 2, 0), brick_colors[rng.randi() % brick_colors.size()], true)
+		# 벽 장식: 뒷문, 실외기, 배관, 창문
+		var length: float = max(size.x, size.z)
+		var along := Vector3(0, 0, 1) if size.z > size.x else Vector3(1, 0, 0)
+		var face := center + inward * 0.32
+		var n := int(length / 4.0)
+		for i in n:
+			var t := -length / 2 + 2.0 + i * 4.0 + rng.randf_range(-0.6, 0.6)
+			var p := face + along * t
+			match rng.randi() % 5:
+				0:
+					_box_in(block, _orient(Vector3(1.2, 2.2, 0.12), along), p + Vector3(0, 1.1, 0), Color(0.22, 0.2, 0.2), false)
+					_box_in(block, _orient(Vector3(1.4, 0.15, 0.3), along), p + Vector3(0, 2.3, 0) + inward * 0.1, Color(0.3, 0.3, 0.32), false)
+				1, 2:
+					var y := rng.randf_range(2.6, h - 1.5)
+					_box_in(block, _orient(Vector3(0.9, 0.65, 0.55), along), p + Vector3(0, y, 0) + inward * 0.2, Color(0.82, 0.83, 0.85), false)
+					var fan := _cyl_in(block, 0.22, 0.04, p + Vector3(0, y, 0) + inward * 0.49, Color(0.35, 0.36, 0.38), false)
+					fan.rotation = _face_rot(inward) + Vector3(PI / 2, 0, 0)
+				3:
+					_cyl_in(block, 0.08, h, p + Vector3(0, h / 2, 0) + inward * 0.05, Color(0.4, 0.42, 0.44), false)
+				_:
+					for k in range(1, int(h / 3.2)):
+						_box_in(block, _orient(Vector3(1.0, 1.2, 0.08), along), p + Vector3(0, 1.4 + k * 3.0, 0), Color(0.35, 0.5, 0.65), false)
+		# 낙서
+		if rng.randf() < 0.6:
+			var g := Label3D.new()
+			g.text = GRAFFITI[rng.randi() % GRAFFITI.size()]
+			g.font = load("res://assets/fonts/Pretendard-ExtraBold.otf")
+			g.font_size = 64
+			g.pixel_size = 0.008
+			g.outline_size = 0
+			g.modulate = [Color(0.95, 0.2, 0.3), Color(0.2, 0.8, 0.9), Color(1, 0.85, 0.2), Color(0.95, 0.95, 0.95)][rng.randi() % 4]
+			g.position = face + inward * 0.02 + along * rng.randf_range(-length / 3, length / 3) + Vector3(0, rng.randf_range(1.2, 2.2), 0)
+			g.rotation = _face_rot(inward)
+			g.rotate_object_local(Vector3.FORWARD, deg_to_rad(rng.randf_range(-8, 8)))
+			g.visibility_range_end = 40.0
+			block.add_child(g)
+
+	# 머리 위 전구줄
+	var bulb_mat := StandardMaterial3D.new()
+	bulb_mat.albedo_color = Color(1, 0.85, 0.5)
+	bulb_mat.emission_enabled = true
+	bulb_mat.emission = Color(1, 0.75, 0.4)
+	bulb_mat.emission_energy_multiplier = 2.5
+	for z in [-13.0, -5.0, 6.0, 14.0]:
+		_box_in(block, Vector3(4.4, 0.03, 0.03), Vector3(0, 5.0, z), Color(0.1, 0.1, 0.1), false)
+		for k in 5:
+			var bulb := MeshInstance3D.new()
+			var sm := SphereMesh.new()
+			sm.radius = 0.08
+			sm.height = 0.16
+			sm.radial_segments = 6
+			sm.rings = 3
+			sm.material = bulb_mat
+			bulb.mesh = sm
+			bulb.position = Vector3(-1.6 + k * 0.8, 4.88, z)
+			block.add_child(bulb)
+	var lamp := OmniLight3D.new()
+	lamp.light_color = Color(1, 0.8, 0.55)
+	lamp.light_energy = 1.4
+	lamp.omni_range = 10.0
+	lamp.position = Vector3(0, 4.5, 0)
+	block.add_child(lamp)
+
+	# 바닥 소품: 쓰레기통, 박스, 쓰레기봉투, 물웅덩이
+	_prop_in(block, "roads/dumpster", Vector3(16.0, 0, -1.2), 90.0, 6.5, true)
+	_prop_in(block, "roads/dumpster", Vector3(-1.1, 0, 16.5), 0.0, 6.5, true)
+	_prop_in(block, "cars/box", Vector3(1.3, 0, -15.5), 20.0, 1.1, true)
+	_prop_in(block, "cars/box", Vector3(1.4, 0.78, -15.4), -10.0, 0.9, true)
+	_prop_in(block, "cars/box", Vector3(12.5, 0, 1.3), 35.0, 1.0, true)
+	for p in [Vector3(-1.4, 0, -8.0), Vector3(-1.5, 0, -7.4), Vector3(14.0, 0, 1.5), Vector3(1.4, 0, 7.5)]:
+		_cyl_in(block, 0.32, 0.55, p + Vector3(0, 0.27, 0), Color(0.08, 0.08, 0.09), false)
+	for p in [Vector3(0.4, 0, -3.0), Vector3(-0.6, 0, 9.0), Vector3(8.0, 0, 0.3)]:
+		_box_in(block, Vector3(rng.randf_range(1.0, 1.8), 0.01, rng.randf_range(0.8, 1.5)), p + Vector3(0, 0.06, 0), Color(0.2, 0.25, 0.32), false)
+	_no_smoking_sign(block, Vector3(-1.4, 0, -17.6), 0.0)
+
+	# 골목 안 흡연 장소와 불법업소 자리
+	for p in [Vector3(0.9, 0, -11.5), Vector3(-0.9, 0, 5.5), Vector3(1.0, 0, 12.5), Vector3(0.6, 0, -0.8), Vector3(12.0, 0, -0.9), Vector3(6.5, 0, 0.9)]:
 		spots.append({"pos": _local_to_world(block, p), "kind": "alley", "busy": false})
+	var basis := Basis.from_euler(block.rotation)
+	shop_slots.append({"pos": _local_to_world(block, Vector3(-2.0, 0, -9.0)), "normal": basis * Vector3.RIGHT, "used": false})
+	shop_slots.append({"pos": _local_to_world(block, Vector3(10.0, 0, 2.0)), "normal": basis * Vector3.FORWARD, "used": false})
+
+
+func _orient(size: Vector3, along: Vector3) -> Vector3:
+	## size 는 (벽을 따라, 높이, 두께) 기준 -> 벽 방향에 맞춰 x/z 를 바꾼다
+	return size if along.x > 0.5 else Vector3(size.z, size.y, size.x)
+
+
+func _face_rot(inward: Vector3) -> Vector3:
+	## +Z 가 inward 를 보도록 하는 회전
+	return Vector3(0, atan2(inward.x, inward.z), 0)
+
+
+func _shop_slot(block: Node3D, pos: Vector3, rot: float, slot: float) -> void:
+	var facing := Basis(Vector3.UP, deg_to_rad(rot)) * Vector3(0, 0, 1)
+	var world_normal := Basis.from_euler(block.rotation) * facing
+	shop_slots.append({"pos": _local_to_world(block, pos + facing * (slot / 2)), "normal": world_normal, "used": false})
+
+
+func is_on_road(p: Vector3) -> bool:
+	for c in [-PITCH, 0.0, PITCH]:
+		if abs(p.x - c) < ROAD_W / 2 - 0.3 or abs(p.z - c) < ROAD_W / 2 - 0.3:
+			return true
+	return false
+
+
+func random_sidewalk_point() -> Vector3:
+	## 블록 둘레 인도 위 아무 데나 (관할 구역 안)
+	for tries in 12:
+		var p := _sidewalk_point()
+		if in_zone(p):
+			return p
+	return nav_nodes[allowed_nodes.pick_random()]
+
+
+func _sidewalk_point() -> Vector3:
+	var c: Vector2 = block_centers.pick_random()
+	var side := randi() % 4
+	var along := randf_range(-17.0, 17.0)
+	var out := randf_range(18.8, 21.4)
+	var local := Vector3(along, 0, out)
+	var p := Basis(Vector3.UP, side * PI / 2) * local
+	return Vector3(c.x + p.x, 0.1, c.y + p.z)
+
+
+func random_crossing() -> Array:
+	## 가운데 도로를 블록 중간에서 가로지르는 [시작, 끝]
+	var along := randf_range(12.0, 42.0) * (1 if randf() < 0.5 else -1)
+	var a: Vector3
+	var b: Vector3
+	if randf() < 0.5:
+		a = Vector3(-6.5, 0.1, along)
+		b = Vector3(6.5, 0.1, along)
+	else:
+		a = Vector3(along, 0.1, -6.5)
+		b = Vector3(along, 0.1, 6.5)
+	return [a, b] if randf() < 0.5 else [b, a]
 
 
 func _building(parent: Node3D, pos: Vector3, rot: float, slot: float) -> void:
@@ -441,26 +599,146 @@ func _parked_cars() -> void:
 # ---------------------------------------------------------------- 보행자 길
 
 func _nav_graph() -> void:
-	## 블록마다 인도 모서리 4개. 블록 둘레 + 이웃 블록으로 건너는 횡단보도.
-	var corner_index := {}
+	## 블록마다 인도 둘레 + (건물 블록이면) 골목 입구 3곳과 골목 한가운데.
+	## 이웃 블록 모서리끼리는 횡단보도로 잇는다.
+	var corners: Array[int] = []
+	var w := WALK
 	for c in block_centers:
-		for q in [Vector2(-1, -1), Vector2(1, -1), Vector2(1, 1), Vector2(-1, 1)]:
-			var p := Vector3(c.x + q.x * WALK, 0.12, c.y + q.y * WALK)
-			corner_index[_key(p)] = nav_nodes.size()
-			nav_nodes.append(p)
-			nav_edges[nav_nodes.size() - 1] = []
-	for bi in block_centers.size():
-		for k in 4:
-			_link(bi * 4 + k, bi * 4 + (k + 1) % 4)
+		var has_alley := _block_turn.has(c)
+		var turn: int = _block_turn.get(c, 0)
+		var b := Basis(Vector3.UP, turn * PI / 2)
+		var ring := [Vector3(-w, 0, -w), Vector3(0, 0, -w), Vector3(w, 0, -w), Vector3(w, 0, 0), Vector3(w, 0, w), Vector3(0, 0, w), Vector3(-w, 0, w)]
+		if not has_alley:
+			ring = [Vector3(-w, 0, -w), Vector3(w, 0, -w), Vector3(w, 0, w), Vector3(-w, 0, w)]
+		var ids := []
+		for lp in ring:
+			var p: Vector3 = b * lp
+			ids.append(_add_node(Vector3(c.x + p.x, 0.12, c.y + p.z)))
+			if abs(abs(lp.x) - w) < 0.1 and abs(abs(lp.z) - w) < 0.1:
+				corners.append(ids[-1])
+		for k in ids.size():
+			_link(ids[k], ids[(k + 1) % ids.size()])
+		if has_alley:
+			var center := _add_node(Vector3(c.x, 0.12, c.y))
+			_link(center, ids[1])   # 북쪽 입구
+			_link(center, ids[3])   # 동쪽 입구
+			_link(center, ids[5])   # 남쪽 입구
 	# 횡단보도: 가운데 도로를 사이에 둔 모서리끼리
-	for i in nav_nodes.size():
-		for j in range(i + 1, nav_nodes.size()):
+	for i in corners:
+		for j in corners:
+			if j <= i:
+				continue
 			var a := nav_nodes[i]
-			var b := nav_nodes[j]
-			var dx: float = abs(a.x - b.x)
-			var dz: float = abs(a.z - b.z)
+			var bb := nav_nodes[j]
+			var dx: float = abs(a.x - bb.x)
+			var dz: float = abs(a.z - bb.z)
 			if (dx < 0.1 and abs(dz - 14.0) < 0.5) or (dz < 0.1 and abs(dx - 14.0) < 0.5):
 				_link(i, j)
+	for i in nav_nodes.size():
+		allowed_nodes.append(i)
+
+
+func _add_node(p: Vector3) -> int:
+	nav_nodes.append(p)
+	nav_edges[nav_nodes.size() - 1] = []
+	return nav_nodes.size() - 1
+
+
+# ---------------------------------------------------------------- 관할 구역
+
+func in_zone(p: Vector3) -> bool:
+	return zone.has_point(Vector2(p.x, p.z))
+
+
+func apply_zone(rect: Rect2) -> void:
+	## 관할 구역 밖은 못 가게 막고, 사람/사건이 구역 안에서만 생기게 거른다.
+	zone = rect
+	allowed_nodes.clear()
+	for i in nav_nodes.size():
+		if in_zone(nav_nodes[i]):
+			allowed_nodes.append(i)
+	for i in nav_edges:
+		nav_edges[i] = nav_edges[i].filter(func(j): return in_zone(nav_nodes[j]) and in_zone(nav_nodes[i]))
+	spots = spots.filter(func(sp): return in_zone(sp.pos))
+	hydrants = hydrants.filter(func(h): return in_zone(h))
+	shop_slots = shop_slots.filter(func(sl): return in_zone(sl.pos))
+	_zone_barriers()
+
+
+func _zone_barriers() -> void:
+	## 구역 경계에 경찰 바리케이드 + 보이지 않는 벽
+	var edges := []   # [시작, 끝, 안쪽 방향]
+	var x0 := zone.position.x
+	var z0 := zone.position.y
+	var x1 := zone.end.x
+	var z1 := zone.end.y
+	if x1 < EDGE:
+		edges.append([Vector3(x1, 0, z0), Vector3(x1, 0, z1), Vector3.LEFT])
+	if z1 < EDGE:
+		edges.append([Vector3(x0, 0, z1), Vector3(x1, 0, z1), Vector3.FORWARD])
+	if x0 > -EDGE:
+		edges.append([Vector3(x0, 0, z0), Vector3(x0, 0, z1), Vector3.RIGHT])
+	if z0 > -EDGE:
+		edges.append([Vector3(x0, 0, z0), Vector3(x1, 0, z0), Vector3.BACK])
+	if edges.is_empty():
+		return
+
+	var st := SurfaceTool.new()
+	st.begin(Mesh.PRIMITIVE_TRIANGLES)
+	for e in edges:
+		var a: Vector3 = e[0]
+		var b: Vector3 = e[1]
+		var inward: Vector3 = e[2]
+		var dir := (b - a).normalized()
+		var length := a.distance_to(b)
+		var wall := StaticBody3D.new()
+		wall.position = (a + b) / 2 + Vector3(0, 5, 0) - inward * 0.3
+		var shape := CollisionShape3D.new()
+		var bs := BoxShape3D.new()
+		bs.size = Vector3(length if abs(dir.x) > 0.5 else 0.4, 10, length if abs(dir.z) > 0.5 else 0.4)
+		shape.shape = bs
+		wall.add_child(shape)
+		root.add_child(wall)
+		var n := int(length / 2.6)
+		for i in n:
+			var p := a + dir * (1.3 + i * 2.6) - inward * 0.3
+			_barricade(st, p, dir)
+		# 안내판
+		for i in range(1, int(length / 18.0) + 1):
+			var sp := a + dir * (i * 18.0 - 9.0) + inward * 0.1
+			var l := Label3D.new()
+			l.text = "관할 구역 밖\n승진하면 넓어져요"
+			l.font = load("res://assets/fonts/Pretendard-ExtraBold.otf")
+			l.font_size = 48
+			l.pixel_size = 0.008
+			l.outline_size = 10
+			l.modulate = Color(1, 0.85, 0.2)
+			l.position = sp + Vector3(0, 2.0, 0)
+			l.rotation = _face_rot(inward)
+			root.add_child(l)
+	var mi := MeshInstance3D.new()
+	mi.mesh = st.commit()
+	mi.material_override = _plain_mat()
+	root.add_child(mi)
+
+
+func _barricade(st: SurfaceTool, p: Vector3, dir: Vector3) -> void:
+	## 노랑/검정 줄무늬 바리케이드 하나를 정점 색으로 그려 넣는다
+	var side := dir.cross(Vector3.UP)
+	var xf := Transform3D(Basis(dir, Vector3.UP, side), p)
+	var parts := [
+		[Vector3(0, 0.9, 0), Vector3(2.4, 0.35, 0.1), Color(1, 0.8, 0.1)],
+		[Vector3(-0.6, 0.9, 0.06), Vector3(0.35, 0.36, 0.02), Color(0.1, 0.1, 0.1)],
+		[Vector3(0.3, 0.9, 0.06), Vector3(0.35, 0.36, 0.02), Color(0.1, 0.1, 0.1)],
+		[Vector3(-0.6, 0.9, -0.06), Vector3(0.35, 0.36, 0.02), Color(0.1, 0.1, 0.1)],
+		[Vector3(0.3, 0.9, -0.06), Vector3(0.35, 0.36, 0.02), Color(0.1, 0.1, 0.1)],
+		[Vector3(-1.0, 0.45, 0), Vector3(0.1, 0.9, 0.5), Color(0.85, 0.85, 0.85)],
+		[Vector3(1.0, 0.45, 0), Vector3(0.1, 0.9, 0.5), Color(0.85, 0.85, 0.85)],
+	]
+	for part in parts:
+		var bm := BoxMesh.new()
+		bm.size = part[1]
+		_append_colored(st, bm, 0, xf * Transform3D(Basis(), part[0]), part[2])
 
 
 func _link(a: int, b: int) -> void:

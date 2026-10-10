@@ -2,7 +2,6 @@ extends Control
 ## 근무 사이 상점. 무기 구매, 강화, 소방차 호출권.
 
 const ITEM := preload("res://ui/shop_item.tscn")
-const ENEMY_NAMES := {"normal": "일반", "runner": "도망자", "angry": "다혈질", "group": "흡연 모임"}
 
 @onready var _money: Label = $M/V/Header/Money
 @onready var _brief: Label = $M/V/Brief
@@ -20,12 +19,12 @@ func _ready() -> void:
 		Sfx.play("click")
 		get_tree().change_scene_to_file("res://scenes/title.tscn"))
 	var cfg := Game.day_config(Game.day)
-	var enemies := []
-	for k in cfg.weights:
-		enemies.append(ENEMY_NAMES[k])
+	var tasks := []
+	for id in cfg.tasks:
+		tasks.append("%s %d" % [Game.TASKS[id].short, cfg.tasks[id]])
 	if cfg.boss:
-		enemies.append("골초왕(보스)")
-	_brief.text = "다음 근무: %d일차 「%s」 · 목표 %d명 · 등장: %s" % [Game.day, cfg.title, cfg.quota, ", ".join(enemies)]
+		tasks.append("골초왕(보스)")
+	_brief.text = "다음 근무: %d일차 「%s」 · %s\n업무: %s" % [Game.day, cfg.title, Game.ZONES[cfg.zone].name, " · ".join(tasks)]
 	_refresh()
 
 

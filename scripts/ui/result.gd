@@ -19,7 +19,7 @@ func show_result() -> void:
 	$Panel/V/Title.text = "근무 완료!" if ok else r.get("fail_reason", "근무 실패...")
 	$Panel/V/Title.modulate = Color.WHITE if ok else Color(1, 0.5, 0.45)
 	$Panel/V/Sub.text = r.day_text
-	var lines := "단속 %d / %d\n민원 %d건\n최고 콤보 x%.1f\n번 돈 %d원" % [r.caught, r.quota, r.complaints, r.best_combo, r.earned]
+	var lines := "%s\n해결한 일 %d건 · 민원 %d건\n최고 콤보 x%.1f\n번 돈 %d원" % [r.tasks_text, r.resolved, r.complaints, r.best_combo, r.earned]
 	if not ok:
 		lines += "\n(실패해서 절반만 받았어요)"
 	$Panel/V/Stats.text = lines

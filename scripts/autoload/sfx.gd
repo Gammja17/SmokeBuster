@@ -24,6 +24,8 @@ const SOUNDS := {
 	"bong": ["res://assets/sfx/bong_001.ogg"],
 	"refill": ["res://assets/sfx/drop_002.ogg"],
 	"fanfare": ["res://assets/sfx/maximize_006.ogg"],
+	"shutter": ["res://assets/sfx/shutter.wav"],
+	"spark": ["res://assets/sfx/spark.wav"],
 }
 const LOOPS := {
 	"stream": "res://assets/sfx/stream_loop.wav",
@@ -31,6 +33,9 @@ const LOOPS := {
 	"siren": "res://assets/sfx/siren_loop.wav",
 	"city": "res://assets/sfx/city_loop.wav",
 	"bgm": "res://assets/music/bgm.wav",
+	"club": "res://assets/music/club.wav",
+	"karaoke": "res://assets/music/karaoke.wav",
+	"lounge": "res://assets/music/lounge.wav",
 }
 
 var _cache := {}

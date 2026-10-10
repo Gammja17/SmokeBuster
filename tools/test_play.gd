@@ -20,149 +20,191 @@ func _initialize() -> void:
 	_run.call_deferred()
 
 
+func _face(player, target: Vector3) -> void:
+	# 몸은 수평으로, 카메라는 위아래로 대상을 본다
+	var flat := Vector3(target.x, player.global_position.y, target.z)
+	player.look_at(flat, Vector3.UP)
+	player.camera.look_at(target, Vector3.UP)
+
+
+func _place_front(player, n, dist: float) -> void:
+	var fwd: Vector3 = -player.global_basis.z
+	fwd.y = 0
+	n.position = player.global_position + fwd.normalized() * dist
+
+
 func _run() -> void:
 	var game = root.get_node("Game")
 	game.new_game()
+	game.day = 4
 	game.owned = ["spray", "pistol", "bucket", "soaker", "hose"]
 	game.has_truck = true
 	change_scene_to_file("res://scenes/world.tscn")
 	await frames(5)
 	world = current_scene
-	check(world != null and world.name == "World", "월드 씬 로드")
-	check(world.city.nav_nodes.size() == 16, "보행자 길 노드 16개 (%d)" % world.city.nav_nodes.size())
+	check(world != null and world.name == "World", "월드 씬 로드 (4일차)")
+	check(world.city.nav_nodes.size() == 3 * 8 + 4, "길 노드: 건물 블록 8개씩 + 공원 4개 (%d)" % world.city.nav_nodes.size())
 	check(world.city.spots.size() > 20, "흡연 장소 %d곳" % world.city.spots.size())
-	check(world.city.hydrants.size() >= 8, "소화전 %d개" % world.city.hydrants.size())
-	check(world.npcs.get_child_count() >= 12, "NPC 스폰 %d명" % world.npcs.get_child_count())
+	check(world.city.shop_slots.size() >= 6, "불법업소 자리 %d곳" % world.city.shop_slots.size())
+	check(world.progress.size() == world.cfg.tasks.size(), "업무 목록 %d종" % world.progress.size())
 
 	world._start_shift()
 	world.cfg.pedestrians = 0
 	world.cfg.max_smokers = 0
+	world.cfg.spawns = []
 	for n in world.npcs.get_children():
 		n.queue_free()
 	await frames(10)
 	check(world.playing, "근무 시작")
-
 	var player = world.player
-	# 플레이어 앞 3m에 흡연자를 세운다
-	var fwd: Vector3 = -player.camera.global_basis.z
-	fwd.y = 0
-	fwd = fwd.normalized()
+	player.global_position = Vector3(-7, 0.2, -7)
+	player.rotation.y = deg_to_rad(-135)
+	await frames(3)
+
+	# ---- 성인 흡연자: 물
 	var s = world._new_npc("normal")
-	s.position = player.global_position + fwd * 3.0
+	_place_front(player, s, 3.0)
 	world.npcs.add_child(s)
 	await frames(5)
-	check(s.is_smoking(), "흡연자 흡연 상태")
-
-	# 분무기 조준해서 펌프
+	check(s.is_smoking() and s._label == null, "흡연자는 글씨 없이 연기만")
 	player.equip("spray")
-	player.camera.look_at(s.global_position + Vector3.UP * 1.3)
-	var money_before: int = world.earned
-	for i in 12:
+	_face(player, s.global_position + Vector3.UP * 1.3)
+	for i in 14:
 		player._fire_cd = 0
 		player._try_single_fire()
 		await frames(10)
-		if not is_instance_valid(s) or s.state == 4:
+		if s.done:
 			break
-	check(world.caught == 1, "분무기로 흡연자 단속 (caught=%d, wet=%.2f)" % [world.caught, s.wet if is_instance_valid(s) else -1.0])
-	check(world.earned > money_before, "보상 지급 %d원" % world.earned)
+	check(world.progress.get("smoke", 0) == 1, "분무기로 흡연자 단속")
 
-	# 행인에게 뿌리면 민원
-	var ped = world._new_npc("ped")
-	ped.position = player.global_position + fwd * 3.0
-	world.npcs.add_child(ped)
-	ped.start_walking(world.city.nearest_nav(ped.position))
-	ped.set_physics_process(false)
-	await frames(3)
-	player.camera.look_at(ped.global_position + Vector3.UP * 1.3)
+	# ---- 미성년 흡연자: 물 뿌리면 민원, 사진은 신고
+	var teen = world._new_npc("teen_smoker")
+	_place_front(player, teen, 4.0)
+	world.npcs.add_child(teen)
+	await frames(5)
+	_face(player, teen.incident_pos())
 	for i in 3:
 		player._fire_cd = 0
 		player._try_single_fire()
 		await frames(12)
-	check(world.complaints >= 1, "행인 맞추면 민원 (%d)" % world.complaints)
-	ped.queue_free()
-
-	# 양동이로 3명 무리 한 번에
-	player.equip("bucket")
-	var group := []
-	for i in 3:
-		var g = world._new_npc("normal")
-		g.position = player.global_position + fwd * 6.0 + fwd.cross(Vector3.UP) * (i - 1) * 0.8
-		world.npcs.add_child(g)
-		group.append(g)
-	await frames(3)
-	var caught_before: int = world.caught
-	player.camera.look_at(group[1].global_position + Vector3.UP * 0.3)
-	player._fire_cd = 0
-	player._try_single_fire()
-	await frames(90)
-	check(world.caught - caught_before >= 2, "양동이로 무리 단속 (+%d) wet=%s" % [world.caught - caught_before, str(group.map(func(g): return g.wet if is_instance_valid(g) else -1.0))])
-
-	# 물총 스트림: 다혈질은 달려와서 발차기
-	player.equip("pistol")
-	var angry = world._new_npc("angry")
-	angry.position = player.global_position + fwd * 8.0
-	world.npcs.add_child(angry)
-	await frames(3)
-	angry.soak(0.1, -fwd, 0.0)
-	check(angry.state == 3, "다혈질이 맞으면 돌진 상태")
-	var mental_before: int = player.mental
-	for i in 15:
-		await frames(10)
-		if i % 5 == 0:
-			print("  angry dist=%.1f state=%d wall=%s" % [angry.global_position.distance_to(player.global_position), angry.state, angry.is_on_wall()])
-	check(player.mental < mental_before, "다혈질 발차기로 멘탈 감소 (%d -> %d)" % [mental_before, player.mental])
-
-	# 도망자: 가까이 가면 도망
-	var runner = world._new_npc("runner")
-	runner.position = player.global_position + fwd * 5.0
-	world.npcs.add_child(runner)
+	check(world.complaints >= 1, "미성년자에게 물 뿌리면 민원 (%d)" % world.complaints)
+	player.set_camera_mode(true)
+	await frames(30)
+	_face(player, teen.incident_pos())
+	await frames(2)
+	var targets: Array = player.photo_targets()
+	check(teen in targets, "카메라 프레임 안에 미성년 흡연자 포착 (%d)" % targets.size())
+	player._photo_cd = 0
+	player.snap_photo()
 	await frames(10)
-	check(runner.state == 2, "도망자가 도망침")
+	check(teen.done, "사진 찍으면 학교 신고 처리")
+	player.set_camera_mode(false)
 
-	# 소방차
-	world.truck_charge = 1.0
-	world._call_truck()
-	await frames(5)
-	var trucks := 0
+	# ---- 학폭: 사진 한 장으로 한 건
+	world._group_seq += 1
+	var center: Vector3 = player.global_position - player.global_basis.z * 7.0
+	center.y = 0.1
+	var victim = world._new_npc("victim")
+	victim.position = center
+	victim.group_id = world._group_seq
+	victim.add_to_group("bully_%d" % world._group_seq)
+	world.npcs.add_child(victim)
+	for b in world._spawn_circle("bully", center, 3, 1.1, "bully_%d" % world._group_seq):
+		b.victim = victim
+	await frames(10)
+	player.set_camera_mode(true)
+	_face(player, center + Vector3.UP * 0.8)
+	await frames(2)
+	player._photo_cd = 0
+	player.snap_photo()
+	await frames(10)
+	check(world.progress.get("bully", 0) == 1, "학폭 현장 촬영 = 1건 (%d)" % world.progress.get("bully", 0))
+	player.set_camera_mode(false)
+
+	# ---- 쓰레기 줍기
+	var before_trash: int = world.total_resolved
+	world._spawn_trash(player.global_position + Vector3(1.0, 0, 0))
+	await frames(3)
+	player._try_pickup()
+	await frames(3)
+	check(world.total_resolved == before_trash + 1, "E로 쓰레기 줍기")
+
+	# ---- 불법업소: 물로 합선
+	var shop = null
 	for c in world.get_children():
-		if c.has_method("launch"):
-			trucks += 1
-	check(trucks == 1, "소방차 출동")
+		if c.has_method("_short_out"):
+			shop = c
+	check(shop != null, "불법업소 배치")
+	if shop:
+		var spos: Vector3 = shop.incident_pos()
+		player.global_position = Vector3(spos.x, 0.2, spos.z) + shop.global_basis.z * 3.5
+		await frames(3)
+		player.equip("hose")
+		_face(player, spos)
+		for i in 300:
+			player._fire_drops(game.WEAPONS.hose, 2)
+			await physics_frame
+			if shop.done:
+				break
+		check(shop.done, "간판에 물 뿌려 철거 (남은 전력 %.1f)" % shop.power)
 
-	# 소화전 리필
-	player.ammo["hose"] = 0.0
-	player.global_position = world.city.hydrants[0] + Vector3(1.2, 0.3, 0)
+	# ---- 음주운전: 찍으면 경찰 출동
+	world._spawn_drunk_car()
 	await frames(5)
-	check(player._near_hydrant, "소화전 근처 감지")
+	var drunk = null
+	for c in world.get_children():
+		if c.has_method("_chase") and c.drunk:
+			drunk = c
+	check(drunk != null and drunk.is_active_incident(), "음주운전 차량 등장")
+	if drunk:
+		drunk.on_photographed()
+		await frames(5)
+	var cops := 0
+	for c in world.get_children():
+		if c.has_method("_chase") and c.police:
+			cops += 1
+	check(cops == 1 and world.progress.get("drunk", 0) == 1, "음주운전 신고 + 경찰차 출동")
 
-	# 보스
-	world._spawn_boss()
+	# ---- 무단횡단
+	world._spawn_jaywalker()
 	await frames(5)
-	var boss = null
+	var jw = null
 	for n in world.npcs.get_children():
-		if n.kind == "boss":
-			boss = n
-	check(boss != null and boss.need >= 10.0, "골초왕 스폰")
+		if n.has_method("light_up") and n.kind == "jaywalker":
+			jw = n
+	check(jw != null, "무단횡단자 등장")
+	if jw:
+		for i in 600:
+			await physics_frame
+			if jw.photo_task() != "":
+				break
+		check(jw.photo_task() == "jaywalk", "도로 위에 있을 때만 신고 가능")
+		var before: int = world.total_resolved
+		jw.on_photographed()
+		await frames(3)
+		check(world.total_resolved == before + 1, "무단횡단 신고")
 
-	# 근무 종료 → 결과 화면
-	world.caught = world.cfg.quota
 	world.time_left = 0.01
 	await frames(120)
-	check(not world.playing, "시간 끝나면 근무 종료")
-	check(world.result.visible, "결과 화면 표시")
-	check(game.day == 2, "성공하면 다음 날 (day=%d)" % game.day)
+	check(not world.playing and world.result.visible, "퇴근 → 결과 화면")
 	paused = false
 
-	# 상점
+	# ---- 1일차는 좁은 구역
+	game.day = 1
+	change_scene_to_file("res://scenes/world.tscn")
+	await frames(8)
+	world = current_scene
+	var z: Rect2 = world.city.zone
+	check(z.size.x < 100, "1일차 관할 구역은 좁다 (%s)" % str(z))
+	var outside := 0
+	for n in world.npcs.get_children():
+		if n.has_method("light_up") and not z.grow(2).has_point(Vector2(n.position.x, n.position.z)):
+			outside += 1
+	check(outside == 0, "사람은 구역 안에만 생긴다 (밖 %d명)" % outside)
+
 	change_scene_to_file("res://scenes/shop.tscn")
 	await frames(5)
 	check(current_scene.name == "Shop", "상점 씬")
-	var money0: int = game.money
-	game.money = 5000
-	game.upgrades.tank = 0
-	current_scene._buy_upgrade("tank")
-	check(game.upgrades.tank == 1 and game.money == 4800, "강화 구매")
-
 	change_scene_to_file("res://scenes/title.tscn")
 	await frames(30)
 	check(current_scene.name == "Title", "타이틀 씬")

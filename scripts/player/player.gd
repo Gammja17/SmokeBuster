@@ -1,11 +1,15 @@
 class_name Player
 extends CharacterBody3D
-## 1인칭 단속반원. WASD/Shift/Space, 좌클릭 발사, 1~5/휠 무기 교체, E 소화전에서 물 채우기, F 소방차.
+## 1인칭 단속반원. WASD/Shift/Space, 좌클릭 발사, 1~5/휠 무기 교체, E 줍기/소화전, F 소방차.
+## 우클릭을 누르고 있으면 카메라 모드: 좌클릭으로 촬영해서 신고한다.
 
 signal ammo_changed(id: String, current: float, maximum: float)
 signal weapon_changed(id: String)
 signal mental_changed(current: int, maximum: int)
-signal hydrant_nearby(near: bool)
+signal prompt_changed(text: String)
+signal camera_mode_changed(on: bool)
+signal photo_taken(targets: Array)
+signal trash_picked(trash: Node3D)
 signal hurt(amount: int)
 signal call_truck
 
@@ -38,6 +42,9 @@ var _shake := 0.0
 var _invuln := 0.0
 var _knock := Vector3.ZERO
 var _near_hydrant := false
+var _prompt := ""
+var camera_mode := false
+var _photo_cd := 0.0
 var _refilling := false
 
 
@@ -93,13 +100,20 @@ func _unhandled_input(event: InputEvent) -> void:
 				equip(id)
 		elif k == KEY_F and Game.has_truck:
 			call_truck.emit()
+		elif k == KEY_E:
+			_try_pickup()
+	elif event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_RIGHT:
+		set_camera_mode(event.pressed and Input.mouse_mode == Input.MOUSE_MODE_CAPTURED)
 	elif event is InputEventMouseButton and event.pressed:
 		if event.button_index == MOUSE_BUTTON_WHEEL_UP:
 			_cycle(-1)
 		elif event.button_index == MOUSE_BUTTON_WHEEL_DOWN:
 			_cycle(1)
 		elif event.button_index == MOUSE_BUTTON_LEFT and Input.mouse_mode == Input.MOUSE_MODE_CAPTURED:
-			_try_single_fire()
+			if camera_mode:
+				snap_photo()
+			else:
+				_try_single_fire()
 
 
 func _cycle(dir: int) -> void:
@@ -130,6 +144,7 @@ func equip(id: String) -> void:
 
 func _physics_process(delta: float) -> void:
 	_fire_cd -= delta
+	_photo_cd -= delta
 	_invuln -= delta
 
 	if not is_on_floor():
@@ -144,7 +159,9 @@ func _physics_process(delta: float) -> void:
 		if Input.is_key_pressed(KEY_A): input.x -= 1
 		if Input.is_key_pressed(KEY_D): input.x += 1
 		sprint = Input.is_key_pressed(KEY_SHIFT) and input.y < 0
-	var speed := WALK_SPEED * Game.move_speed_mult() * (SPRINT_MULT if sprint else 1.0) * (0.55 if slowed else 1.0)
+	if camera_mode:
+		sprint = false
+	var speed := WALK_SPEED * Game.move_speed_mult() * (SPRINT_MULT if sprint else 1.0) * (0.55 if slowed else 1.0) * (0.6 if camera_mode else 1.0)
 	var dir := (transform.basis * Vector3(input.x, 0, input.y)).normalized()
 	var accel := 14.0 if is_on_floor() else 4.0
 	velocity.x = move_toward(velocity.x, dir.x * speed, accel * speed * delta)
@@ -159,9 +176,11 @@ func _physics_process(delta: float) -> void:
 		if _step_dist > (2.6 if sprint else 2.0):
 			_step_dist = 0.0
 			Sfx.play("step", -14.0)
-	camera.fov = lerp(camera.fov, 86.0 if sprint and hspeed > 4 else 78.0, 6.0 * delta)
+	var fov_target := 42.0 if camera_mode else (86.0 if sprint and hspeed > 4 else 78.0)
+	camera.fov = lerp(camera.fov, fov_target, 10.0 * delta)
 
 	_update_hydrant(delta)
+	_update_prompt()
 	_update_fire(delta)
 	_update_view(delta, hspeed)
 
@@ -182,11 +201,11 @@ func _update_view(delta: float, hspeed: float) -> void:
 
 func _wants_fire() -> bool:
 	return input_enabled and Input.mouse_mode == Input.MOUSE_MODE_CAPTURED \
-		and Input.is_mouse_button_pressed(MOUSE_BUTTON_LEFT) and not _refilling
+		and Input.is_mouse_button_pressed(MOUSE_BUTTON_LEFT) and not _refilling and not camera_mode
 
 
 func _try_single_fire() -> void:
-	if not input_enabled or _refilling or _fire_cd > 0.0:
+	if not input_enabled or _refilling or _fire_cd > 0.0 or camera_mode:
 		return
 	var w: Dictionary = Game.WEAPONS[current]
 	if w.mode == "stream":
@@ -300,9 +319,7 @@ func _update_hydrant(delta: float) -> void:
 		if Vector2(h.x - global_position.x, h.z - global_position.z).length() < 2.6:
 			near = true
 			break
-	if near != _near_hydrant:
-		_near_hydrant = near
-		hydrant_nearby.emit(near)
+	_near_hydrant = near
 	_refilling = near and input_enabled and Input.is_key_pressed(KEY_E)
 	if _refilling:
 		var any := false
@@ -316,6 +333,82 @@ func _update_hydrant(delta: float) -> void:
 				Sfx.play("refill", -10.0, randf_range(0.9, 1.3))
 				water.mist_at(global_position + Vector3.UP * 0.8 - global_basis.z * 0.6, Vector3.UP)
 			_emit_ammo()
+
+
+# ---------------------------------------------------------------- 줍기, 안내 문구
+
+func _nearest_trash() -> Node3D:
+	var best: Node3D = null
+	var bd := 2.4
+	for t in get_tree().get_nodes_in_group("trash"):
+		var d := Vector2(t.global_position.x - global_position.x, t.global_position.z - global_position.z).length()
+		if d < bd:
+			bd = d
+			best = t
+	return best
+
+
+func _try_pickup() -> void:
+	var t := _nearest_trash()
+	if t and t.pick():
+		Sfx.play("refill", -4.0, 1.4)
+		_kick = 0.4
+		trash_picked.emit(t)
+
+
+func _update_prompt() -> void:
+	var text := ""
+	if camera_mode:
+		text = ""
+	elif _nearest_trash():
+		text = "E  쓰레기 줍기"
+	elif _near_hydrant:
+		text = "E 꾹  물 채우기"
+	if text != _prompt:
+		_prompt = text
+		prompt_changed.emit(text)
+
+
+# ---------------------------------------------------------------- 카메라
+
+func set_camera_mode(on: bool) -> void:
+	if on == camera_mode:
+		return
+	camera_mode = on
+	_stop_loops()
+	_view.visible = not on
+	Sfx.play("switch", -8.0, 1.3 if on else 1.0)
+	camera_mode_changed.emit(on)
+
+
+func snap_photo() -> void:
+	if _photo_cd > 0.0:
+		return
+	_photo_cd = 0.7
+	Sfx.play("shutter", 0.0)
+	photo_taken.emit(photo_targets())
+
+
+## 지금 화면 가운데(70%) 안에, 가려지지 않고 보이는 신고 대상들
+func photo_targets() -> Array:
+	var results := []
+	var vp := get_viewport().get_visible_rect().size
+	var rect := Rect2(vp * 0.15, vp * 0.7)
+	var space := get_world_3d().direct_space_state
+	for n in get_tree().get_nodes_in_group("incident"):
+		if not n.has_method("photo_task") or n.photo_task() == "":
+			continue
+		var p: Vector3 = n.incident_pos()
+		if camera.global_position.distance_to(p) > 45.0 or camera.is_position_behind(p):
+			continue
+		if not rect.has_point(camera.unproject_position(p)):
+			continue
+		var q := PhysicsRayQueryParameters3D.create(camera.global_position, p, 1, [get_rid()])
+		var hit := space.intersect_ray(q)
+		if not hit.is_empty() and hit.collider != n:
+			continue
+		results.append(n)
+	return results
 
 
 func refill_all() -> void:

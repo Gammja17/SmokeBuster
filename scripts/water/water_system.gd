@@ -148,7 +148,7 @@ func _on_hit(i: int, hit: Dictionary) -> void:
 	if _radius[i] > 0.0:
 		_area_splash(point, _radius[i], _soak[i], _knock[i])
 		return
-	if collider and collider.is_in_group("npc"):
+	if collider and collider.is_in_group("soakable"):
 		collider.soak(_soak[i], v.normalized(), _knock[i])
 		npc_hit.emit(collider, _soak[i])
 		_burst(point, -v.normalized() * 0.5 + Vector3.UP, 4, 2.5)
@@ -165,8 +165,11 @@ func _area_splash(point: Vector3, radius: float, soak: float, knock: float) -> v
 		_mist.emit(point + Vector3(randf_range(-1, 1), randf_range(0, 1), randf_range(-1, 1)) * radius * 0.5,
 			Vector3(randf_range(-1, 1), randf_range(0.5, 2), randf_range(-1, 1)), randf_range(1.0, 2.0))
 	_puddle(Vector3(point.x, 0.13, point.z), radius * 1.4)
-	for n in get_tree().get_nodes_in_group("npc"):
-		var d: float = (n.global_position + Vector3.UP).distance_to(point)
+	for n in get_tree().get_nodes_in_group("soakable"):
+		var center: Vector3 = n.incident_pos() if n.has_method("incident_pos") else n.global_position + Vector3.UP
+		if n is Npc:
+			center = n.global_position + Vector3.UP
+		var d: float = center.distance_to(point)
 		if d <= radius:
 			var dir: Vector3 = n.global_position - point
 			dir.y = 0
