@@ -303,7 +303,7 @@ func _new_npc(kind: String) -> Npc:
 	n.setup(kind, city, player)
 	n.resolved.connect(_on_npc_resolved)
 	n.annoyed.connect(_on_annoyed)
-	n.dropped_trash.connect(_spawn_trash)
+	n.dropped_trash.connect(func(pos): if get_tree().get_nodes_in_group("trash").size() < 25: _spawn_trash(pos))
 	n.hurt_player.connect(func(npc, amount): player.take_hit(amount, npc.global_position))
 	return n
 
