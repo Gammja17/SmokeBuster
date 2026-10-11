@@ -1,13 +1,16 @@
 extends SceneTree
 ## VARCO 애니메이션 GLB 들에서 애니메이션만 뽑아 하나의 AnimationLibrary 로 저장한다.
 ## godot --headless --path . -s tools/build_anims.gd
-## 입력: res://assets/people/anims/<이름>.glb   출력: res://assets/people/anim_lib.res
+## 입력: res://assets/people/anims/<이름>.glb   출력: res://assets/people/anim_lib.res (이미 있으면 거기에 더한다)
 
-const LOOPING := ["idle", "walk", "jog", "run", "sprint", "salute", "talk", "drink", "angry", "wave", "breathe"]
+const LOOPING := ["idle", "walk", "jog", "run", "sprint", "salute", "talk", "drink", "angry", "wave", "breathe",
+		"soaked", "walk_f", "walk_old", "run_kid", "look_around", "dance", "fear", "stumble", "explain", "hands_back", "idle2"]
 
 
 func _initialize() -> void:
 	var lib := AnimationLibrary.new()
+	if ResourceLoader.exists("res://assets/people/anim_lib.res"):
+		lib = load("res://assets/people/anim_lib.res").duplicate(true)
 	var dir := DirAccess.open("res://assets/people/anims")
 	for f in dir.get_files():
 		if not f.ends_with(".glb"):
@@ -21,6 +24,8 @@ func _initialize() -> void:
 			continue
 		var anim: Animation = ap.get_animation(ap.get_animation_list()[0]).duplicate(true)
 		anim.loop_mode = Animation.LOOP_LINEAR if name in LOOPING else Animation.LOOP_NONE
+		if lib.has_animation(name):
+			lib.remove_animation(name)
 		lib.add_animation(name, anim)
 		print(name, " len=%.2f tracks=%d" % [anim.length, anim.get_track_count()])
 		scene.free()

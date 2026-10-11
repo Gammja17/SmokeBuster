@@ -26,6 +26,22 @@ func _face(player, target: Vector3) -> void:
 	player.camera.look_at(target, Vector3.UP)
 
 
+func settle() -> void:
+	## 흘려보낸 입력은 다음 물리 틱에 처리되므로 물리 프레임도 기다린다 (한 화면 프레임에 몰릴 수 있어 화면 프레임도)
+	await frames(3)
+	for i in 3:
+		await physics_frame
+	await frames(2)
+
+
+func key_event(key: Key, down: bool) -> void:
+	var e := InputEventKey.new()
+	e.keycode = key
+	e.physical_keycode = key
+	e.pressed = down
+	Input.parse_input_event(e)
+
+
 func press(key: Key) -> void:
 	## 진짜 키 입력처럼 이벤트를 흘려보낸다
 	var e := InputEventKey.new()
@@ -144,10 +160,10 @@ func _run() -> void:
 			shops += 1
 	check(shops >= 1, "승진하면 불법업소가 생긴다 (%d곳)" % shops)
 
-	# ---- 장비실 (Tab)
+	# ---- 장비실 (B)
 	world._open_shop()
 	await process_frame
-	check(world.shop_layer.visible and paused, "Tab 으로 장비실 열면 게임 멈춤")
+	check(world.shop_layer.visible and paused, "B 로 장비실 열면 게임 멈춤")
 	world._close_shop()
 	await process_frame
 	check(not world.shop_layer.visible and not paused, "닫으면 순찰 계속")
@@ -233,7 +249,7 @@ func _run() -> void:
 	player.global_position = car.global_position + Vector3(2.0, 0, 0)
 	await frames(3)
 	press(KEY_F)
-	await frames(5)
+	await settle()
 	check(world.vehicle == car and not player.visible, "F 키로 순찰차 탑승")
 	var target = world._new_npc("normal")
 	target.position = car.global_position - car.global_basis.z * 9.0
@@ -248,13 +264,13 @@ func _run() -> void:
 			break
 	check(target.done, "차로 들이받아 검거")
 	press(KEY_F)
-	await frames(5)
+	await settle()
 	check(world.vehicle == null and player.visible and player.input_enabled, "F 키로 하차")
 	press(KEY_F)
-	await frames(5)
+	await settle()
 	check(world.vehicle == car, "다시 F 키로 탑승")
 	press(KEY_F)
-	await frames(5)
+	await settle()
 	check(world.vehicle == null, "다시 F 키로 하차")
 
 	# ---- 물리 소품이 물에 밀린다
@@ -285,8 +301,25 @@ func _run() -> void:
 	check(world.city.station_node != null, "파출소 건물")
 	for p in world.get_tree().get_nodes_in_group("pickup"):
 		p.queue_free()
-	var cws: Array = world.get_tree().get_nodes_in_group("coworker")
+	var all_cw: Array = world.get_tree().get_nodes_in_group("coworker")
+	var cws: Array = all_cw.filter(func(c): return c.role in ["chief", "ops", "mechanic", "rookie"])
 	check(cws.size() == 4, "파출소 동료 4명")
+	check(all_cw.size() >= 7, "가게 앞 동네 사람들 (%d명)" % (all_cw.size() - 4))
+	var looks := {}
+	for n in world.get_tree().get_nodes_in_group("npc"):
+		looks[n.model_name] = true
+	check(looks.size() >= 5, "행인 생김새가 다양함 (%d종)" % looks.size())
+	# Tab 무기 휠: 누르면 열리고 시간이 느려지고, 마우스를 민 쪽 무기로 바뀐다
+	game.owned = ["spray", "pistol", "bucket", "soaker", "hose"]
+	player.equip("spray")
+	key_event(KEY_TAB, true)
+	await frames(2)
+	var wheel = world.hud.wheel
+	check(wheel.visible and Engine.time_scale < 1.0, "Tab 꾹: 무기 휠 열림 + 슬로모션")
+	wheel.feed(Vector2(0, 300))
+	key_event(KEY_TAB, false)
+	await frames(12)
+	check(not wheel.visible and Engine.time_scale == 1.0 and player.current != "spray", "휠에서 고른 무기로 교체 (%s, vis=%s, ts=%.2f, in=%s)" % [player.current, wheel.visible, Engine.time_scale, player.input_enabled])
 	player.global_position = cws[0].global_position + Vector3(0, 0.3, 1.5)
 	await frames(3)
 	player._try_pickup()

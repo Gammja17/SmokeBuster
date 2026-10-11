@@ -1,27 +1,9 @@
-[gd_scene load_steps=4 format=3]
+[gd_scene format=3]
 
 [ext_resource type="Script" path="res://scripts/ui/title.gd" id="1_title"]
-[ext_resource type="Environment" path="res://scenes/world_env.tres" id="2_env"]
 [ext_resource type="PackedScene" path="res://ui/title_ui.tscn" id="3_ui"]
 
-[node name="Title" type="Node3D"]
+[node name="Title" type="Node"]
 script = ExtResource("1_title")
-
-[node name="Env" type="WorldEnvironment" parent="."]
-environment = ExtResource("2_env")
-
-[node name="Sun" type="DirectionalLight3D" parent="."]
-light_color = Color(1, 0.92, 0.8, 1)
-light_energy = 2.0
-light_angular_distance = 0.8
-light_volumetric_fog_energy = 1.5
-shadow_enabled = true
-directional_shadow_max_distance = 140.0
-directional_shadow_blend_splits = true
-
-[node name="Pivot" type="Node3D" parent="."]
-
-[node name="Camera" type="Camera3D" parent="Pivot"]
-fov = 60.0
 
 [node name="UI" parent="." instance=ExtResource("3_ui")]

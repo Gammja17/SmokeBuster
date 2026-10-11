@@ -17,7 +17,7 @@ const HINTS := [
 	"V로 3인칭 시점! 전력질주하다 문제아에게 부딪히면 태클로 잡아요.",
 	"무전 출동이 오면 파란 빛기둥이 현장이에요. 순찰차로 달려가세요!",
 	"파출소 문 앞에서 E: 휴식(멘탈, 물 회복)과 장비실. 편의점 30원, 병원 100원.",
-	"Tab: 장비실 · 물이 떨어지면 빨간 소화전 옆에서 E를 꾹",
+	"Tab 꾹: 무기 휠 · B: 장비실 · 물이 떨어지면 빨간 소화전 옆에서 E를 꾹",
 ]
 const EVENTS := [
 	["group", "흡연 모임 출몰!", "골목에 여럿이 모여 담배를 피워요"],
@@ -121,6 +121,7 @@ func _ready() -> void:
 	_spawn_vehicles()
 	_spawn_props(22)
 	_spawn_coworkers()
+	_spawn_townsfolk()
 	_decorate_station()
 	hud.radar.range_m = 75.0 if Game.upgrades.cctv > 0 else 45.0
 	# 시작하자마자 근처에 흡연자 둘
@@ -157,7 +158,7 @@ func _unhandled_input(event: InputEvent) -> void:
 	if event is InputEventKey and event.pressed and not event.echo and playing:
 		if event.keycode == KEY_ESCAPE and not pause.visible and not shop_layer.visible:
 			pause.open()
-		elif event.keycode == KEY_TAB and not pause.visible:
+		elif event.keycode == KEY_B and not pause.visible:
 			if shop_layer.visible:
 				_close_shop()
 			else:
@@ -610,7 +611,18 @@ func _spawn_shop() -> void:
 	add_child(shop_node)
 	shop_node.global_position = slot.pos + slot.normal * 0.05
 	shop_node.look_at(shop_node.global_position - slot.normal, Vector3.UP)
+	# 업소 사장이 가게 앞을 지킨다. 철거되면 발을 구르다 사라진다
+	var owner_npc := Coworker.new()
+	owner_npc.role = "s_shady"
+	owner_npc.position = Vector3(1.7, 0.06, 1.3)
+	owner_npc.rotation.y = PI
+	shop_node.add_child(owner_npc)
 	shop_node.resolved.connect(func(s, task):
+		if is_instance_valid(owner_npc):
+			owner_npc.say(["내 가게!!", "이게 무슨 짓이에요!", "아이고 망했다..."].pick_random(), "angry")
+			_later(4.0, func():
+				if is_instance_valid(owner_npc):
+					owner_npc.queue_free())
 		_complete(task, Game.TASKS[task].name, s.incident_pos())
 		hud.banner("불법업소 철거!", "", 1.6)
 		player.shake(0.4))
@@ -1110,6 +1122,28 @@ func _spawn_coworkers() -> void:
 		cw.position = c[1]
 		cw.rotation.y = PI + c[2]
 		add_child(cw)
+
+
+func _spawn_townsfolk() -> void:
+	## 편의점/병원/학교 앞 사람, 그리고 가게 앞 분식집 사장님 둘
+	var who := {"store": "s_clerk", "hospital": "s_doctor", "school": "s_teacher"}
+	for d in city.doors:
+		if d.role in who:
+			_place_town(who[d.role], d.pos + d.normal * 1.3, d.normal, 2.2)
+	var fronts := city.shop_slots.filter(func(sl): return not sl.used and city.in_zone(sl.pos))
+	fronts.shuffle()
+	for sl in fronts.slice(0, 2):
+		sl.used = true   # 불법업소가 같은 자리에 생기지 않게
+		_place_town("s_vendor", sl.pos + sl.normal * 1.4, sl.normal, 0.0)
+
+
+func _place_town(role: String, pos: Vector3, normal: Vector3, side: float) -> void:
+	var t := Coworker.new()
+	t.role = role
+	t.position = pos + normal.cross(Vector3.UP).normalized() * side
+	t.position.y = 0.06
+	t.rotation.y = atan2(-normal.x, -normal.z)
+	add_child(t)
 
 
 func _decorate_station() -> void:

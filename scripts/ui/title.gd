@@ -1,79 +1,117 @@
-extends Node3D
-## 타이틀. 뒤에 동네를 만들어 두고 카메라가 천천히 돈다.
+extends Node
+## 메인 메뉴. VARCO 로 뽑은 밤거리 그림 위에 큰 제목과 메뉴 목록.
+## 고른 줄은 양옆 괄호와 윗줄로 감싼다. ↑↓/W S 로 고르고 Enter, 마우스로 눌러도 된다.
 
-@onready var _pivot: Node3D = $Pivot
-@onready var _camera: Camera3D = $Pivot/Camera
+const BG := "res://assets/ui/menu_bg.png"
+
 @onready var _ui: CanvasLayer = $UI
+@onready var _bg: TextureRect = $UI/BG
+@onready var _menu: VBoxContainer = $UI/Center/MenuBox/Menu
+@onready var _selector: Control = $UI/Center/MenuBox/Selector
+@onready var _howto: PanelContainer = $UI/HowToPanel
 
-var _city := CityBuilder.new()
+var _items: Array[Label] = []
+var _sel := 0
+var _sel_tw: Tween
 
 
 func _ready() -> void:
 	get_tree().paused = false
 	Input.mouse_mode = Input.MOUSE_MODE_VISIBLE
-	$Sun.rotation_degrees = Vector3(-50, -35, 0)
-	_city.build(self, 77)
-	_pivot.position = Vector3(0, 0, 30)
-	_camera.position = Vector3(0, 5.5, 0)
-	_spawn_extras()
-
-	var cont: Button = _ui.get_node("Left/Continue")
-	var fresh: Button = _ui.get_node("Left/New")
-	var save_label: Label = _ui.get_node("Left/Save")
+	if ResourceLoader.exists(BG):
+		_bg.texture = load(BG)
+	var save_label: Label = $UI/Center/Save
+	var cont: Label = _menu.get_node("Continue")
 	if Game.has_save():
-		save_label.text = "이어하기: %s · %d원" % [Game.rank_name(), Game.money]
+		save_label.text = "저장된 순찰: %s · ₩%d" % [Game.rank_name(), Game.money]
 	else:
-		save_label.visible = false
+		save_label.text = " "
 		cont.visible = false
-		fresh.text = "순찰 시작"
-	cont.pressed.connect(_start.bind(false))
-	fresh.pressed.connect(_start.bind(true))
-	for b in [cont, fresh]:
-		b.mouse_entered.connect(Sfx.play.bind("select", -12.0))
-	(cont if cont.visible else fresh).grab_focus()
+	for c in _menu.get_children():
+		if c.visible:
+			_items.append(c)
+	for i in _items.size():
+		_items[i].mouse_entered.connect(_select.bind(i))
+		_items[i].gui_input.connect(_on_item_input.bind(i))
+	_selector.draw.connect(_draw_selector)
+	_select.call_deferred(0, false)
 	Sfx.music(true)
-
-	var logo: Control = _ui.get_node("Left/Logo")
-	logo.pivot_offset = Vector2(0, logo.size.y / 2)
+	# 배경을 아주 천천히 밀고 당긴다
+	_bg.pivot_offset = _bg.size / 2
 	var tw := create_tween().set_loops()
-	tw.tween_property(logo, "rotation", deg_to_rad(-1.5), 1.2).set_trans(Tween.TRANS_SINE)
-	tw.tween_property(logo, "rotation", deg_to_rad(1.5), 1.2).set_trans(Tween.TRANS_SINE)
+	tw.tween_property(_bg, "scale", Vector2.ONE * 1.06, 14.0).set_trans(Tween.TRANS_SINE)
+	tw.tween_property(_bg, "scale", Vector2.ONE, 14.0).set_trans(Tween.TRANS_SINE)
 
 
-func _spawn_extras() -> void:
-	# 배경에 걷는 행인과 담배 피우는 사람
-	var dummy := Node3D.new()
-	dummy.position = Vector3(-27, 0, -27)
-	add_child(dummy)
-	for i in 10:
-		var n := Npc.new()
-		n.setup("ped", _city, dummy)
-		var node := randi() % _city.nav_nodes.size()
-		n.position = _city.nav_nodes[node]
-		add_child(n)
-		n.start_walking(node)
-	for i in 4:
-		var spot: Dictionary = _city.spots[randi() % _city.spots.size()]
-		var s := Npc.new()
-		s.setup("normal", _city, dummy)
-		s.position = spot.pos
-		s.rotation.y = randf() * TAU
-		add_child(s)
+func _select(i: int, sound := true) -> void:
+	if _howto.visible:
+		return
+	if sound and i != _sel:
+		Sfx.play("select", -12.0)
+	_sel = i
+	for j in _items.size():
+		_items[j].add_theme_color_override("font_color", Color.WHITE if j == i else Color(1, 1, 1, 0.62))
+	var target := _items[i].position.y
+	if _sel_tw:
+		_sel_tw.kill()
+	if not sound:
+		_selector.position.y = target
+	else:
+		_sel_tw = create_tween()
+		_sel_tw.tween_property(_selector, "position:y", target, 0.12).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
+	_selector.queue_redraw()
 
 
-var _t := 0.0
+func _draw_selector() -> void:
+	## [: 고른 줄 :]  과 그 위의 가는 선
+	var w := _selector.size.x
+	var h := _selector.size.y
+	var col := Color(1, 1, 1, 0.9)
+	_selector.draw_line(Vector2(14, 1), Vector2(w - 14, 1), Color(1, 1, 1, 0.55), 1.5)
+	for x in [0.0, w - 4.0]:
+		_selector.draw_rect(Rect2(x, 4, 4, h - 8), col)
+		var dx: float = 8.0 if x == 0.0 else -6.0
+		_selector.draw_rect(Rect2(x + dx, 10, 2, 4), col)
+		_selector.draw_rect(Rect2(x + dx, h - 14, 2, 4), col)
 
 
-func _process(delta: float) -> void:
-	# 가운데 도로를 따라 천천히 왕복하며 대각선 앞을 본다
-	_t += delta * 0.05
-	var z := sin(_t) * 40.0
-	_pivot.position = Vector3(1.5, 0, z)
-	_camera.look_at(Vector3(-14, 2.0, z - 22.0 * cos(_t)))
+func _on_item_input(event: InputEvent, i: int) -> void:
+	if event is InputEventMouseButton and event.pressed and event.button_index == MOUSE_BUTTON_LEFT:
+		_select(i, false)
+		_activate()
+
+
+func _unhandled_input(event: InputEvent) -> void:
+	if not (event is InputEventKey and event.pressed and not event.echo):
+		return
+	var k: int = event.keycode
+	if _howto.visible:
+		if k in [KEY_ESCAPE, KEY_ENTER, KEY_KP_ENTER, KEY_SPACE]:
+			_howto.visible = false
+			Sfx.play("click")
+		return
+	if k in [KEY_UP, KEY_W]:
+		_select((_sel - 1 + _items.size()) % _items.size())
+	elif k in [KEY_DOWN, KEY_S]:
+		_select((_sel + 1) % _items.size())
+	elif k in [KEY_ENTER, KEY_KP_ENTER, KEY_SPACE]:
+		_activate()
+
+
+func _activate() -> void:
+	Sfx.play("click")
+	match _items[_sel].name:
+		"Continue":
+			_start(false)
+		"New":
+			_start(true)
+		"HowTo":
+			_howto.visible = true
+		"Quit":
+			get_tree().quit()
 
 
 func _start(fresh: bool) -> void:
-	Sfx.play("click")
 	if fresh:
 		Game.new_game()
 	get_tree().change_scene_to_file("res://scenes/world.tscn")

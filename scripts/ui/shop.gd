@@ -1,5 +1,5 @@
 extends Control
-## 장비실. 순찰 중 Tab 으로 열어 무기 구매, 강화, 소방차 호출권을 산다.
+## 장비실. 순찰 중 B 로 열어 무기 구매, 강화, 소방차 호출권을 산다.
 
 const ITEM := preload("res://ui/shop_item.tscn")
 
@@ -24,10 +24,10 @@ func _ready() -> void:
 
 
 func _input(event: InputEvent) -> void:
-	# Tab/Esc 로 닫기 (Tab 은 GUI 포커스 이동보다 먼저 잡는다)
+	# B/Tab/Esc 로 닫기 (Tab 은 GUI 포커스 이동보다 먼저 잡는다)
 	if not is_visible_in_tree():
 		return
-	if event is InputEventKey and event.pressed and not event.echo and event.keycode in [KEY_TAB, KEY_ESCAPE]:
+	if event is InputEventKey and event.pressed and not event.echo and event.keycode in [KEY_B, KEY_TAB, KEY_ESCAPE]:
 		get_viewport().set_input_as_handled()
 		closed.emit()
 

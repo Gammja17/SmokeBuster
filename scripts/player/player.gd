@@ -98,6 +98,21 @@ func capture_mouse() -> void:
 func _unhandled_input(event: InputEvent) -> void:
 	if not input_enabled:
 		return
+	# Tab 을 누르고 있는 동안 GTA 식 무기 휠
+	var wheel := get_tree().get_first_node_in_group("weapon_wheel")
+	if wheel and event is InputEventKey and event.keycode == KEY_TAB and not event.echo:
+		if event.pressed and not wheel.visible and not camera_mode and not driving:
+			wheel.open()
+		elif not event.pressed and wheel.visible:
+			var id: String = wheel.close()
+			if id != current and id in Game.owned:
+				equip(id)
+		get_viewport().set_input_as_handled()
+		return
+	if wheel and wheel.visible:
+		if event is InputEventMouseMotion:
+			wheel.feed(event.relative)
+		return
 	if event is InputEventMouseMotion and Input.mouse_mode == Input.MOUSE_MODE_CAPTURED:
 		rotate_y(-event.relative.x * MOUSE_SENS)
 		camera.rotate_x(-event.relative.y * MOUSE_SENS)

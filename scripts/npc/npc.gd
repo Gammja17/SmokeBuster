@@ -16,8 +16,30 @@ signal shout(npc: Npc, text: String)
 
 enum State { WALK, SMOKING, FLEE, CHARGE, LEAVING, STAGGER, CROSSING, HANGOUT, DOWN }
 
-## 사람처럼 보이는 모델만 (j=경찰 옷은 플레이어, r=복면은 도둑 전용)
-const MODELS := ["a", "b", "c", "e", "f", "i", "k", "m", "n", "p", "q"]
+## 역할마다 어울리는 VARCO 실사 인물 (assets/people/<이름>.glb)
+const POOLS := {
+	"ped": ["m_office", "f_office", "m_hiker", "f_ajumma", "m_grandpa", "f_grandma", "m_college", "f_college",
+			"m_delivery", "f_trench", "m_worker", "f_mom", "m_gamer", "m_jogger"],
+	"normal": ["m_office", "m_hiker", "m_worker", "m_delivery", "m_gamer", "f_trench", "f_office", "m_college", "m_grandpa"],
+	"runner": ["m_jogger", "m_college", "m_delivery"],
+	"angry": ["m_thug", "m_hiker", "f_ajumma", "m_track"],
+	"boss": ["m_boss"],
+	"litter": ["m_office", "m_gamer", "m_worker", "m_hiker", "f_college"],
+	"jaywalker": ["f_grandma", "m_grandpa", "m_delivery", "f_ajumma", "f_mom"],
+	"teen_smoker": ["t_badboy", "t_badgirl"],
+	"teen_drinker": ["t_badboy", "t_badgirl"],
+	"bully": ["t_badboy", "t_badgirl"],
+	"victim": ["t_nerd", "t_boy", "t_girl"],
+	"thief": ["m_thief"],
+	"fighter": ["m_thug", "m_track", "m_drunk"],
+	"tagger": ["m_tagger"],
+	"pee": ["m_drunk", "m_office"],
+}
+const FEMALE := ["f_office", "f_ajumma", "f_grandma", "f_college", "f_trench", "f_mom", "t_girl", "t_badgirl"]
+const OLD := ["m_grandpa", "f_grandma"]
+## 예전 이름 -> 공용 애니메이션 이름
+const ANIM_MAP := {"emote-no": "wave_off", "emote-yes": "laugh", "attack-melee-right": "punch", "attack-kick-right": "kick",
+	"holding-both": "shield", "die": "fall", "pick-up": "getup", "interact-right": "drink"}
 const ADULT_SMOKERS := ["normal", "runner", "angry", "boss"]
 const MINORS := ["teen_smoker", "teen_drinker", "bully", "victim"]
 const LINES := {
@@ -67,8 +89,13 @@ var walk_speed := 1.6
 var run_speed := 5.2
 var done := false
 
-var _model: Node3D
+var _model: Human
 var _anim: AnimationPlayer
+var model_name := ""
+var _walk_anim := "walk"
+var _cur_anim := ""
+var _busy_t := 0.0
+var _hand: Node3D
 var _overlay: StandardMaterial3D
 var _meshes: Array = []
 var _overlay_on := false
@@ -125,7 +152,6 @@ func _ready() -> void:
 	collision_mask = 1
 	match kind:
 		"boss":
-			_scale = 1.15
 			need = 14.0
 			walk_speed = 1.3
 			run_speed = 2.6
@@ -147,8 +173,24 @@ func _ready() -> void:
 		"pee":
 			need = 0.6
 	if is_minor():
-		_scale = 0.48
 		walk_speed = 1.9
+
+	model_name = (POOLS.get(kind, POOLS.ped) as Array).pick_random()
+	var height := randf_range(1.66, 1.84)
+	if model_name in FEMALE:
+		height = randf_range(1.58, 1.70)
+	if model_name in OLD:
+		height = randf_range(1.55, 1.64)
+		_walk_anim = "walk_old"
+	elif model_name in FEMALE:
+		_walk_anim = "walk_f"
+	elif model_name == "m_drunk":
+		_walk_anim = "stumble"
+	if is_minor():
+		height = randf_range(1.55, 1.68)
+	if kind == "boss":
+		height = 2.2
+	_scale = height / 1.75 * 0.65
 
 	var col := CollisionShape3D.new()
 	var cap := CapsuleShape3D.new()
@@ -158,13 +200,9 @@ func _ready() -> void:
 	col.position.y = cap.height / 2
 	add_child(col)
 
-	_model = load("res://assets/chars/character-%s.glb" % ("r" if kind == "thief" else MODELS.pick_random())).instantiate()
-	_model.scale = Vector3.ONE * _scale
-	_model.rotation.y = PI
+	_model = Human.make(model_name, height)
 	add_child(_model)
-	_anim = _model.find_child("AnimationPlayer", true, false)
-	for a in ["idle", "walk", "sprint"]:
-		_anim.get_animation(a).loop_mode = Animation.LOOP_LINEAR
+	_anim = _model.anim
 	_anim.speed_scale = randf_range(0.9, 1.1)
 
 	_overlay = StandardMaterial3D.new()
@@ -488,6 +526,7 @@ func _physics_process(delta: float) -> void:
 	_voice_cd -= delta
 	_squash_cd -= delta
 	_splat_cd -= delta
+	_busy_t -= delta
 	_down_cd -= delta
 	_slip_cd -= delta
 	if _shield_t > 0.0:
@@ -605,7 +644,7 @@ func _smoke_step(delta: float) -> Vector3:
 		_puff_t = randf_range(2.5, 4.5)
 		_play("interact-right", 0.15)
 		_later(0.5, _puff_out)
-	if not _anim.is_playing():
+	if _busy_t <= 0.0:
 		_play("idle")
 	if kind == "runner" and player:
 		if global_position.distance_to(player.global_position) < 9.0:
@@ -642,7 +681,7 @@ func _hangout_step(delta: float) -> Vector3:
 			if _puff_t <= 0.0:
 				_puff_t = randf_range(3.0, 6.0)
 				say(LINES.pee.pick_random(), Color(1, 0.95, 0.6))
-	if not _anim.is_playing():
+	if _busy_t <= 0.0:
 		_play("idle")
 	return Vector3.ZERO
 
@@ -707,7 +746,7 @@ func _charge_step() -> Vector3:
 			_later(0.25, _kick_land)
 		rotation.y = lerp_angle(rotation.y, atan2(-to.x, -to.z), 0.3)
 		return Vector3.ZERO
-	if _anim.current_animation != "sprint" and _kick_cd < 1.0:
+	if _cur_anim != "sprint" and _kick_cd < 1.0:
 		_play("sprint")
 	return to.normalized() * run_speed
 
@@ -743,8 +782,8 @@ func _hit_react(amount: float, dir: Vector3, knock: float) -> void:
 	if _squash_cd <= 0.0:
 		_squash_cd = 0.14
 		var tw := create_tween()
-		tw.tween_property(_model, "scale", Vector3(1.18, 0.8, 1.18) * _scale, 0.05)
-		tw.tween_property(_model, "scale", Vector3.ONE * _scale, 0.25).set_trans(Tween.TRANS_ELASTIC).set_ease(Tween.EASE_OUT)
+		tw.tween_property(_model, "scale", Vector3(1.18, 0.8, 1.18), 0.05)
+		tw.tween_property(_model, "scale", Vector3.ONE, 0.25).set_trans(Tween.TRANS_ELASTIC).set_ease(Tween.EASE_OUT)
 	# 비명
 	if _voice_cd <= 0.0 and state != State.DOWN:
 		_voice_cd = randf_range(0.7, 1.2)
@@ -1071,8 +1110,28 @@ func say(text: String, color := Color.WHITE) -> void:
 
 
 func _play(anim: String, blend := 0.2) -> void:
-	if _anim.has_animation(anim):
-		_anim.play(anim, blend)
+	## 예전(Kenney) 이름으로 불러도 역할/몸에 맞는 실사 애니메이션으로 바꿔 튼다
+	_cur_anim = anim
+	var a: String = ANIM_MAP.get(anim, anim)
+	match a:
+		"walk":
+			a = _walk_anim
+		"sprint":
+			if is_minor():
+				a = "run_kid"
+		"drink":
+			if kind == "litter":
+				a = "throw"
+			elif kind == "tagger":
+				a = "wave"
+		"wave_off":
+			if kind == "victim":
+				a = "fear"
+	# 몸짓은 잠깐만 하고 다시 서 있게 (_busy_t 가 끝나면 호출한 쪽이 idle 로 돌린다)
+	_busy_t = 2.2 if anim in ["interact-right", "emote-yes", "emote-no", "attack-melee-right", "attack-kick-right"] else 0.0
+	if a == _model.playing():
+		_anim.seek(0.0)
+	_model.play(a, blend)
 
 
 func _make_label(color: Color, size: int) -> Label3D:
@@ -1090,13 +1149,19 @@ func _make_label(color: Color, size: int) -> Label3D:
 
 
 func _hand_tip() -> Array:
-	## 오른손 끝 (붙일 부모 노드, 위치)
-	var arm: Node3D = _model.find_child("arm-right", true, false)
-	var tip_pos := Vector3.ZERO
-	if arm and arm is MeshInstance3D and arm.mesh:
-		var a: AABB = arm.mesh.get_aabb()
-		tip_pos = Vector3(a.get_center().x, a.position.y + 0.02, a.end.z)
-	return [arm if arm else _model, tip_pos]
+	## 오른손 끝 (붙일 부모 노드, 위치). 손 뼈에 붙이고, 붙인 물건 크기는 예전처럼 _scale 기준으로 맞춘다.
+	if _hand == null:
+		var skels := _model.find_children("*", "Skeleton3D", true, false)
+		if skels.is_empty():
+			return [_model, Vector3(0.25, 1.0, -0.2) / _scale]
+		var ba := BoneAttachment3D.new()
+		ba.bone_name = "RightHand"
+		skels[0].add_child(ba)
+		_hand = Node3D.new()
+		ba.add_child(_hand)
+		var gs: float = ba.global_transform.basis.get_scale().x / max(global_transform.basis.get_scale().x, 0.001)
+		_hand.scale = Vector3.ONE * (_scale / max(gs, 0.001))
+	return [_hand, Vector3(0, 0.09, 0.03) / _scale]
 
 
 func _add_backpack() -> void:

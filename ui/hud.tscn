@@ -1,9 +1,10 @@
-[gd_scene load_steps=9 format=3]
+[gd_scene format=3]
 
 [ext_resource type="Script" path="res://scripts/ui/hud.gd" id="1_hud"]
 [ext_resource type="Script" path="res://scripts/ui/radar.gd" id="2_radar"]
 [ext_resource type="Script" path="res://scripts/ui/indicators.gd" id="3_ind"]
 [ext_resource type="FontFile" path="res://assets/fonts/Pretendard-ExtraBold.otf" id="4_title"]
+[ext_resource type="Script" path="res://scripts/ui/weapon_wheel.gd" id="5_wheel"]
 
 [sub_resource type="StyleBoxFlat" id="polaroid_bg"]
 content_margin_left = 10.0
@@ -34,6 +35,51 @@ corner_radius_top_left = 6
 corner_radius_top_right = 6
 corner_radius_bottom_right = 6
 corner_radius_bottom_left = 6
+
+[sub_resource type="FontVariation" id="italic"]
+base_font = ExtResource("4_title")
+variation_transform = Transform2D(1, 0, 0.22, 1, 0, 0)
+
+[sub_resource type="StyleBoxFlat" id="rank_circle"]
+bg_color = Color(0.18, 0.4, 0.75, 1)
+border_width_left = 2
+border_width_top = 2
+border_width_right = 2
+border_width_bottom = 2
+border_color = Color(0.9, 0.95, 1, 1)
+corner_radius_top_left = 20
+corner_radius_top_right = 20
+corner_radius_bottom_right = 20
+corner_radius_bottom_left = 20
+
+[sub_resource type="StyleBoxFlat" id="bar_bg"]
+bg_color = Color(0, 0, 0, 0.55)
+
+[sub_resource type="StyleBoxFlat" id="xp_fill"]
+bg_color = Color(0.35, 0.6, 0.95, 1)
+
+[sub_resource type="StyleBoxFlat" id="mental_fill"]
+bg_color = Color(0.36, 0.72, 0.36, 1)
+
+[sub_resource type="StyleBoxFlat" id="water_fill"]
+bg_color = Color(0.33, 0.62, 0.88, 1)
+
+[sub_resource type="StyleBoxFlat" id="stat_fill"]
+bg_color = Color(0.92, 0.92, 0.92, 1)
+
+[sub_resource type="StyleBoxFlat" id="panel_dark"]
+content_margin_left = 12.0
+content_margin_top = 8.0
+content_margin_right = 12.0
+content_margin_bottom = 10.0
+bg_color = Color(0, 0, 0, 0.62)
+
+[sub_resource type="StyleBoxFlat" id="head_red"]
+content_margin_left = 8.0
+content_margin_top = 2.0
+content_margin_right = 8.0
+content_margin_bottom = 2.0
+bg_color = Color(0.62, 0.32, 0.25, 1)
 
 [node name="HUD" type="CanvasLayer"]
 script = ExtResource("1_hud")
@@ -121,225 +167,368 @@ text = "×"
 horizontal_alignment = 1
 vertical_alignment = 1
 
-[node name="TopCenter" type="PanelContainer" parent="."]
+[node name="TopCenter" type="Control" parent="."]
+layout_mode = 3
 anchors_preset = 5
 anchor_left = 0.5
 anchor_right = 0.5
-offset_left = -170.0
-offset_top = 12.0
-offset_right = 170.0
-offset_bottom = 130.0
+offset_left = -230.0
+offset_top = 10.0
+offset_right = 230.0
+offset_bottom = 90.0
 grow_horizontal = 2
 mouse_filter = 2
 
 [node name="V" type="VBoxContainer" parent="TopCenter"]
-layout_mode = 2
-theme_override_constants/separation = 2
-alignment = 1
-
-[node name="Zone" type="Label" parent="TopCenter/V"]
-layout_mode = 2
-theme_override_colors/font_color = Color(0.7, 0.85, 1, 1)
-theme_override_font_sizes/font_size = 20
-text = "1구역 · 첫 번째 블록"
-horizontal_alignment = 1
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+theme_override_constants/separation = 0
 
 [node name="Rank" type="Label" parent="TopCenter/V"]
 layout_mode = 2
+theme_override_constants/outline_size = 8
 theme_override_fonts/font = ExtResource("4_title")
-theme_override_font_sizes/font_size = 40
+theme_override_font_sizes/font_size = 22
 text = "순경"
 horizontal_alignment = 1
 
-[node name="Next" type="Label" parent="TopCenter/V"]
+[node name="Bar" type="HBoxContainer" parent="TopCenter/V"]
 layout_mode = 2
-theme_override_font_sizes/font_size = 20
-text = "다음 승진까지 400"
-horizontal_alignment = 1
+mouse_filter = 2
+theme_override_constants/separation = 6
 
-[node name="XpBar" type="ProgressBar" parent="TopCenter/V"]
-custom_minimum_size = Vector2(0, 10)
+[node name="Cur" type="Label" parent="TopCenter/V/Bar"]
+custom_minimum_size = Vector2(40, 40)
 layout_mode = 2
-theme_override_styles/fill = SubResource("quota_fill")
+theme_override_constants/outline_size = 6
+theme_override_fonts/font = ExtResource("4_title")
+theme_override_font_sizes/font_size = 20
+theme_override_styles/normal = SubResource("rank_circle")
+text = "1"
+horizontal_alignment = 1
+vertical_alignment = 1
+
+[node name="XpBar" type="ProgressBar" parent="TopCenter/V/Bar"]
+custom_minimum_size = Vector2(0, 12)
+layout_mode = 2
+size_flags_horizontal = 3
+size_flags_vertical = 4
+mouse_filter = 2
+theme_override_styles/background = SubResource("bar_bg")
+theme_override_styles/fill = SubResource("xp_fill")
 max_value = 5.0
 show_percentage = false
 
-[node name="TopLeft" type="VBoxContainer" parent="."]
-offset_left = 20.0
-offset_top = 14.0
-offset_right = 380.0
-offset_bottom = 120.0
+[node name="NextRank" type="Label" parent="TopCenter/V/Bar"]
+custom_minimum_size = Vector2(40, 40)
+layout_mode = 2
+theme_override_constants/outline_size = 6
+theme_override_fonts/font = ExtResource("4_title")
+theme_override_font_sizes/font_size = 20
+theme_override_styles/normal = SubResource("rank_circle")
+text = "2"
+horizontal_alignment = 1
+vertical_alignment = 1
+
+[node name="Next" type="Label" parent="TopCenter/V"]
+layout_mode = 2
+theme_override_constants/outline_size = 6
+theme_override_font_sizes/font_size = 16
+text = "400 / 1100"
+horizontal_alignment = 1
+
+[node name="TopRight" type="VBoxContainer" parent="."]
+anchors_preset = 1
+anchor_left = 1.0
+anchor_right = 1.0
+offset_left = -460.0
+offset_top = 10.0
+offset_right = -24.0
+offset_bottom = 200.0
+grow_horizontal = 0
 mouse_filter = 2
-
-[node name="Money" type="Label" parent="TopLeft"]
-layout_mode = 2
-theme_override_colors/font_color = Color(1, 0.88, 0.35, 1)
-theme_override_fonts/font = ExtResource("4_title")
-theme_override_font_sizes/font_size = 34
-text = "0원"
-
-[node name="Combo" type="Label" parent="TopLeft"]
-modulate = Color(1, 1, 1, 0)
-layout_mode = 2
-theme_override_colors/font_color = Color(1, 0.55, 0.3, 1)
-theme_override_fonts/font = ExtResource("4_title")
-theme_override_font_sizes/font_size = 26
-text = "콤보 x2"
-
-[node name="Feed" type="VBoxContainer" parent="TopLeft"]
-layout_mode = 2
 theme_override_constants/separation = 0
 
-[node name="Radar" type="Control" parent="."]
-anchors_preset = 1
-anchor_left = 1.0
-anchor_right = 1.0
-offset_left = -214.0
-offset_top = 14.0
-offset_right = -14.0
-offset_bottom = 214.0
-grow_horizontal = 0
-mouse_filter = 2
-script = ExtResource("2_radar")
-
-[node name="Mission" type="PanelContainer" parent="."]
-visible = false
-anchors_preset = 1
-anchor_left = 1.0
-anchor_right = 1.0
-offset_left = -334.0
-offset_top = 224.0
-offset_right = -14.0
-offset_bottom = 330.0
-grow_horizontal = 0
-mouse_filter = 2
-
-[node name="V" type="VBoxContainer" parent="Mission"]
+[node name="Money" type="Label" parent="TopRight"]
 layout_mode = 2
+theme_override_colors/font_color = Color(0.45, 0.82, 0.4, 1)
+theme_override_constants/outline_size = 12
+theme_override_fonts/font = SubResource("italic")
+theme_override_font_sizes/font_size = 46
+text = "0원"
+horizontal_alignment = 2
+
+[node name="Wanted" type="Label" parent="TopRight"]
+layout_mode = 2
+theme_override_colors/font_color = Color(1, 1, 1, 1)
+theme_override_constants/outline_size = 8
+theme_override_font_sizes/font_size = 30
+text = ""
+horizontal_alignment = 2
+
+[node name="Combo" type="Label" parent="TopRight"]
+modulate = Color(1, 1, 1, 0)
+layout_mode = 2
+theme_override_colors/font_color = Color(1, 0.6, 0.25, 1)
+theme_override_constants/outline_size = 10
+theme_override_fonts/font = SubResource("italic")
+theme_override_font_sizes/font_size = 28
+text = "콤보 x2"
+horizontal_alignment = 2
+
+[node name="Weapon" type="Label" parent="TopRight"]
+layout_mode = 2
+theme_override_constants/outline_size = 8
+theme_override_fonts/font = ExtResource("4_title")
+theme_override_font_sizes/font_size = 22
+text = "분무기"
+horizontal_alignment = 2
+
+[node name="Ammo" type="Label" parent="TopRight"]
+layout_mode = 2
+theme_override_constants/outline_size = 8
+theme_override_fonts/font = ExtResource("4_title")
+theme_override_font_sizes/font_size = 26
+text = "30  /  30"
+horizontal_alignment = 2
+
+[node name="Truck" type="HBoxContainer" parent="TopRight"]
+visible = false
+layout_mode = 2
+
+[node name="TruckBar" type="ProgressBar" parent="TopRight/Truck"]
+custom_minimum_size = Vector2(160, 8)
+layout_mode = 2
+max_value = 1.0
+show_percentage = false
+
+[node name="TopLeft" type="VBoxContainer" parent="."]
+offset_left = 24.0
+offset_top = 14.0
+offset_right = 360.0
+offset_bottom = 160.0
+mouse_filter = 2
+theme_override_constants/separation = 0
+
+[node name="Mission" type="PanelContainer" parent="TopLeft"]
+visible = false
+layout_mode = 2
+mouse_filter = 2
+theme_override_styles/panel = SubResource("panel_dark")
+
+[node name="V" type="VBoxContainer" parent="TopLeft/Mission"]
+layout_mode = 2
+mouse_filter = 2
 theme_override_constants/separation = 2
 
-[node name="Head" type="Label" parent="Mission/V"]
+[node name="Head" type="Label" parent="TopLeft/Mission/V"]
 layout_mode = 2
-theme_override_colors/font_color = Color(0.45, 0.75, 1, 1)
-theme_override_font_sizes/font_size = 16
+theme_override_colors/font_color = Color(1, 1, 1, 1)
+theme_override_font_sizes/font_size = 15
+theme_override_styles/normal = SubResource("head_red")
 text = "무전 출동"
 
-[node name="Title" type="Label" parent="Mission/V"]
+[node name="Title" type="Label" parent="TopLeft/Mission/V"]
 layout_mode = 2
 theme_override_fonts/font = ExtResource("4_title")
 theme_override_font_sizes/font_size = 24
 text = "흡연 민원 다수"
 
-[node name="Info" type="Label" parent="Mission/V"]
+[node name="Info" type="Label" parent="TopLeft/Mission/V"]
 layout_mode = 2
-theme_override_font_sizes/font_size = 18
+theme_override_colors/font_color = Color(0.85, 0.85, 0.85, 1)
+theme_override_font_sizes/font_size = 17
 text = "편의점 근처 · 120m · 남은 시간 1:20"
 
-[node name="BottomLeft" type="PanelContainer" parent="."]
+[node name="Feed" type="VBoxContainer" parent="."]
 anchors_preset = 2
 anchor_top = 1.0
 anchor_bottom = 1.0
-offset_left = 16.0
-offset_top = -120.0
-offset_right = 300.0
-offset_bottom = -16.0
+offset_left = 24.0
+offset_top = -460.0
+offset_right = 404.0
+offset_bottom = -248.0
 grow_vertical = 0
 mouse_filter = 2
+theme_override_constants/separation = 4
+alignment = 2
 
-[node name="V" type="VBoxContainer" parent="BottomLeft"]
+[node name="BottomLeft" type="VBoxContainer" parent="."]
+anchors_preset = 2
+anchor_top = 1.0
+anchor_bottom = 1.0
+offset_left = 24.0
+offset_top = -236.0
+offset_right = 324.0
+offset_bottom = -20.0
+grow_vertical = 0
+mouse_filter = 2
+theme_override_constants/separation = 4
+
+[node name="Radar" type="Control" parent="BottomLeft"]
+custom_minimum_size = Vector2(300, 196)
 layout_mode = 2
+mouse_filter = 2
+script = ExtResource("2_radar")
 
-[node name="Mental" type="Label" parent="BottomLeft/V"]
+[node name="Bars" type="HBoxContainer" parent="BottomLeft"]
 layout_mode = 2
-theme_override_colors/font_color = Color(1, 0.45, 0.5, 1)
-theme_override_font_sizes/font_size = 26
-text = "멘탈 ♥♥♥♥♥"
+mouse_filter = 2
+theme_override_constants/separation = 3
 
-[node name="Complaints" type="Label" parent="BottomLeft/V"]
+[node name="MentalBar" type="ProgressBar" parent="BottomLeft/Bars"]
+custom_minimum_size = Vector2(0, 9)
 layout_mode = 2
-theme_override_colors/font_color = Color(1, 0.8, 0.5, 1)
-theme_override_font_sizes/font_size = 22
-text = "민원 0건"
+size_flags_horizontal = 3
+size_flags_stretch_ratio = 2.0
+mouse_filter = 2
+theme_override_styles/background = SubResource("bar_bg")
+theme_override_styles/fill = SubResource("mental_fill")
+max_value = 5.0
+value = 5.0
+show_percentage = false
 
-[node name="BottomRight" type="PanelContainer" parent="."]
+[node name="WaterBar" type="ProgressBar" parent="BottomLeft/Bars"]
+custom_minimum_size = Vector2(0, 9)
+layout_mode = 2
+size_flags_horizontal = 3
+mouse_filter = 2
+theme_override_styles/background = SubResource("bar_bg")
+theme_override_styles/fill = SubResource("water_fill")
+value = 100.0
+show_percentage = false
+
+[node name="BottomRight" type="VBoxContainer" parent="."]
 anchors_preset = 3
 anchor_left = 1.0
 anchor_top = 1.0
 anchor_right = 1.0
 anchor_bottom = 1.0
-offset_left = -340.0
-offset_top = -190.0
-offset_right = -16.0
-offset_bottom = -16.0
+offset_left = -520.0
+offset_top = -96.0
+offset_right = -28.0
+offset_bottom = -20.0
 grow_horizontal = 0
 grow_vertical = 0
 mouse_filter = 2
+theme_override_constants/separation = -4
+alignment = 2
 
-[node name="V" type="VBoxContainer" parent="BottomRight"]
+[node name="Zone" type="Label" parent="BottomRight"]
 layout_mode = 2
-theme_override_constants/separation = 4
-
-[node name="Weapon" type="Label" parent="BottomRight/V"]
-layout_mode = 2
-theme_override_fonts/font = ExtResource("4_title")
+theme_override_constants/outline_size = 8
+theme_override_fonts/font = SubResource("italic")
 theme_override_font_sizes/font_size = 30
-text = "분무기"
+text = "1구역"
+horizontal_alignment = 2
 
-[node name="AmmoBar" type="ProgressBar" parent="BottomRight/V"]
-custom_minimum_size = Vector2(0, 18)
+[node name="Place" type="Label" parent="BottomRight"]
 layout_mode = 2
-theme_override_styles/fill = SubResource("ammo_fill")
+theme_override_constants/outline_size = 8
+theme_override_fonts/font = SubResource("italic")
+theme_override_font_sizes/font_size = 24
+text = "파출소 근처"
+horizontal_alignment = 2
+
+[node name="WeaponWheel" type="Control" parent="."]
+visible = false
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+script = ExtResource("5_wheel")
+
+[node name="Stats" type="PanelContainer" parent="WeaponWheel"]
+layout_mode = 1
+anchors_preset = 1
+anchor_left = 1.0
+anchor_right = 1.0
+offset_left = -330.0
+offset_top = 220.0
+offset_right = -24.0
+offset_bottom = 380.0
+grow_horizontal = 0
+mouse_filter = 2
+theme_override_styles/panel = SubResource("panel_dark")
+
+[node name="V" type="VBoxContainer" parent="WeaponWheel/Stats"]
+layout_mode = 2
+mouse_filter = 2
+theme_override_constants/separation = 2
+
+[node name="Power" type="VBoxContainer" parent="WeaponWheel/Stats/V"]
+layout_mode = 2
+theme_override_constants/separation = 0
+
+[node name="L" type="Label" parent="WeaponWheel/Stats/V/Power"]
+layout_mode = 2
+theme_override_font_sizes/font_size = 16
+text = "위력"
+
+[node name="Bar" type="ProgressBar" parent="WeaponWheel/Stats/V/Power"]
+custom_minimum_size = Vector2(0, 7)
+layout_mode = 2
+theme_override_styles/background = SubResource("bar_bg")
+theme_override_styles/fill = SubResource("stat_fill")
+max_value = 1.0
 show_percentage = false
 
-[node name="Ammo" type="Label" parent="BottomRight/V"]
+[node name="Rate" type="VBoxContainer" parent="WeaponWheel/Stats/V"]
 layout_mode = 2
-theme_override_font_sizes/font_size = 18
-text = "물 30 / 30"
+theme_override_constants/separation = 0
 
-[node name="Slots" type="HBoxContainer" parent="BottomRight/V"]
-layout_mode = 2
-theme_override_constants/separation = 6
-
-[node name="Slot1" type="Label" parent="BottomRight/V/Slots"]
+[node name="L" type="Label" parent="WeaponWheel/Stats/V/Rate"]
 layout_mode = 2
 theme_override_font_sizes/font_size = 16
-text = "1 분무기"
+text = "연사"
 
-[node name="Slot2" type="Label" parent="BottomRight/V/Slots"]
+[node name="Bar" type="ProgressBar" parent="WeaponWheel/Stats/V/Rate"]
+custom_minimum_size = Vector2(0, 7)
+layout_mode = 2
+theme_override_styles/background = SubResource("bar_bg")
+theme_override_styles/fill = SubResource("stat_fill")
+max_value = 1.0
+show_percentage = false
+
+[node name="Range" type="VBoxContainer" parent="WeaponWheel/Stats/V"]
+layout_mode = 2
+theme_override_constants/separation = 0
+
+[node name="L" type="Label" parent="WeaponWheel/Stats/V/Range"]
 layout_mode = 2
 theme_override_font_sizes/font_size = 16
-text = "2"
+text = "사거리"
 
-[node name="Slot3" type="Label" parent="BottomRight/V/Slots"]
+[node name="Bar" type="ProgressBar" parent="WeaponWheel/Stats/V/Range"]
+custom_minimum_size = Vector2(0, 7)
+layout_mode = 2
+theme_override_styles/background = SubResource("bar_bg")
+theme_override_styles/fill = SubResource("stat_fill")
+max_value = 1.0
+show_percentage = false
+
+[node name="Tank" type="VBoxContainer" parent="WeaponWheel/Stats/V"]
+layout_mode = 2
+theme_override_constants/separation = 0
+
+[node name="L" type="Label" parent="WeaponWheel/Stats/V/Tank"]
 layout_mode = 2
 theme_override_font_sizes/font_size = 16
-text = "3"
+text = "물통"
 
-[node name="Slot4" type="Label" parent="BottomRight/V/Slots"]
+[node name="Bar" type="ProgressBar" parent="WeaponWheel/Stats/V/Tank"]
+custom_minimum_size = Vector2(0, 7)
 layout_mode = 2
-theme_override_font_sizes/font_size = 16
-text = "4"
-
-[node name="Slot5" type="Label" parent="BottomRight/V/Slots"]
-layout_mode = 2
-theme_override_font_sizes/font_size = 16
-text = "5"
-
-[node name="Truck" type="HBoxContainer" parent="BottomRight/V"]
-visible = false
-layout_mode = 2
-
-[node name="TruckLabel" type="Label" parent="BottomRight/V/Truck"]
-layout_mode = 2
-theme_override_font_sizes/font_size = 18
-text = "F 소방차"
-
-[node name="TruckBar" type="ProgressBar" parent="BottomRight/V/Truck"]
-custom_minimum_size = Vector2(0, 14)
-layout_mode = 2
-size_flags_horizontal = 3
-size_flags_vertical = 4
-theme_override_styles/fill = SubResource("truck_fill")
+theme_override_styles/background = SubResource("bar_bg")
+theme_override_styles/fill = SubResource("stat_fill")
 max_value = 1.0
 show_percentage = false
 

@@ -1,71 +1,322 @@
-[gd_scene load_steps=2 format=3]
+[gd_scene format=3]
 
 [ext_resource type="FontFile" path="res://assets/fonts/Pretendard-ExtraBold.otf" id="1_title"]
+[ext_resource type="FontFile" path="res://assets/fonts/Pretendard-SemiBold.otf" id="2_semi"]
+
+[sub_resource type="Gradient" id="vig_g"]
+offsets = PackedFloat32Array(0.35, 1)
+colors = PackedColorArray(0, 0, 0, 0, 0, 0, 0, 0.85)
+
+[sub_resource type="GradientTexture2D" id="vig"]
+gradient = SubResource("vig_g")
+width = 256
+height = 256
+fill = 1
+fill_from = Vector2(0.5, 0.5)
+fill_to = Vector2(1.05, 0.5)
+
+[sub_resource type="Gradient" id="glow_g"]
+offsets = PackedFloat32Array(0, 1)
+colors = PackedColorArray(1, 0.85, 0.6, 0.35, 1, 0.85, 0.6, 0)
+
+[sub_resource type="GradientTexture2D" id="glow"]
+gradient = SubResource("glow_g")
+width = 256
+height = 128
+fill = 1
+fill_from = Vector2(0.5, 0)
+fill_to = Vector2(0.5, 1)
+
+[sub_resource type="StyleBoxFlat" id="howto_bg"]
+content_margin_left = 36.0
+content_margin_top = 28.0
+content_margin_right = 36.0
+content_margin_bottom = 28.0
+bg_color = Color(0.02, 0.02, 0.03, 0.88)
+border_width_top = 2
+border_width_bottom = 2
+border_color = Color(1, 1, 1, 0.5)
 
 [node name="TitleUI" type="CanvasLayer"]
 
-[node name="Shade" type="ColorRect" parent="."]
-anchors_preset = 9
+[node name="BG" type="TextureRect" parent="."]
+anchors_preset = 15
+anchor_right = 1.0
 anchor_bottom = 1.0
-offset_right = 620.0
+offset_left = -40.0
+offset_top = -24.0
+offset_right = 40.0
+offset_bottom = 24.0
+grow_horizontal = 2
 grow_vertical = 2
 mouse_filter = 2
-color = Color(0.02, 0.06, 0.14, 0.55)
+expand_mode = 1
+stretch_mode = 6
 
-[node name="Left" type="VBoxContainer" parent="."]
-anchors_preset = 4
-anchor_top = 0.5
-anchor_bottom = 0.5
-offset_left = 60.0
-offset_top = -270.0
-offset_right = 580.0
-offset_bottom = 290.0
+[node name="Dim" type="ColorRect" parent="."]
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
 grow_vertical = 2
+mouse_filter = 2
+color = Color(0.02, 0.02, 0.03, 0.35)
+
+[node name="Vignette" type="TextureRect" parent="."]
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+texture = SubResource("vig")
+expand_mode = 1
+
+[node name="Glow" type="TextureRect" parent="."]
+anchors_preset = 5
+anchor_left = 0.5
+anchor_right = 0.5
+offset_left = -520.0
+offset_right = 520.0
+offset_bottom = 300.0
+grow_horizontal = 2
+mouse_filter = 2
+texture = SubResource("glow")
+expand_mode = 1
+
+[node name="Lines" type="Control" parent="."]
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+
+[node name="L1" type="ColorRect" parent="Lines"]
+anchor_left = 0.3
+anchor_right = 0.3
+anchor_bottom = 1.0
+offset_right = 1.0
+mouse_filter = 2
+color = Color(1, 1, 1, 0.07)
+
+[node name="L2" type="ColorRect" parent="Lines"]
+anchor_left = 0.38
+anchor_right = 0.38
+anchor_bottom = 1.0
+offset_right = 1.0
+mouse_filter = 2
+color = Color(1, 0.4, 0.3, 0.06)
+
+[node name="L3" type="ColorRect" parent="Lines"]
+anchor_left = 0.5
+anchor_right = 0.5
+anchor_bottom = 1.0
+offset_right = 1.0
+mouse_filter = 2
+color = Color(1, 1, 1, 0.05)
+
+[node name="L4" type="ColorRect" parent="Lines"]
+anchor_left = 0.62
+anchor_right = 0.62
+anchor_bottom = 1.0
+offset_right = 1.0
+mouse_filter = 2
+color = Color(0.4, 0.8, 1, 0.06)
+
+[node name="L5" type="ColorRect" parent="Lines"]
+anchor_left = 0.7
+anchor_right = 0.7
+anchor_bottom = 1.0
+offset_right = 1.0
+mouse_filter = 2
+color = Color(1, 1, 1, 0.07)
+
+[node name="Center" type="VBoxContainer" parent="."]
+anchors_preset = 8
+anchor_left = 0.5
+anchor_top = 0.5
+anchor_right = 0.5
+anchor_bottom = 0.5
+offset_left = -420.0
+offset_top = -330.0
+offset_right = 420.0
+offset_bottom = 300.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+theme_override_constants/separation = 0
+
+[node name="Kicker" type="Label" parent="Center"]
+layout_mode = 2
+theme_override_colors/font_color = Color(1, 1, 1, 0.65)
+theme_override_fonts/font = ExtResource("2_semi")
+theme_override_font_sizes/font_size = 20
+text = "S  M  O  K  E     B  U  S  T  E  R"
+horizontal_alignment = 1
+
+[node name="Logo" type="Label" parent="Center"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.97, 0.96, 0.93, 1)
+theme_override_colors/font_outline_color = Color(1, 0.95, 0.85, 0.18)
+theme_override_colors/font_shadow_color = Color(0, 0, 0, 0.6)
+theme_override_constants/outline_size = 26
+theme_override_constants/shadow_offset_y = 6
+theme_override_fonts/font = ExtResource("1_title")
+theme_override_font_sizes/font_size = 112
+text = "물대포 단속반"
+horizontal_alignment = 1
+
+[node name="Gap" type="Control" parent="Center"]
+custom_minimum_size = Vector2(0, 40)
+layout_mode = 2
+mouse_filter = 2
+
+[node name="MenuBox" type="Control" parent="Center"]
+custom_minimum_size = Vector2(0, 250)
+layout_mode = 2
+mouse_filter = 2
+
+[node name="Selector" type="Control" parent="Center/MenuBox"]
+layout_mode = 0
+offset_left = 190.0
+offset_right = 650.0
+offset_bottom = 48.0
+mouse_filter = 2
+
+[node name="Menu" type="VBoxContainer" parent="Center/MenuBox"]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+theme_override_constants/separation = 2
+
+[node name="Continue" type="Label" parent="Center/MenuBox/Menu"]
+custom_minimum_size = Vector2(0, 48)
+layout_mode = 2
+mouse_filter = 0
+theme_override_fonts/font = ExtResource("2_semi")
+theme_override_font_sizes/font_size = 32
+text = "이어서 순찰"
+horizontal_alignment = 1
+vertical_alignment = 1
+
+[node name="New" type="Label" parent="Center/MenuBox/Menu"]
+custom_minimum_size = Vector2(0, 48)
+layout_mode = 2
+mouse_filter = 0
+theme_override_fonts/font = ExtResource("2_semi")
+theme_override_font_sizes/font_size = 32
+text = "새 게임"
+horizontal_alignment = 1
+vertical_alignment = 1
+
+[node name="HowTo" type="Label" parent="Center/MenuBox/Menu"]
+custom_minimum_size = Vector2(0, 48)
+layout_mode = 2
+mouse_filter = 0
+theme_override_fonts/font = ExtResource("2_semi")
+theme_override_font_sizes/font_size = 32
+text = "조작법"
+horizontal_alignment = 1
+vertical_alignment = 1
+
+[node name="Quit" type="Label" parent="Center/MenuBox/Menu"]
+custom_minimum_size = Vector2(0, 48)
+layout_mode = 2
+mouse_filter = 0
+theme_override_fonts/font = ExtResource("2_semi")
+theme_override_font_sizes/font_size = 32
+text = "게임 종료"
+horizontal_alignment = 1
+vertical_alignment = 1
+
+[node name="Save" type="Label" parent="Center"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.85, 0.66, 0.32, 1)
+theme_override_font_sizes/font_size = 20
+text = "저장된 순찰: 경장 · ₩1,200"
+horizontal_alignment = 1
+
+[node name="Hints" type="HBoxContainer" parent="Center"]
+custom_minimum_size = Vector2(0, 70)
+layout_mode = 2
+mouse_filter = 2
+theme_override_constants/separation = 10
+alignment = 1
+
+[node name="K1" type="Label" parent="Center/Hints"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.85, 0.66, 0.32, 1)
+theme_override_fonts/font = ExtResource("2_semi")
+theme_override_font_sizes/font_size = 26
+text = "Enter"
+
+[node name="T1" type="Label" parent="Center/Hints"]
+layout_mode = 2
+theme_override_fonts/font = ExtResource("2_semi")
+theme_override_font_sizes/font_size = 26
+text = "선택      "
+
+[node name="K2" type="Label" parent="Center/Hints"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.85, 0.66, 0.32, 1)
+theme_override_fonts/font = ExtResource("2_semi")
+theme_override_font_sizes/font_size = 26
+text = "Esc"
+
+[node name="T2" type="Label" parent="Center/Hints"]
+layout_mode = 2
+theme_override_fonts/font = ExtResource("2_semi")
+theme_override_font_sizes/font_size = 26
+text = "뒤로"
+
+[node name="HowToPanel" type="PanelContainer" parent="."]
+visible = false
+anchors_preset = 8
+anchor_left = 0.5
+anchor_top = 0.5
+anchor_right = 0.5
+anchor_bottom = 0.5
+offset_left = -480.0
+offset_top = -230.0
+offset_right = 480.0
+offset_bottom = 230.0
+grow_horizontal = 2
+grow_vertical = 2
+theme_override_styles/panel = SubResource("howto_bg")
+
+[node name="V" type="VBoxContainer" parent="HowToPanel"]
+layout_mode = 2
 theme_override_constants/separation = 14
 
-[node name="Kicker" type="Label" parent="Left"]
+[node name="Head" type="Label" parent="HowToPanel/V"]
 layout_mode = 2
-theme_override_colors/font_color = Color(0.6, 0.85, 1, 1)
-theme_override_font_sizes/font_size = 24
-text = "길거리 무단 흡연, 이제 그만!"
-
-[node name="Logo" type="Label" parent="Left"]
-layout_mode = 2
-theme_override_colors/font_color = Color(1, 1, 1, 1)
-theme_override_colors/font_outline_color = Color(0.05, 0.3, 0.75, 1)
-theme_override_constants/outline_size = 22
 theme_override_fonts/font = ExtResource("1_title")
-theme_override_font_sizes/font_size = 92
-text = "물대포
-단속반"
+theme_override_font_sizes/font_size = 40
+text = "조작법"
+horizontal_alignment = 1
 
-[node name="Save" type="Label" parent="Left"]
+[node name="Body" type="Label" parent="HowToPanel/V"]
 layout_mode = 2
-theme_override_colors/font_color = Color(1, 0.88, 0.4, 1)
 theme_override_font_sizes/font_size = 22
-text = "이어하기: 경장 · 1200원"
-
-[node name="Continue" type="Button" parent="Left"]
-custom_minimum_size = Vector2(340, 62)
-layout_mode = 2
-size_flags_horizontal = 0
-theme_override_font_sizes/font_size = 30
-text = "이어서 순찰"
-
-[node name="New" type="Button" parent="Left"]
-custom_minimum_size = Vector2(340, 62)
-layout_mode = 2
-size_flags_horizontal = 0
-theme_override_font_sizes/font_size = 30
-text = "새로 시작"
-
-[node name="HowTo" type="Label" parent="Left"]
-layout_mode = 2
-theme_override_colors/font_color = Color(0.8, 0.88, 1, 1)
-theme_override_font_sizes/font_size = 19
 text = "WASD 이동 · Shift 달리기 · 마우스 조준 · 좌클릭 물 뿌리기
-1~5 / 휠 무기 · 우클릭 카메라 · E 줍기 · F 차 타기 · V 3인칭 · Tab 장비실
+1~5 / 마우스 휠 무기 교체 · Tab 꾹 무기 휠
+우클릭 카메라 (학생 비행, 무단횡단, 음주운전 신고)
+E 줍기 / 대화 / 소화전 물 채우기 · F 차 타기 · V 3인칭
+B 장비실 · Esc 일시정지
+
 정해진 일은 없어요. 동네를 돌며 마음대로 단속하세요!"
+horizontal_alignment = 1
+
+[node name="Back" type="Label" parent="HowToPanel/V"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.85, 0.66, 0.32, 1)
+theme_override_font_sizes/font_size = 20
+text = "Esc 뒤로"
+horizontal_alignment = 1
 
 [node name="Credit" type="Label" parent="."]
 anchors_preset = 3
@@ -73,13 +324,13 @@ anchor_left = 1.0
 anchor_top = 1.0
 anchor_right = 1.0
 anchor_bottom = 1.0
-offset_left = -520.0
+offset_left = -620.0
 offset_top = -40.0
 offset_right = -16.0
 offset_bottom = -10.0
 grow_horizontal = 0
 grow_vertical = 0
-theme_override_colors/font_color = Color(1, 1, 1, 0.6)
-theme_override_font_sizes/font_size = 16
-text = "에셋: Kenney (CC0) · 글꼴: Pretendard (OFL)"
+theme_override_colors/font_color = Color(1, 1, 1, 0.45)
+theme_override_font_sizes/font_size = 15
+text = "캐릭터: VARCO 3D · 소품: Poly Haven, Kenney (CC0) · 글꼴: Pretendard (OFL)"
 horizontal_alignment = 2

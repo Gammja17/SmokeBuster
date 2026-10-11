@@ -6,22 +6,25 @@ extends CanvasLayer
 @onready var indicators: Control = $Indicators
 @onready var crosshair: Control = $Crosshair
 @onready var hitmarker: Label = $Crosshair/Hitmarker
-@onready var zone_label: Label = $TopCenter/V/Zone
+@onready var zone_label: Label = $BottomRight/Zone
+@onready var place_label: Label = $BottomRight/Place
 @onready var rank_label: Label = $TopCenter/V/Rank
 @onready var next_label: Label = $TopCenter/V/Next
-@onready var xp_bar: ProgressBar = $TopCenter/V/XpBar
-@onready var money_label: Label = $TopLeft/Money
-@onready var combo_label: Label = $TopLeft/Combo
-@onready var feed: VBoxContainer = $TopLeft/Feed
-@onready var radar: Control = $Radar
-@onready var mental_label: Label = $BottomLeft/V/Mental
-@onready var complaints_label: Label = $BottomLeft/V/Complaints
-@onready var weapon_label: Label = $BottomRight/V/Weapon
-@onready var ammo_bar: ProgressBar = $BottomRight/V/AmmoBar
-@onready var ammo_label: Label = $BottomRight/V/Ammo
-@onready var slots: HBoxContainer = $BottomRight/V/Slots
-@onready var truck_box: HBoxContainer = $BottomRight/V/Truck
-@onready var truck_bar: ProgressBar = $BottomRight/V/Truck/TruckBar
+@onready var xp_bar: ProgressBar = $TopCenter/V/Bar/XpBar
+@onready var cur_rank: Label = $TopCenter/V/Bar/Cur
+@onready var next_rank: Label = $TopCenter/V/Bar/NextRank
+@onready var money_label: Label = $TopRight/Money
+@onready var wanted_label: Label = $TopRight/Wanted
+@onready var combo_label: Label = $TopRight/Combo
+@onready var feed: VBoxContainer = $Feed
+@onready var radar: Control = $BottomLeft/Radar
+@onready var mental_bar: ProgressBar = $BottomLeft/Bars/MentalBar
+@onready var weapon_label: Label = $TopRight/Weapon
+@onready var ammo_bar: ProgressBar = $BottomLeft/Bars/WaterBar
+@onready var ammo_label: Label = $TopRight/Ammo
+@onready var truck_box: HBoxContainer = $TopRight/Truck
+@onready var truck_bar: ProgressBar = $TopRight/Truck/TruckBar
+@onready var wheel: Control = $WeaponWheel
 @onready var prompt: Label = $Prompt
 @onready var hint: Label = $Hint
 @onready var viewfinder: Control = $Viewfinder
@@ -31,9 +34,9 @@ extends CanvasLayer
 @onready var polaroid_photo: TextureRect = $Polaroid/V/Photo
 @onready var polaroid_caption: Label = $Polaroid/V/Caption
 @onready var announce_label: Label = $Announce
-@onready var mission_box: PanelContainer = $Mission
-@onready var mission_title: Label = $Mission/V/Title
-@onready var mission_info: Label = $Mission/V/Info
+@onready var mission_box: PanelContainer = $TopLeft/Mission
+@onready var mission_title: Label = $TopLeft/Mission/V/Title
+@onready var mission_info: Label = $TopLeft/Mission/V/Info
 @onready var banner_big: Label = $Banner/Big
 @onready var banner_small: Label = $Banner/Small
 
@@ -43,17 +46,21 @@ var _polaroid_tw: Tween
 var _player: Node3D
 var _money_shown := 0.0
 var _money_target := 0
+var _world: Node
+var _place_t := 0.0
 
 
 func bind(world: Node, player: Node3D) -> void:
 	radar.world = world
 	radar.player = player
 	indicators.player = player
+	wheel.player = player
 	_player = player
+	_world = world
 
 
 func set_mission(title: String, place: String, left: float, dist: float, done: int, total: int) -> void:
-	## 오른쪽 위 출동 정보 (빈 제목이면 숨김)
+	## 왼쪽 위 출동 정보 (빈 제목이면 숨김)
 	mission_box.visible = title != ""
 	if title == "":
 		return
@@ -64,8 +71,9 @@ func set_mission(title: String, place: String, left: float, dist: float, done: i
 
 
 func set_driving(on: bool, kind := "") -> void:
-	## 운전 중엔 무기 칸을 숨기고, 소방차일 때만 조준점
-	$BottomRight.visible = not on
+	## 운전 중엔 무기 표시를 숨기고, 소방차일 때만 조준점
+	weapon_label.visible = not on
+	ammo_label.visible = not on
 	crosshair.visible = not on or kind == "firetruck"
 
 
@@ -100,12 +108,15 @@ func show_polaroid(tex: Texture2D, caption: String, good: bool) -> void:
 func set_rank(rank_name: String, zone_name: String, xp: int, lo: int, hi: int) -> void:
 	rank_label.text = rank_name
 	zone_label.text = zone_name
+	cur_rank.text = str(Game.rank() + 1)
+	next_rank.text = str(Game.rank() + 2)
 	if hi <= lo:
 		next_label.text = "최고 계급 · 실적 %d" % xp
+		next_rank.text = "★"
 		xp_bar.max_value = 1
 		xp_bar.value = 1
 		return
-	next_label.text = "다음 승진까지 %d" % (hi - xp)
+	next_label.text = "%d / %d" % [xp, hi]
 	xp_bar.max_value = hi - lo
 	xp_bar.value = xp - lo
 
@@ -119,7 +130,22 @@ func _process(delta: float) -> void:
 		var n: int = _player.photo_targets().size()
 		vf_targets.text = ("신고 대상 %d 포착!" % n) if n > 0 else ""
 	_money_shown = move_toward(_money_shown, _money_target, max(abs(_money_target - _money_shown) * 8.0, 40.0) * delta)
-	money_label.text = "%d원" % int(_money_shown)
+	money_label.text = _won(int(_money_shown))
+	# 오른쪽 아래 현재 위치 (GTA 의 동네/거리 이름 자리)
+	_place_t -= delta
+	if _place_t <= 0.0 and _world and _player:
+		_place_t = 0.5
+		place_label.text = _world._place_name(_player.global_position)
+
+
+func _won(m: int) -> String:
+	var s := str(m)
+	var out := ""
+	for i in s.length():
+		if i > 0 and (s.length() - i) % 3 == 0:
+			out += ","
+		out += s[i]
+	return "₩" + out
 
 
 func set_combo(mult: float) -> void:
@@ -134,15 +160,28 @@ func set_combo(mult: float) -> void:
 
 
 func add_feed(text: String, color := Color.WHITE) -> void:
-	var l := Label.new()
-	l.text = text
-	l.add_theme_color_override("font_color", color)
-	l.add_theme_font_size_override("font_size", 22)
+	## GTA 식 알림: 미니맵 위에 검은 상자로 쌓인다 (새 것이 아래)
+	var l := PanelContainer.new()
+	var sb := StyleBoxFlat.new()
+	sb.bg_color = Color(0, 0, 0, 0.62)
+	sb.content_margin_left = 10
+	sb.content_margin_right = 10
+	sb.content_margin_top = 4
+	sb.content_margin_bottom = 6
+	sb.border_width_left = 4
+	sb.border_color = color
+	l.add_theme_stylebox_override("panel", sb)
+	l.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	var t := Label.new()
+	t.text = text
+	t.add_theme_font_size_override("font_size", 19)
+	t.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	l.add_child(t)
 	feed.add_child(l)
-	feed.move_child(l, 0)
 	while feed.get_child_count() > 5:
-		feed.get_child(feed.get_child_count() - 1).queue_free()
-		feed.remove_child(feed.get_child(feed.get_child_count() - 1))
+		var old := feed.get_child(0)
+		feed.remove_child(old)
+		old.queue_free()
 	var tw := l.create_tween()
 	tw.tween_interval(3.0)
 	tw.tween_property(l, "modulate:a", 0.0, 0.6)
@@ -150,37 +189,31 @@ func add_feed(text: String, color := Color.WHITE) -> void:
 
 
 func set_mental(cur: int, maximum: int) -> void:
-	mental_label.text = "멘탈 " + "♥".repeat(cur) + "♡".repeat(maximum - cur)
+	mental_bar.max_value = maximum
+	mental_bar.value = cur
+	mental_bar.modulate = Color(1, 0.4, 0.4) if cur <= 1 else Color.WHITE
 
 
 func set_complaints(cur: int, maximum: int) -> void:
-	complaints_label.text = "민원 %d건" % cur
+	## 민원은 GTA 의 수배 별처럼
+	wanted_label.text = "" if cur <= 0 else "★".repeat(min(cur, 5)) + "☆".repeat(max(5 - cur, 0))
 	if cur > 0:
-		complaints_label.pivot_offset = complaints_label.size / 2
-		complaints_label.scale = Vector2.ONE * 1.25
-		create_tween().tween_property(complaints_label, "scale", Vector2.ONE, 0.25)
+		wanted_label.pivot_offset = Vector2(wanted_label.size.x, wanted_label.size.y / 2)
+		wanted_label.scale = Vector2.ONE * 1.3
+		create_tween().tween_property(wanted_label, "scale", Vector2.ONE, 0.25)
 
 
 func set_weapon(id: String) -> void:
 	weapon_label.text = Game.WEAPONS[id].name
-	for i in Game.WEAPON_ORDER.size():
-		var wid: String = Game.WEAPON_ORDER[i]
-		var slot: Label = slots.get_child(i)
-		if wid in Game.owned:
-			slot.text = "%d %s" % [i + 1, Game.WEAPONS[wid].name]
-			slot.modulate = Color(1, 0.95, 0.5) if wid == id else Color(1, 1, 1, 0.6)
-		else:
-			slot.text = "%d -" % (i + 1)
-			slot.modulate = Color(1, 1, 1, 0.25)
 
 
 func set_ammo(id: String, cur: float, maximum: float) -> void:
 	ammo_bar.max_value = maximum
 	ammo_bar.value = cur
 	if Game.WEAPONS[id].mode == "throw":
-		ammo_label.text = "양동이 %d / %d" % [int(cur), int(maximum)]
+		ammo_label.text = "%d  /  %d" % [int(cur), int(maximum)]
 	else:
-		ammo_label.text = "물 %d / %d" % [int(ceil(cur)), int(maximum)]
+		ammo_label.text = "%d  /  %d" % [int(ceil(cur)), int(maximum)]
 	ammo_label.modulate = Color(1, 0.4, 0.4) if cur < maximum * 0.2 else Color.WHITE
 
 

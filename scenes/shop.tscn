@@ -120,4 +120,4 @@ text = "타이틀로"
 custom_minimum_size = Vector2(320, 64)
 layout_mode = 2
 theme_override_font_sizes/font_size = 32
-text = "순찰 계속 (Tab)"
+text = "순찰 계속 (B)"
