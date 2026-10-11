@@ -10,11 +10,6 @@ const WALK := 20.0           # 보행자 길(인도 중앙) 반 크기
 const INNER := 18.0          # 건물이 서는 안쪽 반 크기
 const EDGE := 63.0           # 바깥 인도 끝
 
-const BUILDINGS := [
-	"building-a", "building-b", "building-c", "building-d", "building-e", "building-f", "building-g",
-	"building-h", "building-i", "building-j", "building-k", "building-l", "building-m", "building-n",
-]
-const TALL := ["building-skyscraper-a", "building-skyscraper-b", "building-skyscraper-c", "building-skyscraper-e"]
 const GRAFFITI := ["흡연금지", "CCTV 작동중", "쓰레기 버리지 마시오", "XX 참교육", "민지 사랑해", "여기서 담배 피면 벌금"]
 ## 순찰차/소방차 자리 (x, z): 여기엔 주차된 차를 두지 않는다
 const RESERVED := [Vector2(-3.6, -24.0), Vector2(3.6, -24.0)]
@@ -155,7 +150,7 @@ func _mat_key(mat: Material) -> String:
 # ---------------------------------------------------------------- 기본 바닥/도로
 
 func _ground() -> void:
-	_box(Vector3(260, 1, 260), Vector3(0, -0.5, 0), Color(0.24, 0.25, 0.27), true)
+	_box_m(root, Vector3(260, 1, 260), Vector3(0, -0.5, 0), Mats.asphalt(), true)
 	# 보이지 않는 경계 벽
 	for s in [-1, 1]:
 		_wall(Vector3(1, 20, 140), Vector3(s * (EDGE + 1), 10, 0))
@@ -163,27 +158,11 @@ func _ground() -> void:
 
 
 func _roads() -> void:
-	var lines := [-PITCH, 0.0, PITCH]
-	var seg := PITCH - ROAD_W     # 교차로 사이 길이 (44)
-	var tiles := 4
-	var tile_len := seg / tiles
-	for c in lines:
-		for k in range(2):
-			var start: float = lines[k] + ROAD_W / 2
-			for i in tiles:
-				var along: float = start + tile_len * (i + 0.5)
-				var model := "road-crossing" if (i == 0 or i == tiles - 1) else "road-straight"
-				# 도로 타일은 X 방향으로 뻗어 있다. 세로 도로 (x = c) 는 90도 돌린다
-				_prop("roads/" + model, Vector3(c, 0.01, along), 90.0, Vector3(tile_len, ROAD_W, ROAD_W), false)
-				# 가로 도로 (z = c)
-				_prop("roads/" + model, Vector3(along, 0.01, c), 0.0, Vector3(tile_len, ROAD_W, ROAD_W), false)
-	for x in lines:
-		for z in lines:
-			_prop("roads/road-square", Vector3(x, 0.01, z), 0.0, Vector3.ONE * ROAD_W, false)
+	_road_markings()
 
 
 func _block_slab(c: Vector2) -> void:
-	_box(Vector3(BLOCK_HALF * 2, 0.06, BLOCK_HALF * 2), Vector3(c.x, 0.03, c.y), Color(0.66, 0.64, 0.6), false)
+	_box_m(root, Vector3(BLOCK_HALF * 2, 0.06, BLOCK_HALF * 2), Vector3(c.x, 0.03, c.y), Mats.pavement(), false)
 	# 연석 테두리
 	for s in [-1, 1]:
 		_box(Vector3(BLOCK_HALF * 2 + 0.3, 0.16, 0.3), Vector3(c.x, 0.08, c.y + s * BLOCK_HALF), Color(0.8, 0.8, 0.78), false)
@@ -205,17 +184,15 @@ func _building_block(c: Vector2, turn: int) -> void:
 	for q in [Vector2(-1, -1), Vector2(1, -1), Vector2(-1, 1), Vector2(1, 1)]:
 		var pos := Vector3(q.x * 10.0, 0, q.y * 10.0)
 		var rot := 180.0 if q.y < 0 else 0.0
-		_building(block, pos, rot, slot)
+		_building(block, pos, rot, 16.0 - 0.6)
 		_shop_slot(block, pos, rot, 16.0)
 	_alley(block)
 
 
 func _alley(block: Node3D) -> void:
-	var brick_colors := [Color(0.55, 0.33, 0.27), Color(0.5, 0.45, 0.4), Color(0.42, 0.38, 0.36), Color(0.6, 0.5, 0.42)]
-	var floor_col := Color(0.28, 0.28, 0.3)
 	# 바닥 (남북 골목 + 동쪽 가지)
-	_box_in(block, Vector3(4.0, 0.05, 36.0), Vector3(0, 0.03, 0), floor_col, false)
-	_box_in(block, Vector3(16.0, 0.05, 4.0), Vector3(10.0, 0.03, 0), floor_col, false)
+	_box_m(block, Vector3(4.0, 0.05, 36.0), Vector3(0, 0.03, 0), Mats.pbr("concrete", 3.0, Color(0.7, 0.7, 0.72)), false)
+	_box_m(block, Vector3(16.0, 0.05, 4.0), Vector3(10.0, 0.03, 0), Mats.pbr("concrete", 3.0, Color(0.7, 0.7, 0.72)), false)
 	# 배수구 줄
 	_box_in(block, Vector3(0.3, 0.06, 36.0), Vector3(0, 0.04, 0), Color(0.18, 0.18, 0.2), false)
 
@@ -232,7 +209,7 @@ func _alley(block: Node3D) -> void:
 		var center: Vector3 = w[0]
 		var size: Vector3 = w[1]
 		var inward: Vector3 = w[2]
-		_box_in(block, Vector3(size.x, h, size.z), center + Vector3(0, h / 2, 0), brick_colors[rng.randi() % brick_colors.size()], true)
+		_box_m(block, Vector3(size.x, h, size.z), center + Vector3(0, h / 2, 0), Mats.brick() if rng.randf() < 0.6 else Mats.facade(rng.randi() % 7), true)
 		# 벽 장식: 뒷문, 실외기, 배관, 창문
 		var length: float = max(size.x, size.z)
 		var along := Vector3(0, 0, 1) if size.z > size.x else Vector3(1, 0, 0)
@@ -372,31 +349,171 @@ func random_crossing() -> Array:
 	return [a, b] if randf() < 0.5 else [b, a]
 
 
-func _building(parent: Node3D, pos: Vector3, rot: float, slot: float) -> void:
-	var tall := rng.randf() < 0.25
-	var name: String = (TALL if tall else BUILDINGS)[rng.randi_range(0, (TALL if tall else BUILDINGS).size() - 1)]
-	var aabb := _model_aabb("commercial/" + name)
-	var sx := aabb.size.x
-	var sz := aabb.size.z
-	var s: float = min(slot / sx, slot / sz) * 0.98
-	if tall:
-		s = min(s, 9.0)
-	var node := _instance("commercial/" + name)
-	node.scale = Vector3.ONE * s
-	node.rotation_degrees.y = rot
-	# 건물 바닥 중심이 slot 중심에 오도록
-	var center := Vector3(aabb.get_center().x, 0, aabb.get_center().z) * s
-	node.position = pos - Basis(Vector3.UP, deg_to_rad(rot)) * center
-	parent.add_child(node)
-	# 충돌 박스는 slot 전체
+const SHOPS := [
+	["편의점", Color(0.1, 0.55, 0.3)], ["약국", Color(0.1, 0.5, 0.25)], ["치킨", Color(0.95, 0.55, 0.05)],
+	["PC방", Color(0.15, 0.25, 0.7)], ["노래방", Color(0.6, 0.15, 0.6)], ["부동산", Color(0.75, 0.15, 0.15)],
+	["카페", Color(0.35, 0.22, 0.12)], ["분식", Color(0.9, 0.3, 0.2)], ["미용실", Color(0.85, 0.35, 0.55)],
+	["세탁소", Color(0.2, 0.55, 0.8)], ["휴대폰", Color(0.95, 0.75, 0.05)], ["빵집", Color(0.75, 0.5, 0.2)],
+	["안경", Color(0.25, 0.25, 0.3)], ["학원", Color(0.2, 0.4, 0.75)], ["꽃집", Color(0.55, 0.75, 0.25)],
+	["치과", Color(0.15, 0.6, 0.65)], ["국밥", Color(0.7, 0.2, 0.15)], ["당구장", Color(0.1, 0.45, 0.2)],
+]
+
+var buildings: Array = []      # 건물 정보 {pos(정면 가운데), normal, name, node}
+
+
+func _building(parent: Node3D, pos: Vector3, rot: float, slot: float, shop := "") -> Node3D:
+	## 실사 소재로 지은 건물: 1층 상가(쇼윈도, 간판, 차양), 위층 유리창, 옥상 실외기/물탱크
+	var b := Node3D.new()
+	b.position = pos
+	b.rotation_degrees.y = rot
+	parent.add_child(b)
+	var w := slot - 0.3
+	var d := slot - 0.3
+	var floors := rng.randi_range(3, 7)
+	var h := 4.2 + (floors - 1) * 3.2
+	var wall: Material = Mats.facade(rng.randi() % 7)
+	_box_m(b, Vector3(w, h, d), Vector3(0, h / 2, 0), wall, false)
+	# 1층과 2층 사이 띠, 옥상 난간
+	var trim: Material = Mats.flat(Color(0.82, 0.82, 0.8), 0.6)
+	_box_m(b, Vector3(w + 0.2, 0.3, d + 0.2), Vector3(0, 4.2, 0), trim, false)
+	for s in [-1, 1]:
+		_box_m(b, Vector3(w + 0.2, 0.7, 0.25), Vector3(0, h + 0.35, s * (d / 2)), trim, false)
+		_box_m(b, Vector3(0.25, 0.7, d + 0.2), Vector3(s * (w / 2), h + 0.35, 0), trim, false)
+
+	# 1층 상가
+	var info: Array = SHOPS[rng.randi() % SHOPS.size()]
+	var shop_name: String = shop if shop != "" else info[0]
+	var sign_col: Color = info[1]
+	var fz := d / 2
+	_box_m(b, Vector3(w - 1.2, 2.7, 0.08), Vector3(0, 1.55, fz + 0.03), Mats.shop_glass(), false)
+	var frame: Material = Mats.flat(Color(0.15, 0.15, 0.17), 0.4, 0.6)
+	for x in [-(w - 1.2) / 2, 0.0, (w - 1.2) / 2]:
+		_box_m(b, Vector3(0.12, 2.8, 0.14), Vector3(x, 1.5, fz + 0.05), frame, false)
+	_box_m(b, Vector3(w - 1.0, 0.12, 0.14), Vector3(0, 2.9, fz + 0.05), frame, false)
+	# 간판
+	_box_m(b, Vector3(w - 0.4, 1.0, 0.25), Vector3(0, 3.55, fz + 0.14), Mats.sign_board(sign_col), false)
+	var l := Label3D.new()
+	l.text = shop_name
+	l.font = load("res://assets/fonts/Pretendard-ExtraBold.otf")
+	l.font_size = 120
+	l.pixel_size = 0.0065
+	l.outline_size = 0
+	l.modulate = Color(1, 1, 1)
+	l.position = Vector3(0, 3.55, fz + 0.28)
+	l.visibility_range_end = 70.0
+	b.add_child(l)
+	# 차양
+	if rng.randf() < 0.5:
+		var aw := MeshInstance3D.new()
+		var am := BoxMesh.new()
+		am.size = Vector3(w - 1.4, 0.08, 1.3)
+		am.material = Mats.flat(sign_col.lightened(0.2), 0.8)
+		aw.mesh = am
+		aw.position = Vector3(0, 2.95, fz + 0.62)
+		aw.rotation_degrees.x = 14
+		b.add_child(aw)
+	# 세로 간판 (한국 상가 느낌)
+	if rng.randf() < 0.45:
+		var vs: Array = SHOPS[rng.randi() % SHOPS.size()]
+		var vx := (w / 2 - 0.5) * (1 if rng.randf() < 0.5 else -1)
+		_box_m(b, Vector3(0.9, 3.6, 0.3), Vector3(vx, 6.6, fz + 0.4), Mats.sign_board(vs[1]), false)
+		var vl := Label3D.new()
+		vl.text = "\n".join(Array(vs[0].split("")))
+		vl.font = l.font
+		vl.font_size = 96
+		vl.pixel_size = 0.0065
+		vl.outline_size = 0
+		vl.line_spacing = -18
+		vl.position = Vector3(vx, 6.6, fz + 0.57)
+		vl.visibility_range_end = 70.0
+		b.add_child(vl)
+
+	# 위층 창문 (앞면과 양옆)
+	var glass: Material = Mats.glass()
+	var sill: Material = Mats.flat(Color(0.85, 0.85, 0.83), 0.6)
+	for f in range(1, floors):
+		var y := 4.2 + (f - 1) * 3.2 + 1.65
+		var cols := int((w - 1.0) / 2.6)
+		for c in cols:
+			var x := -((cols - 1) * 2.6) / 2 + c * 2.6
+			_box_m(b, Vector3(1.6, 1.7, 0.1), Vector3(x, y, fz + 0.02), glass, false)
+			_box_m(b, Vector3(1.8, 0.12, 0.28), Vector3(x, y - 0.9, fz + 0.1), sill, false)
+		for s in [-1, 1]:
+			var rows := int((d - 1.0) / 2.6)
+			for c in rows:
+				var z := -((rows - 1) * 2.6) / 2 + c * 2.6
+				_box_m(b, Vector3(0.1, 1.7, 1.6), Vector3(s * (w / 2 + 0.02), y, z), glass, false)
+	# 옥상
+	var ac: Material = Mats.flat(Color(0.8, 0.82, 0.84), 0.5, 0.3)
+	for i in rng.randi_range(1, 3):
+		_box_m(b, Vector3(1.2, 0.9, 0.9), Vector3(rng.randf_range(-w / 3, w / 3), h + 0.45, rng.randf_range(-d / 3, d / 3)), ac, false)
+	if rng.randf() < 0.5:
+		var tank := MeshInstance3D.new()
+		var tm := CylinderMesh.new()
+		tm.top_radius = 0.9
+		tm.bottom_radius = 0.9
+		tm.height = 1.8
+		tm.material = Mats.flat(Color(0.25, 0.45, 0.75), 0.4)
+		tank.mesh = tm
+		tank.position = Vector3(rng.randf_range(-w / 4, w / 4), h + 0.9, rng.randf_range(-d / 4, d / 4))
+		b.add_child(tank)
+
+	# 충돌
 	var body := StaticBody3D.new()
-	body.position = pos + Vector3(0, aabb.size.y * s / 2, 0)
+	body.position = Vector3(0, h / 2, 0)
 	var shape := CollisionShape3D.new()
 	var box := BoxShape3D.new()
-	box.size = Vector3(slot, aabb.size.y * s, slot)
+	box.size = Vector3(w, h, d)
 	shape.shape = box
 	body.add_child(shape)
-	parent.add_child(body)
+	b.add_child(body)
+	buildings.append({"node": b, "name": shop_name, "height": h})
+	return b
+
+
+func _box_m(parent: Node3D, size: Vector3, pos: Vector3, mat: Material, collide: bool) -> MeshInstance3D:
+	var mesh := MeshInstance3D.new()
+	var bm := BoxMesh.new()
+	bm.size = size
+	mesh.mesh = bm
+	mesh.material_override = mat
+	mesh.position = pos
+	parent.add_child(mesh)
+	if collide:
+		var body := StaticBody3D.new()
+		body.position = pos
+		var shape := CollisionShape3D.new()
+		var bs := BoxShape3D.new()
+		bs.size = size
+		shape.shape = bs
+		body.add_child(shape)
+		parent.add_child(body)
+	return mesh
+
+
+func _road_markings() -> void:
+	## 도로 위 노란 중앙선, 흰 가장자리선, 교차로 앞 횡단보도
+	var yellow := Color(0.95, 0.75, 0.1)
+	var white := Color(0.92, 0.92, 0.9)
+	var lines := [-PITCH, 0.0, PITCH]
+	for c in lines:
+		for k in range(2):
+			var a: float = lines[k] + ROAD_W / 2
+			var b: float = lines[k + 1] - ROAD_W / 2
+			var mid := (a + b) / 2
+			var len := b - a
+			for off in [-0.15, 0.15]:
+				_box(Vector3(0.12, 0.02, len - 6.0), Vector3(c + off, 0.012, mid), yellow, false)
+				_box(Vector3(len - 6.0, 0.02, 0.12), Vector3(mid, 0.012, c + off), yellow, false)
+			for off in [-4.5, 4.5]:
+				_box(Vector3(0.15, 0.02, len), Vector3(c + off, 0.012, mid), white, false)
+				_box(Vector3(len, 0.02, 0.15), Vector3(mid, 0.012, c + off), white, false)
+			# 횡단보도 (교차로 양쪽)
+			for end in [a + 1.6, b - 1.6]:
+				for i in 9:
+					var x := -4.0 + i * 1.0
+					_box(Vector3(0.5, 0.02, 2.6), Vector3(c + x, 0.013, end), white, false)
+					_box(Vector3(2.6, 0.02, 0.5), Vector3(end, 0.013, c + x), white, false)
 
 
 # ---------------------------------------------------------------- 공원
@@ -405,7 +522,7 @@ func _park(c: Vector2) -> void:
 	var park := Node3D.new()
 	park.position = Vector3(c.x, 0.06, c.y)
 	root.add_child(park)
-	_box_in(park, Vector3(INNER * 2, 0.06, INNER * 2), Vector3(0, 0.03, 0), Color(0.36, 0.62, 0.3), false)
+	_box_m(park, Vector3(INNER * 2, 0.06, INNER * 2), Vector3(0, 0.03, 0), Mats.grass(), false)
 	# 십자 산책로
 	_box_in(park, Vector3(INNER * 2, 0.07, 3.0), Vector3(0, 0.035, 0), Color(0.78, 0.7, 0.55), false)
 	_box_in(park, Vector3(3.0, 0.07, INNER * 2), Vector3(0, 0.035, 0), Color(0.78, 0.7, 0.55), false)
@@ -565,8 +682,8 @@ func _outer_ring() -> void:
 	# 바깥 인도
 	var ow := EDGE - (PITCH + ROAD_W / 2)   # 4
 	for s in [-1, 1]:
-		_box(Vector3(EDGE * 2, 0.06, ow), Vector3(0, 0.03, s * (EDGE - ow / 2)), Color(0.66, 0.64, 0.6), false)
-		_box(Vector3(ow, 0.06, EDGE * 2 - ow * 2), Vector3(s * (EDGE - ow / 2), 0.03, 0), Color(0.66, 0.64, 0.6), false)
+		_box_m(root, Vector3(EDGE * 2, 0.06, ow), Vector3(0, 0.03, s * (EDGE - ow / 2)), Mats.pavement(), false)
+		_box_m(root, Vector3(ow, 0.06, EDGE * 2 - ow * 2), Vector3(s * (EDGE - ow / 2), 0.03, 0), Mats.pavement(), false)
 	# 바깥 건물 벽 (안쪽을 바라봄)
 	var slot := 12.0
 	var count := int((EDGE * 2 + slot * 2) / slot)

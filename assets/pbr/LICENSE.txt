@@ -1,0 +1,2 @@
+Textures and HDRI from Poly Haven (https://polyhaven.com), CC0 license.
+asphalt_02, concrete_pavement, brick_wall_02, concrete_wall_003, aerial_grass_rock, grey_plaster_02, beige_wall_001, blue_floor_tiles_01, kloofendal_48d_partly_cloudy_puresky

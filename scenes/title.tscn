@@ -11,11 +11,13 @@ script = ExtResource("1_title")
 environment = ExtResource("2_env")
 
 [node name="Sun" type="DirectionalLight3D" parent="."]
-light_color = Color(1, 0.93, 0.82, 1)
-light_energy = 1.15
+light_color = Color(1, 0.92, 0.8, 1)
+light_energy = 2.0
+light_angular_distance = 0.8
+light_volumetric_fog_energy = 1.5
 shadow_enabled = true
-directional_shadow_max_distance = 60.0
-directional_shadow_mode = 0
+directional_shadow_max_distance = 140.0
+directional_shadow_blend_splits = true
 
 [node name="Pivot" type="Node3D" parent="."]
 
