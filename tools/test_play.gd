@@ -283,6 +283,15 @@ func _run() -> void:
 
 	# ---- 거점과 건물 문
 	check(world.city.station_node != null, "파출소 건물")
+	for p in world.get_tree().get_nodes_in_group("pickup"):
+		p.queue_free()
+	var cws: Array = world.get_tree().get_nodes_in_group("coworker")
+	check(cws.size() == 4, "파출소 동료 4명")
+	player.global_position = cws[0].global_position + Vector3(0, 0.3, 1.5)
+	await frames(3)
+	player._try_pickup()
+	await frames(2)
+	check(cws[0]._label.text != cws[0].display_name(), "E 로 동료와 대화")
 	var roles: Array = world.city.doors.map(func(d): return d.role)
 	check("station" in roles and "store" in roles and "hospital" in roles, "파출소/편의점/병원 문 (%s)" % str(roles))
 	var store: Dictionary = world.city.doors.filter(func(d): return d.role == "store")[0]

@@ -120,6 +120,7 @@ func _ready() -> void:
 		_spawn_shop()
 	_spawn_vehicles()
 	_spawn_props(22)
+	_spawn_coworkers()
 	_decorate_station()
 	hud.radar.range_m = 75.0 if Game.upgrades.cctv > 0 else 45.0
 	# 시작하자마자 근처에 흡연자 둘
@@ -1098,6 +1099,17 @@ func _use_door(door: Dictionary) -> void:
 			Sfx.play("buy")
 		"school":
 			hud.add_feed("교문이 닫혀 있어요. 근처 학생들 비행을 잘 지켜보세요", Color(0.8, 0.85, 1))
+
+
+func _spawn_coworkers() -> void:
+	## 파출소 앞 동료들 (소장님은 정문, 상황실 요원은 옆, 정비 담당은 차고, 신입은 순찰차 옆)
+	for c in [["chief", Vector3(-20.6, 0.06, -7.7), 0.0], ["ops", Vector3(-23.0, 0.06, -7.5), 0.3],
+			["mechanic", Vector3(-11.0, 0.06, -7.7), -0.4], ["rookie", Vector3(-14.8, 0.06, -5.4), 0.3]]:
+		var cw := Coworker.new()
+		cw.role = c[0]
+		cw.position = c[1]
+		cw.rotation.y = PI + c[2]
+		add_child(cw)
 
 
 func _decorate_station() -> void:
