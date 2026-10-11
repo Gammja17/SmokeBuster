@@ -1,5 +1,5 @@
 extends Node
-## 진행 상황(날짜, 돈, 무기, 강화)과 무기/상점/날짜 데이터. 저장은 user://save.json.
+## 진행 상황(돈, 실적, 무기, 강화)과 무기/상점/사건/계급 데이터. 저장은 user://save.json.
 
 const SAVE_PATH := "user://save.json"
 
@@ -51,22 +51,19 @@ const UPGRADES := {
 }
 const TRUCK_PRICE := 3000
 
-var day := 1
 var money := 0
+var xp := 0                  # 실적. 쌓이면 승진하고 관할 구역이 넓어진다
 var owned: Array = ["spray"]
 var upgrades := {"tank": 0, "pressure": 0, "speed": 0, "mental": 0}
 var has_truck := false
 var total_caught := 0
-
-# 이번 근무 결과 (결과 화면으로 넘겨줌)
-var last_result := {}
 
 
 func _ready() -> void:
 	load_game()
 
 
-## 업무 종류. how: water(물로 해결), photo(카메라 신고), pickup(E로 줍기), break(물로 간판 합선)
+## 사건 종류. how: water(물로 해결), photo(카메라 신고), pickup(E로 줍기), break(물로 간판 합선)
 const TASKS := {
 	"smoke": {"name": "흡연자 단속", "short": "흡연", "reward": 50, "how": "water", "color": Color(1, 0.3, 0.2)},
 	"litter": {"name": "무단투기 단속", "short": "무단투기", "reward": 60, "how": "water", "color": Color(0.95, 0.6, 0.2)},
@@ -78,86 +75,65 @@ const TASKS := {
 	"drunk": {"name": "음주운전 신고", "short": "음주운전", "reward": 250, "how": "photo", "color": Color(0.3, 0.9, 1)},
 	"shop": {"name": "불법업소 철거", "short": "불법업소", "reward": 300, "how": "break", "color": Color(1, 0.35, 0.95)},
 }
-## 관할 구역 (x, z 사각형). 날이 갈수록 넓어진다.
+## 관할 구역 (x, z 사각형). 승진하면 넓어진다.
 const ZONES := [
 	{"name": "1구역 · 첫 번째 블록", "rect": Rect2(-63, -63, 72, 72)},
 	{"name": "2구역 · 공원까지", "rect": Rect2(-63, -63, 126, 72)},
 	{"name": "3구역 · 동네 전체", "rect": Rect2(-63, -63, 126, 126)},
 ]
 const RANKS := ["순경", "경장", "경사", "경위", "경감", "경정", "총경"]
-const RANK_DAYS := [1, 3, 4, 5, 7, 10, 14]   # 이 날짜부터 그 계급
+const RANK_XP := [0, 400, 1100, 2400, 4500, 7500, 12000]   # 이 실적부터 그 계급
+const HOW_TEXT := {"water": "물", "photo": "촬영", "pickup": "E 줍기", "break": "간판에 물"}
+const SPAWN_NAMES := {
+	"smoke": "흡연자", "trash": "쓰레기", "litter": "무단투기범", "jaywalk": "무단횡단", "teen_smoke": "담배 피는 학생",
+	"shop": "불법업소", "teen_drink": "술 마시는 학생", "bully": "학교폭력", "drunk": "음주운전",
+}
 
 
-func rank_index(d: int) -> int:
+func rank() -> int:
 	var r := 0
-	for i in RANK_DAYS.size():
-		if d >= RANK_DAYS[i]:
+	for i in RANK_XP.size():
+		if xp >= RANK_XP[i]:
 			r = i
 	return r
 
 
-const HOW_TEXT := {"water": "물", "photo": "촬영", "pickup": "E 줍기", "break": "간판에 물"}
+func rank_name() -> String:
+	return RANKS[rank()]
 
 
-func day_config(d: int) -> Dictionary:
-	## 날짜별 업무 목록과 등장하는 사건. 5일차는 보스, 이후는 무한 모드처럼 계속 어려워진다.
-	var cfg := {
-		"duration": 180.0,
-		"tasks": {},
-		"max_smokers": 2 + d,
-		"spawn_every": max(9.0 - d * 0.8, 3.5),
-		"pedestrians": 12 + d * 2,
-		"weights": {"normal": 1.0},
-		"spawns": ["smoke", "trash"],
-		"boss": false,
-		"title": "",
-		"zone": zone_index(d),
+## 다음 승진까지 [현재 계급 시작 실적, 다음 계급 실적] (최고 계급이면 같은 값)
+func rank_span() -> Array:
+	var r := rank()
+	var nxt: int = RANK_XP[min(r + 1, RANK_XP.size() - 1)]
+	return [RANK_XP[r], nxt]
+
+
+func zone_for_rank(r: int) -> int:
+	return 0 if r == 0 else (1 if r == 1 else 2)
+
+
+## 계급별로 동네에 나오는 사건과 밀도
+func patrol_config(r: int) -> Dictionary:
+	var spawns := ["smoke", "trash", "litter"]
+	var weights := {"normal": 1.0}
+	if r >= 1:
+		spawns.append_array(["jaywalk", "teen_smoke", "shop"])
+		weights = {"normal": 1.0, "runner": 0.5}
+	if r >= 2:
+		spawns.append_array(["teen_drink", "bully", "drunk"])
+		weights = {"normal": 1.0, "runner": 0.6, "angry": 0.5, "group": 0.35}
+	var zone := zone_for_rank(r)
+	return {
+		"spawns": spawns,
+		"weights": weights,
+		"zone": zone,
+		"incidents": min(5 + r * 2, 13),        # 동시에 진행 중인 사건 수 목표
+		"pedestrians": [9, 14, 20][zone],
+		"shops": [0, 1, 2][zone],
+		"events": r >= 1,
+		"boss": r >= 3,
 	}
-	match d:
-		1:
-			cfg.duration = 150.0
-			cfg.tasks = {"smoke": 3, "trash": 5}
-			cfg.title = "첫 출근"
-		2:
-			cfg.tasks = {"smoke": 3, "trash": 4, "litter": 2, "jaywalk": 2}
-			cfg.weights = {"normal": 1.0, "runner": 0.5}
-			cfg.spawns = ["smoke", "trash", "litter", "jaywalk"]
-			cfg.title = "길거리 질서"
-		3:
-			cfg.tasks = {"smoke": 3, "jaywalk": 2, "teen_smoke": 2, "shop": 1}
-			cfg.weights = {"normal": 1.0, "runner": 0.5, "angry": 0.5}
-			cfg.spawns = ["smoke", "trash", "litter", "jaywalk", "teen_smoke", "shop"]
-			cfg.title = "수상한 동네"
-		4:
-			cfg.tasks = {"smoke": 3, "litter": 2, "teen_drink": 3, "bully": 1, "drunk": 1, "shop": 1}
-			cfg.weights = {"normal": 1.0, "runner": 0.6, "angry": 0.5, "group": 0.4}
-			cfg.spawns = ["smoke", "trash", "litter", "jaywalk", "teen_smoke", "teen_drink", "bully", "drunk", "shop"]
-			cfg.title = "골목의 그림자"
-		5:
-			cfg.tasks = {"smoke": 5, "trash": 6, "jaywalk": 2, "teen_smoke": 2, "bully": 1, "drunk": 1, "shop": 2}
-			cfg.weights = {"normal": 1.0, "runner": 0.6, "angry": 0.6, "group": 0.4}
-			cfg.spawns = ["smoke", "trash", "litter", "jaywalk", "teen_smoke", "teen_drink", "bully", "drunk", "shop"]
-			cfg.boss = true
-			cfg.title = "골초왕 등장"
-		_:
-			var n := d - 5
-			cfg.tasks = {"smoke": 5 + n, "trash": 6, "litter": 2, "jaywalk": 2 + n / 2, "teen_smoke": 2, "teen_drink": 2, "bully": 1, "drunk": 1 + n / 3, "shop": 2}
-			cfg.weights = {"normal": 1.0, "runner": 0.8, "angry": 0.8, "group": 0.6}
-			cfg.spawns = ["smoke", "trash", "litter", "jaywalk", "teen_smoke", "teen_drink", "bully", "drunk", "shop"]
-			cfg.boss = d % 3 == 0
-			cfg.title = "무한 근무 %d일차" % n
-	# 좁은 구역엔 사람도 적게
-	cfg.pedestrians = [7 + d, 12, 12 + d * 2][cfg.zone]
-	cfg.max_smokers = [2 + d, 4, 2 + d][cfg.zone]
-	return cfg
-
-
-func zone_index(d: int) -> int:
-	if d <= 2:
-		return 0
-	if d == 3:
-		return 1
-	return 2
 
 
 func weapon_stat(id: String, key: String) -> float:
@@ -189,8 +165,8 @@ func reward_for(kind: String) -> int:
 
 
 func new_game() -> void:
-	day = 1
 	money = 0
+	xp = 0
 	owned = ["spray"]
 	upgrades = {"tank": 0, "pressure": 0, "speed": 0, "mental": 0}
 	has_truck = false
@@ -199,7 +175,7 @@ func new_game() -> void:
 
 
 func has_save() -> bool:
-	return FileAccess.file_exists(SAVE_PATH) and (day > 1 or money > 0)
+	return FileAccess.file_exists(SAVE_PATH) and (xp > 0 or money > 0)
 
 
 func save_game() -> void:
@@ -207,7 +183,7 @@ func save_game() -> void:
 	if f == null:
 		return
 	f.store_string(JSON.stringify({
-		"day": day, "money": money, "owned": owned, "upgrades": upgrades,
+		"money": money, "xp": xp, "owned": owned, "upgrades": upgrades,
 		"has_truck": has_truck, "total_caught": total_caught,
 	}))
 
@@ -218,8 +194,8 @@ func load_game() -> void:
 	var data = JSON.parse_string(FileAccess.get_file_as_string(SAVE_PATH))
 	if typeof(data) != TYPE_DICTIONARY:
 		return
-	day = int(data.get("day", 1))
 	money = int(data.get("money", 0))
+	xp = int(data.get("xp", 0))
 	owned = data.get("owned", ["spray"])
 	var up: Dictionary = data.get("upgrades", {})
 	for k in upgrades:

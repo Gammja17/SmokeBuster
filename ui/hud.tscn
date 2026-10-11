@@ -1,4 +1,4 @@
-[gd_scene load_steps=10 format=3]
+[gd_scene load_steps=9 format=3]
 
 [ext_resource type="Script" path="res://scripts/ui/hud.gd" id="1_hud"]
 [ext_resource type="Script" path="res://scripts/ui/radar.gd" id="2_radar"]
@@ -13,17 +13,6 @@ content_margin_bottom = 8.0
 bg_color = Color(0.97, 0.96, 0.92, 1)
 shadow_color = Color(0, 0, 0, 0.45)
 shadow_size = 10
-
-[sub_resource type="StyleBoxFlat" id="tasks_bg"]
-content_margin_left = 12.0
-content_margin_top = 8.0
-content_margin_right = 12.0
-content_margin_bottom = 8.0
-bg_color = Color(0.03, 0.07, 0.14, 0.72)
-corner_radius_top_left = 10
-corner_radius_top_right = 10
-corner_radius_bottom_right = 10
-corner_radius_bottom_left = 10
 
 [sub_resource type="StyleBoxFlat" id="ammo_fill"]
 bg_color = Color(0.35, 0.78, 1, 1)
@@ -148,27 +137,27 @@ layout_mode = 2
 theme_override_constants/separation = 2
 alignment = 1
 
-[node name="Day" type="Label" parent="TopCenter/V"]
+[node name="Zone" type="Label" parent="TopCenter/V"]
 layout_mode = 2
 theme_override_colors/font_color = Color(0.7, 0.85, 1, 1)
 theme_override_font_sizes/font_size = 20
-text = "1일차 · 첫 출근"
+text = "1구역 · 첫 번째 블록"
 horizontal_alignment = 1
 
-[node name="Timer" type="Label" parent="TopCenter/V"]
+[node name="Rank" type="Label" parent="TopCenter/V"]
 layout_mode = 2
 theme_override_fonts/font = ExtResource("4_title")
 theme_override_font_sizes/font_size = 40
-text = "2:30"
+text = "순경"
 horizontal_alignment = 1
 
-[node name="Quota" type="Label" parent="TopCenter/V"]
+[node name="Next" type="Label" parent="TopCenter/V"]
 layout_mode = 2
 theme_override_font_sizes/font_size = 20
-text = "단속 0 / 5"
+text = "다음 승진까지 400"
 horizontal_alignment = 1
 
-[node name="QuotaBar" type="ProgressBar" parent="TopCenter/V"]
+[node name="XpBar" type="ProgressBar" parent="TopCenter/V"]
 custom_minimum_size = Vector2(0, 10)
 layout_mode = 2
 theme_override_styles/fill = SubResource("quota_fill")
@@ -196,26 +185,6 @@ theme_override_colors/font_color = Color(1, 0.55, 0.3, 1)
 theme_override_fonts/font = ExtResource("4_title")
 theme_override_font_sizes/font_size = 26
 text = "콤보 x2"
-
-[node name="Tasks" type="PanelContainer" parent="TopLeft"]
-layout_mode = 2
-mouse_filter = 2
-theme_override_styles/panel = SubResource("tasks_bg")
-
-[node name="V" type="VBoxContainer" parent="TopLeft/Tasks"]
-layout_mode = 2
-theme_override_constants/separation = 2
-
-[node name="Head" type="Label" parent="TopLeft/Tasks/V"]
-layout_mode = 2
-theme_override_colors/font_color = Color(0.55, 0.85, 1, 1)
-theme_override_fonts/font = ExtResource("4_title")
-theme_override_font_sizes/font_size = 20
-text = "오늘의 업무"
-
-[node name="List" type="VBoxContainer" parent="TopLeft/Tasks/V"]
-layout_mode = 2
-theme_override_constants/separation = 0
 
 [node name="Feed" type="VBoxContainer" parent="TopLeft"]
 layout_mode = 2
@@ -257,7 +226,7 @@ text = "멘탈 ♥♥♥♥♥"
 layout_mode = 2
 theme_override_colors/font_color = Color(1, 0.8, 0.5, 1)
 theme_override_font_sizes/font_size = 22
-text = "민원 ○○○○○"
+text = "민원 0건"
 
 [node name="BottomRight" type="PanelContainer" parent="."]
 anchors_preset = 3

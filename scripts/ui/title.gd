@@ -21,11 +21,11 @@ func _ready() -> void:
 	var fresh: Button = _ui.get_node("Left/New")
 	var save_label: Label = _ui.get_node("Left/Save")
 	if Game.has_save():
-		save_label.text = "이어하기: %d일차 · %d원" % [Game.day, Game.money]
+		save_label.text = "이어하기: %s · %d원" % [Game.rank_name(), Game.money]
 	else:
 		save_label.visible = false
 		cont.visible = false
-		fresh.text = "출근하기"
+		fresh.text = "순찰 시작"
 	cont.pressed.connect(_start.bind(false))
 	fresh.pressed.connect(_start.bind(true))
 	for b in [cont, fresh]:

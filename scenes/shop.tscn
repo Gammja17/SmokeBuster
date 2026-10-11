@@ -4,6 +4,7 @@
 [ext_resource type="FontFile" path="res://assets/fonts/Pretendard-ExtraBold.otf" id="2_title"]
 
 [node name="Shop" type="Control"]
+process_mode = 3
 layout_mode = 3
 anchors_preset = 15
 anchor_right = 1.0
@@ -19,7 +20,7 @@ anchor_right = 1.0
 anchor_bottom = 1.0
 grow_horizontal = 2
 grow_vertical = 2
-color = Color(0.04, 0.09, 0.18, 1)
+color = Color(0.03, 0.07, 0.15, 0.93)
 
 [node name="M" type="MarginContainer" parent="."]
 layout_mode = 1
@@ -119,4 +120,4 @@ text = "타이틀로"
 custom_minimum_size = Vector2(320, 64)
 layout_mode = 2
 theme_override_font_sizes/font_size = 32
-text = "출근하기!"
+text = "순찰 계속 (Tab)"

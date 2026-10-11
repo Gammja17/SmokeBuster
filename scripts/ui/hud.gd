@@ -6,10 +6,10 @@ extends CanvasLayer
 @onready var indicators: Control = $Indicators
 @onready var crosshair: Control = $Crosshair
 @onready var hitmarker: Label = $Crosshair/Hitmarker
-@onready var day_label: Label = $TopCenter/V/Day
-@onready var timer_label: Label = $TopCenter/V/Timer
-@onready var quota_label: Label = $TopCenter/V/Quota
-@onready var quota_bar: ProgressBar = $TopCenter/V/QuotaBar
+@onready var zone_label: Label = $TopCenter/V/Zone
+@onready var rank_label: Label = $TopCenter/V/Rank
+@onready var next_label: Label = $TopCenter/V/Next
+@onready var xp_bar: ProgressBar = $TopCenter/V/XpBar
 @onready var money_label: Label = $TopLeft/Money
 @onready var combo_label: Label = $TopLeft/Combo
 @onready var feed: VBoxContainer = $TopLeft/Feed
@@ -24,7 +24,6 @@ extends CanvasLayer
 @onready var truck_bar: ProgressBar = $BottomRight/V/Truck/TruckBar
 @onready var prompt: Label = $Prompt
 @onready var hint: Label = $Hint
-@onready var task_list: VBoxContainer = $TopLeft/Tasks/V/List
 @onready var viewfinder: Control = $Viewfinder
 @onready var vf_targets: Label = $Viewfinder/Targets
 @onready var flash: ColorRect = $Flash
@@ -35,12 +34,9 @@ extends CanvasLayer
 @onready var banner_big: Label = $Banner/Big
 @onready var banner_small: Label = $Banner/Small
 
-const TASK_ROW := preload("res://ui/task_row.tscn")
-
 var _banner_tw: Tween
 var _announce_tw: Tween
 var _polaroid_tw: Tween
-var _rows := {}
 var _player: Node3D
 var _money_shown := 0.0
 var _money_target := 0
@@ -51,28 +47,6 @@ func bind(world: Node, player: Node3D) -> void:
 	radar.player = player
 	indicators.player = player
 	_player = player
-
-
-func setup_tasks(tasks: Dictionary) -> void:
-	for c in task_list.get_children():
-		c.queue_free()
-	_rows.clear()
-	for id in tasks:
-		var row := TASK_ROW.instantiate()
-		task_list.add_child(row)
-		row.setup(id)
-		row.set_count(0, tasks[id])
-		_rows[id] = row
-
-
-func set_task(id: String, cur: int, need: int) -> void:
-	if _rows.has(id):
-		_rows[id].set_count(cur, need)
-		if cur == need:
-			var r: Control = _rows[id]
-			r.pivot_offset = r.size / 2
-			r.scale = Vector2.ONE * 1.15
-			create_tween().tween_property(r, "scale", Vector2.ONE, 0.25)
 
 
 func set_camera_mode(on: bool) -> void:
@@ -103,22 +77,17 @@ func show_polaroid(tex: Texture2D, caption: String, good: bool) -> void:
 	_polaroid_tw.tween_callback(func(): polaroid.visible = false)
 
 
-func set_day(text: String) -> void:
-	day_label.text = text
-
-
-func set_time(sec: float) -> void:
-	var s := int(ceil(max(sec, 0.0)))
-	timer_label.text = "%d:%02d" % [s / 60, s % 60]
-	timer_label.modulate = Color(1, 0.4, 0.35) if s <= 15 and s % 2 == 0 else Color.WHITE
-
-
-func set_quota(caught: int, quota: int) -> void:
-	quota_label.text = "단속 %d / %d" % [caught, quota]
-	quota_bar.max_value = quota
-	quota_bar.value = min(caught, quota)
-	if caught >= quota:
-		quota_label.modulate = Color(0.5, 1, 0.5)
+func set_rank(rank_name: String, zone_name: String, xp: int, lo: int, hi: int) -> void:
+	rank_label.text = rank_name
+	zone_label.text = zone_name
+	if hi <= lo:
+		next_label.text = "최고 계급 · 실적 %d" % xp
+		xp_bar.max_value = 1
+		xp_bar.value = 1
+		return
+	next_label.text = "다음 승진까지 %d" % (hi - xp)
+	xp_bar.max_value = hi - lo
+	xp_bar.value = xp - lo
 
 
 func set_money(m: int) -> void:
@@ -165,7 +134,7 @@ func set_mental(cur: int, maximum: int) -> void:
 
 
 func set_complaints(cur: int, maximum: int) -> void:
-	complaints_label.text = "민원 " + "●".repeat(cur) + "○".repeat(maximum - cur)
+	complaints_label.text = "민원 %d건" % cur
 	if cur > 0:
 		complaints_label.pivot_offset = complaints_label.size / 2
 		complaints_label.scale = Vector2.ONE * 1.25

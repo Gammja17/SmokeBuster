@@ -6,7 +6,7 @@
 [ext_resource type="Script" path="res://scripts/player/player.gd" id="4_player"]
 [ext_resource type="PackedScene" path="res://ui/hud.tscn" id="5_hud"]
 [ext_resource type="PackedScene" path="res://ui/pause.tscn" id="6_pause"]
-[ext_resource type="PackedScene" path="res://ui/result.tscn" id="7_result"]
+[ext_resource type="PackedScene" path="res://scenes/shop.tscn" id="7_shop"]
 
 [node name="World" type="Node3D"]
 script = ExtResource("1_world")
@@ -33,4 +33,9 @@ script = ExtResource("4_player")
 
 [node name="Pause" parent="." instance=ExtResource("6_pause")]
 
-[node name="Result" parent="." instance=ExtResource("7_result")]
+[node name="ShopLayer" type="CanvasLayer" parent="."]
+process_mode = 3
+layer = 12
+visible = false
+
+[node name="Shop" parent="ShopLayer" instance=ExtResource("7_shop")]

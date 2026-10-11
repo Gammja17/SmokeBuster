@@ -29,6 +29,8 @@ var ring_lanes: Array = []   # 자동차가 도는 사각 경로 [half, clockwis
 var shop_slots: Array = []   # 불법업소를 붙일 수 있는 건물 정면 {pos, normal, used}
 var zone := Rect2(-EDGE, -EDGE, EDGE * 2, EDGE * 2)   # 관할 구역 (x, z)
 var allowed_nodes: Array[int] = []
+var _all := {}               # 구역으로 거르기 전 원본 (spots, hydrants, shop_slots, edges)
+var _barrier_nodes: Array[Node] = []
 var _block_turn := {}
 
 var _aabb_cache := {}
@@ -293,8 +295,8 @@ func _alley(block: Node3D) -> void:
 	block.add_child(lamp)
 
 	# 바닥 소품: 쓰레기통, 박스, 쓰레기봉투, 물웅덩이
-	_prop_in(block, "roads/dumpster", Vector3(16.0, 0, -1.2), 90.0, 6.5, true)
-	_prop_in(block, "roads/dumpster", Vector3(-1.1, 0, 16.5), 0.0, 6.5, true)
+	_prop_in(block, "roads/dumpster", Vector3(13.5, 0, -1.25), 90.0, 6.0, true)
+	_prop_in(block, "roads/dumpster", Vector3(-1.25, 0, 11.0), 0.0, 6.0, true)
 	_prop_in(block, "cars/box", Vector3(1.3, 0, -15.5), 20.0, 1.1, true)
 	_prop_in(block, "cars/box", Vector3(1.4, 0.78, -15.4), -10.0, 0.9, true)
 	_prop_in(block, "cars/box", Vector3(12.5, 0, 1.3), 35.0, 1.0, true)
@@ -456,20 +458,22 @@ func _sidewalk_props(c: Vector2) -> void:
 	for side in 4:
 		var ang := side * 90.0
 		var basis := Basis(Vector3.UP, deg_to_rad(ang))
+		# 변 한가운데(-3~3)는 골목 입구라서 비워 둔다
 		for i in [-1, 1]:
-			var tp := cw + basis * Vector3(i * 9.0, 0, BLOCK_HALF - 0.55)
+			var tp := cw + basis * Vector3(i * 14.0, 0, BLOCK_HALF - 0.55)
 			_planter_tree(tp)
 		var kind := rng.randi_range(0, 3)
+		var off := 8.5 * (1 if rng.randf() < 0.5 else -1)
 		match kind:
 			0:
-				_bus_stop(cw + basis * Vector3(0, 0, 19.9), ang)
-				spots.append({"pos": cw + basis * Vector3(2.6, 0, 19.6), "kind": "busstop", "busy": false})
+				_bus_stop(cw + basis * Vector3(off, 0, 19.9), ang)
+				spots.append({"pos": cw + basis * Vector3(off + 2.6, 0, 19.6), "kind": "busstop", "busy": false})
 			1:
-				_cafe(cw + basis * Vector3(3.0, 0, 19.0), ang)
-				spots.append({"pos": cw + basis * Vector3(0.0, 0, 19.8), "kind": "cafe", "busy": false})
+				_cafe(cw + basis * Vector3(off, 0, 19.0), ang)
+				spots.append({"pos": cw + basis * Vector3(off - 2.5, 0, 19.8), "kind": "cafe", "busy": false})
 			_:
-				_trash_can(cw + basis * Vector3(2.0, 0, 21.45))
-				spots.append({"pos": cw + basis * Vector3(3.2, 0, 20.2), "kind": "street", "busy": false})
+				_trash_can(cw + basis * Vector3(off, 0, 21.45))
+				spots.append({"pos": cw + basis * Vector3(off + 1.2, 0, 20.2), "kind": "street", "busy": false})
 		if side % 2 == 0:
 			var hp := cw + basis * Vector3(-15.0, 0, 21.3)
 			_hydrant(hp)
@@ -652,16 +656,26 @@ func in_zone(p: Vector3) -> bool:
 
 func apply_zone(rect: Rect2) -> void:
 	## 관할 구역 밖은 못 가게 막고, 사람/사건이 구역 안에서만 생기게 거른다.
+	if _all.is_empty():
+		_all = {"spots": spots, "hydrants": hydrants.duplicate(), "shop_slots": shop_slots, "edges": nav_edges.duplicate(true)}
 	zone = rect
 	allowed_nodes.clear()
 	for i in nav_nodes.size():
 		if in_zone(nav_nodes[i]):
 			allowed_nodes.append(i)
-	for i in nav_edges:
-		nav_edges[i] = nav_edges[i].filter(func(j): return in_zone(nav_nodes[j]) and in_zone(nav_nodes[i]))
-	spots = spots.filter(func(sp): return in_zone(sp.pos))
-	hydrants = hydrants.filter(func(h): return in_zone(h))
-	shop_slots = shop_slots.filter(func(sl): return in_zone(sl.pos))
+	var edges: Dictionary = _all.edges
+	for i in edges:
+		nav_edges[i] = edges[i].filter(func(j): return in_zone(nav_nodes[j]) and in_zone(nav_nodes[i]))
+	spots = _all.spots.filter(func(sp): return in_zone(sp.pos))
+	hydrants.clear()
+	for h in _all.hydrants:
+		if in_zone(h):
+			hydrants.append(h)
+	shop_slots = _all.shop_slots.filter(func(sl): return in_zone(sl.pos))
+	for n in _barrier_nodes:
+		if is_instance_valid(n):
+			n.queue_free()
+	_barrier_nodes.clear()
 	_zone_barriers()
 
 
@@ -699,6 +713,7 @@ func _zone_barriers() -> void:
 		shape.shape = bs
 		wall.add_child(shape)
 		root.add_child(wall)
+		_barrier_nodes.append(wall)
 		var n := int(length / 2.6)
 		for i in n:
 			var p := a + dir * (1.3 + i * 2.6) - inward * 0.3
@@ -707,7 +722,7 @@ func _zone_barriers() -> void:
 		for i in range(1, int(length / 18.0) + 1):
 			var sp := a + dir * (i * 18.0 - 9.0) + inward * 0.1
 			var l := Label3D.new()
-			l.text = "관할 구역 밖\n승진하면 넓어져요"
+			l.text = "관할 구역 밖\n실적을 쌓아 승진하면 열려요"
 			l.font = load("res://assets/fonts/Pretendard-ExtraBold.otf")
 			l.font_size = 48
 			l.pixel_size = 0.008
@@ -716,10 +731,12 @@ func _zone_barriers() -> void:
 			l.position = sp + Vector3(0, 2.0, 0)
 			l.rotation = _face_rot(inward)
 			root.add_child(l)
+			_barrier_nodes.append(l)
 	var mi := MeshInstance3D.new()
 	mi.mesh = st.commit()
 	mi.material_override = _plain_mat()
 	root.add_child(mi)
+	_barrier_nodes.append(mi)
 
 
 func _barricade(st: SurfaceTool, p: Vector3, dir: Vector3) -> void:

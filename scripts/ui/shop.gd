@@ -1,5 +1,5 @@
 extends Control
-## 근무 사이 상점. 무기 구매, 강화, 소방차 호출권.
+## 장비실. 순찰 중 Tab 으로 열어 무기 구매, 강화, 소방차 호출권을 산다.
 
 const ITEM := preload("res://ui/shop_item.tscn")
 
@@ -8,23 +8,34 @@ const ITEM := preload("res://ui/shop_item.tscn")
 @onready var _weapons: VBoxContainer = $M/V/Cols/Weapons/Scroll/List
 @onready var _upgrades: VBoxContainer = $M/V/Cols/Upgrades/Scroll/List
 
+signal closed
+
 
 func _ready() -> void:
-	Input.mouse_mode = Input.MOUSE_MODE_VISIBLE
-	Sfx.music(true)
 	$M/V/Footer/Start.pressed.connect(func():
 		Sfx.play("click")
-		get_tree().change_scene_to_file("res://scenes/world.tscn"))
+		closed.emit())
 	$M/V/Footer/ToTitle.pressed.connect(func():
 		Sfx.play("click")
+		Game.save_game()
+		get_tree().paused = false
 		get_tree().change_scene_to_file("res://scenes/title.tscn"))
-	var cfg := Game.day_config(Game.day)
-	var tasks := []
-	for id in cfg.tasks:
-		tasks.append("%s %d" % [Game.TASKS[id].short, cfg.tasks[id]])
-	if cfg.boss:
-		tasks.append("골초왕(보스)")
-	_brief.text = "다음 근무: %d일차 「%s」 · %s\n업무: %s" % [Game.day, cfg.title, Game.ZONES[cfg.zone].name, " · ".join(tasks)]
+	refresh()
+
+
+func _input(event: InputEvent) -> void:
+	# Tab/Esc 로 닫기 (Tab 은 GUI 포커스 이동보다 먼저 잡는다)
+	if not is_visible_in_tree():
+		return
+	if event is InputEventKey and event.pressed and not event.echo and event.keycode in [KEY_TAB, KEY_ESCAPE]:
+		get_viewport().set_input_as_handled()
+		closed.emit()
+
+
+func refresh() -> void:
+	var span: Array = Game.rank_span()
+	var next := "최고 계급" if span[1] <= span[0] else "다음 승진까지 실적 %d" % (span[1] - Game.xp)
+	_brief.text = "%s · %s · %s" % [Game.rank_name(), Game.ZONES[Game.zone_for_rank(Game.rank())].name, next]
 	_refresh()
 
 

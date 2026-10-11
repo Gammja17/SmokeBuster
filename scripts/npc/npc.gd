@@ -743,7 +743,8 @@ func _knockdown(dir: Vector3, power: float) -> void:
 
 func _down_step(delta: float) -> Vector3:
 	_down_t -= delta
-	if _down_t <= 0.0 and _anim.current_animation != "pick-up":
+	if _down_t <= 0.0:
+		_down_t = 99.0   # 일어나는 중 (한 번만)
 		_play("pick-up", 0.15)
 		get_tree().create_timer(0.45).timeout.connect(_get_up)
 	return Vector3.ZERO
@@ -777,7 +778,7 @@ func _resume_anim() -> void:
 
 func _check_slip() -> void:
 	## 물웅덩이 위를 뛰다가 미끄러진다
-	if _slip_cd > 0.0 or state == State.DOWN:
+	if _slip_cd > 0.0 or state == State.DOWN or done:
 		return
 	var hv := Vector2(velocity.x, velocity.z).length()
 	if hv < 3.0:

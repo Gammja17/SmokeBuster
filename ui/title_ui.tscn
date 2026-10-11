@@ -43,14 +43,14 @@ text = "물대포
 layout_mode = 2
 theme_override_colors/font_color = Color(1, 0.88, 0.4, 1)
 theme_override_font_sizes/font_size = 22
-text = "이어하기: 3일차 · 1200원"
+text = "이어하기: 경장 · 1200원"
 
 [node name="Continue" type="Button" parent="Left"]
 custom_minimum_size = Vector2(340, 62)
 layout_mode = 2
 size_flags_horizontal = 0
 theme_override_font_sizes/font_size = 30
-text = "이어서 출근"
+text = "이어서 순찰"
 
 [node name="New" type="Button" parent="Left"]
 custom_minimum_size = Vector2(340, 62)
@@ -64,8 +64,8 @@ layout_mode = 2
 theme_override_colors/font_color = Color(0.8, 0.88, 1, 1)
 theme_override_font_sizes/font_size = 19
 text = "WASD 이동 · Shift 달리기 · 마우스 조준 · 좌클릭 물 뿌리기
-1~5 / 휠 무기 교체 · E 소화전에서 물 채우기 · F 소방차 · Esc 일시정지
-흡연자만 적시세요! 행인에게 뿌리면 민원이 들어옵니다."
+1~5 / 휠 무기 · 우클릭 카메라 신고 · E 줍기/물 채우기 · Tab 장비실
+정해진 일은 없어요. 동네를 돌며 마음대로 단속하세요!"
 
 [node name="Credit" type="Label" parent="."]
 anchors_preset = 3
