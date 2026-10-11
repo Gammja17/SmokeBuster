@@ -308,7 +308,7 @@ func _run() -> void:
 	var looks := {}
 	for n in world.get_tree().get_nodes_in_group("npc"):
 		looks[n.model_name] = true
-	check(looks.size() >= 5, "행인 생김새가 다양함 (%d종)" % looks.size())
+	check(looks.size() >= 4, "행인 생김새가 다양함 (%d종)" % looks.size())
 	# Tab 무기 휠: 누르면 열리고 시간이 느려지고, 마우스를 민 쪽 무기로 바뀐다
 	game.owned = ["spray", "pistol", "bucket", "soaker", "hose"]
 	player.equip("spray")

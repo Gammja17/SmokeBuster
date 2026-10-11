@@ -75,7 +75,7 @@ func _merge_static() -> void:
 	var originals: Array = root.find_children("*", "MeshInstance3D", true, false)
 	for mi in originals:
 		var mesh: Mesh = mi.mesh
-		if mesh == null:
+		if mesh == null or mi.has_meta("keep_lod"):
 			continue
 		var xf: Transform3D = mi.global_transform
 		var center: Vector3 = xf * mesh.get_aabb().get_center()
@@ -93,6 +93,8 @@ func _merge_static() -> void:
 			else:
 				groups[key].st.append_from(mesh, si, xf)
 	for mi in originals:
+		if mi.has_meta("keep_lod"):
+			continue
 		mi.get_parent().remove_child(mi)
 		mi.queue_free()
 	var merged := Node3D.new()
@@ -1176,6 +1178,13 @@ func _ph(parent: Node3D, name: String, pos: Vector3, rot: float, scl: float) -> 
 	n.rotation_degrees.y = rot
 	n.scale = Vector3.ONE * scl
 	parent.add_child(n)
+	# 고해상도 소품(가로등 3만, 소화전 9천 삼각형)은 합치지 않고 그대로 둬서 엔진 LOD 가 멀수록 줄이게 한다
+	var far := {"street_lamp_01": 110.0, "fire_hydrant": 60.0}.get(name, 70.0) as float
+	for mi in n.find_children("*", "MeshInstance3D", true, false):
+		mi.set_meta("keep_lod", true)
+		mi.visibility_range_end = far
+		if name == "fire_hydrant":
+			mi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 	return n
 
 

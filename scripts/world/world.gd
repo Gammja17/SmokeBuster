@@ -62,6 +62,14 @@ var _capture_grace := 0.0
 func _ready() -> void:
 	get_tree().paused = false
 	$Sun.rotation_degrees = Vector3(-50, -35, 0)
+	Game.apply_quality(self)
+	# 처음 보는 인물이 나올 때 디스크에서 읽느라 끊기지 않게 미리 다 읽어 둔다 (load 는 캐시됨)
+	var names := {}
+	for pool in Npc.POOLS.values():
+		for n in pool:
+			names[n] = true
+	for n in names:
+		load("res://assets/people/%s.glb" % n)
 	rank = Game.rank()
 	cfg = Game.patrol_config(rank)
 	city.build(self, 4242)
@@ -1133,8 +1141,8 @@ func _spawn_townsfolk() -> void:
 	var fronts := city.shop_slots.filter(func(sl): return not sl.used and city.in_zone(sl.pos))
 	fronts.shuffle()
 	for sl in fronts.slice(0, 2):
-		sl.used = true   # 불법업소가 같은 자리에 생기지 않게
-		_place_town("s_vendor", sl.pos + sl.normal * 1.4, sl.normal, 0.0)
+		# 업소 자리는 비워 두고 옆으로 비켜 선다 (불법업소가 생겨도 겹치지 않게)
+		_place_town("s_vendor", sl.pos + sl.normal * 1.4, sl.normal, -3.5)
 
 
 func _place_town(role: String, pos: Vector3, normal: Vector3, side: float) -> void:

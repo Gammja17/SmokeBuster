@@ -3,9 +3,10 @@
 importer="texture"
 type="CompressedTexture2D"
 uid="uid://yg3kme73mmn"
-path="res://.godot/imported/m_thief_1.png-1ec0ec3b5121881e6705e2deec5adcfe.ctex"
+path.s3tc="res://.godot/imported/m_thief_1.png-1ec0ec3b5121881e6705e2deec5adcfe.s3tc.ctex"
 metadata={
-"vram_texture": false
+"imported_formats": ["s3tc_bptc"],
+"vram_texture": true
 }
 generator_parameters={
 "md5": "daeeb4e4574a1ca698e6d3b88958e7b5"
@@ -14,17 +15,17 @@ generator_parameters={
 [deps]
 
 source_file="res://assets/people/m_thief_1.png"
-dest_files=["res://.godot/imported/m_thief_1.png-1ec0ec3b5121881e6705e2deec5adcfe.ctex"]
+dest_files=["res://.godot/imported/m_thief_1.png-1ec0ec3b5121881e6705e2deec5adcfe.s3tc.ctex"]
 
 [params]
 
-compress/mode=0
+compress/mode=2
 compress/high_quality=false
 compress/lossy_quality=0.7
 compress/uastc_level=0
 compress/rdo_quality_loss=0.0
 compress/hdr_compression=1
-compress/normal_map=0
+compress/normal_map=1
 compress/channel_pack=0
 mipmaps/generate=true
 mipmaps/limit=-1
@@ -39,5 +40,5 @@ process/premult_alpha=false
 process/normal_map_invert_y=false
 process/hdr_as_srgb=false
 process/hdr_clamp_exposure=false
-process/size_limit=0
+process/size_limit=512
 detect_3d/compress_to=1

@@ -15,7 +15,13 @@ func _ready() -> void:
 		get_tree().paused = false
 		Input.mouse_mode = Input.MOUSE_MODE_VISIBLE
 		get_tree().change_scene_to_file("res://scenes/title.tscn"))
-	for b in [$Panel/V/Resume, $Panel/V/Shop, $Panel/V/Title2]:
+	# 그래픽 품질: 누를 때마다 높음 -> 낮음 -> 보통 -> 높음
+	var gfx: Button = $Panel/V/Gfx
+	gfx.text = "그래픽 품질: " + Game.QUALITY_NAMES[Game.quality]
+	gfx.pressed.connect(func():
+		Game.set_quality((Game.quality + 1) % 3, get_parent())
+		gfx.text = "그래픽 품질: " + Game.QUALITY_NAMES[Game.quality])
+	for b in [$Panel/V/Resume, $Panel/V/Shop, $Panel/V/Gfx, $Panel/V/Title2]:
 		b.mouse_entered.connect(Sfx.play.bind("select", -12.0))
 
 

@@ -64,6 +64,49 @@ var total_caught := 0
 
 func _ready() -> void:
 	load_game()
+	_load_settings()
+
+
+# ---------------------------------------------------------------- 그래픽 품질 (저장 파일과 따로 user://settings.cfg)
+
+const QUALITY_NAMES := ["낮음", "보통", "높음"]
+var quality := 2
+
+
+func _load_settings() -> void:
+	var cfg := ConfigFile.new()
+	if cfg.load("user://settings.cfg") == OK:
+		quality = clampi(cfg.get_value("gfx", "quality", 2), 0, 2)
+
+
+func set_quality(q: int, world: Node) -> void:
+	quality = q
+	var cfg := ConfigFile.new()
+	cfg.set_value("gfx", "quality", q)
+	cfg.save("user://settings.cfg")
+	apply_quality(world)
+
+
+func apply_quality(world: Node) -> void:
+	## 낮음: 반사/AO/안개 끄고 그림자 짧게, 3D 를 77% 해상도로 그려 FSR 로 키움
+	## 보통: 반사만 끄고 그림자 조금 짧게.  높음: 다 켬 (그래도 무거운 SSIL 과 PCSS 는 뺌)
+	var q := quality
+	var vp := get_viewport()
+	var env: Environment = world.get_node("Env").environment
+	var sun: DirectionalLight3D = world.get_node("Sun")
+	env.ssr_enabled = q >= 2
+	env.ssr_max_steps = 24
+	env.ssil_enabled = false
+	env.ssao_enabled = q >= 1
+	env.volumetric_fog_enabled = q >= 1
+	sun.directional_shadow_max_distance = [50.0, 80.0, 100.0][q]
+	sun.light_angular_distance = 0.0
+	RenderingServer.directional_shadow_atlas_set_size(2048 if q == 0 else 4096, true)
+	RenderingServer.directional_soft_shadow_filter_set_quality([RenderingServer.SHADOW_QUALITY_SOFT_VERY_LOW, RenderingServer.SHADOW_QUALITY_SOFT_LOW, RenderingServer.SHADOW_QUALITY_SOFT_MEDIUM][q])
+	vp.msaa_3d = Viewport.MSAA_2X if q == 2 else Viewport.MSAA_DISABLED
+	vp.screen_space_aa = Viewport.SCREEN_SPACE_AA_FXAA
+	vp.scaling_3d_mode = Viewport.SCALING_3D_MODE_FSR if q == 0 else Viewport.SCALING_3D_MODE_BILINEAR
+	vp.scaling_3d_scale = 0.77 if q == 0 else 1.0
 
 
 ## 사건 종류. how: water(물로 해결), photo(카메라 신고), pickup(E로 줍기), break(물로 간판 합선)
