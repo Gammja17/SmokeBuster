@@ -31,12 +31,14 @@ extends CanvasLayer
 @onready var polaroid: PanelContainer = $Polaroid
 @onready var polaroid_photo: TextureRect = $Polaroid/V/Photo
 @onready var polaroid_caption: Label = $Polaroid/V/Caption
+@onready var announce_label: Label = $Announce
 @onready var banner_big: Label = $Banner/Big
 @onready var banner_small: Label = $Banner/Small
 
 const TASK_ROW := preload("res://ui/task_row.tscn")
 
 var _banner_tw: Tween
+var _announce_tw: Tween
 var _polaroid_tw: Tween
 var _rows := {}
 var _player: Node3D
@@ -80,7 +82,7 @@ func set_camera_mode(on: bool) -> void:
 
 func camera_flash() -> void:
 	flash.color.a = 0.85
-	create_tween().tween_property(flash, "color:a", 0.0, 0.35)
+	create_tween().set_ignore_time_scale(true).tween_property(flash, "color:a", 0.0, 0.35)
 
 
 func show_polaroid(tex: Texture2D, caption: String, good: bool) -> void:
@@ -94,7 +96,7 @@ func show_polaroid(tex: Texture2D, caption: String, good: bool) -> void:
 	polaroid.position.x = get_viewport().get_visible_rect().size.x
 	if _polaroid_tw:
 		_polaroid_tw.kill()
-	_polaroid_tw = create_tween()
+	_polaroid_tw = create_tween().set_ignore_time_scale(true)
 	_polaroid_tw.tween_property(polaroid, "position:x", get_viewport().get_visible_rect().size.x - 330.0, 0.25).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
 	_polaroid_tw.tween_interval(2.6)
 	_polaroid_tw.tween_property(polaroid, "modulate:a", 0.0, 0.4)
@@ -229,6 +231,21 @@ func hit(strong: bool) -> void:
 	var tw := create_tween()
 	tw.tween_property(hitmarker, "scale", Vector2.ONE * (1.0 if strong else 0.6), 0.1)
 	tw.parallel().tween_property(hitmarker, "modulate:a", 0.0, 0.35 if strong else 0.15)
+
+
+func announce(text: String, color := Color(1, 0.85, 0.25)) -> void:
+	## 콤보 외침 (더블! 트리플! 물벼락!)
+	announce_label.text = text
+	announce_label.add_theme_color_override("font_color", color)
+	announce_label.modulate.a = 1.0
+	announce_label.scale = Vector2.ONE * 2.2
+	announce_label.rotation = deg_to_rad(randf_range(-6, 6))
+	if _announce_tw:
+		_announce_tw.kill()
+	_announce_tw = create_tween().set_ignore_time_scale(true)
+	_announce_tw.tween_property(announce_label, "scale", Vector2.ONE, 0.18).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+	_announce_tw.tween_interval(0.7)
+	_announce_tw.tween_property(announce_label, "modulate:a", 0.0, 0.3)
 
 
 func damage_flash(strength := 0.45) -> void:

@@ -15,6 +15,26 @@ var _age: PackedFloat32Array = []
 var _size: PackedFloat32Array = []
 var _color: Color = Color.WHITE
 
+static var _puff_tex: Texture2D
+
+
+## 가장자리로 갈수록 투명해지는 하얀 동그라미 (연기/물보라용)
+static func soft_puff() -> Texture2D:
+	if _puff_tex == null:
+		var g := Gradient.new()
+		g.set_color(0, Color(1, 1, 1, 1))
+		g.set_color(1, Color(1, 1, 1, 0))
+		g.add_point(0.45, Color(1, 1, 1, 0.55))
+		var t := GradientTexture2D.new()
+		t.gradient = g
+		t.fill = GradientTexture2D.FILL_RADIAL
+		t.fill_from = Vector2(0.5, 0.5)
+		t.fill_to = Vector2(1.0, 0.5)
+		t.width = 64
+		t.height = 64
+		_puff_tex = t
+	return _puff_tex
+
 
 func setup(mesh: Mesh, count: int, color: Color) -> void:
 	max_count = count

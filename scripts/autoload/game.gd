@@ -84,6 +84,18 @@ const ZONES := [
 	{"name": "2구역 · 공원까지", "rect": Rect2(-63, -63, 126, 72)},
 	{"name": "3구역 · 동네 전체", "rect": Rect2(-63, -63, 126, 126)},
 ]
+const RANKS := ["순경", "경장", "경사", "경위", "경감", "경정", "총경"]
+const RANK_DAYS := [1, 3, 4, 5, 7, 10, 14]   # 이 날짜부터 그 계급
+
+
+func rank_index(d: int) -> int:
+	var r := 0
+	for i in RANK_DAYS.size():
+		if d >= RANK_DAYS[i]:
+			r = i
+	return r
+
+
 const HOW_TEXT := {"water": "물", "photo": "촬영", "pickup": "E 줍기", "break": "간판에 물"}
 
 

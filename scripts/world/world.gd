@@ -49,6 +49,10 @@ var _hints: Array = []
 var _hint_t := 0.0
 var _city_sound: AudioStreamPlayer
 var _capture_grace := 0.0
+var _streak := 0
+var photos: Array[Texture2D] = []
+const CHEERS := ["속이 다 시원하네!", "잘한다!", "역시 단속반!", "오오~", "멋져요!", "그렇지!"]
+const STREAK_NAMES := ["", "", "더블!", "트리플!", "물벼락!", "싹쓸이!!", "동네 평화!!!"]
 
 
 func _ready() -> void:
@@ -60,8 +64,9 @@ func _ready() -> void:
 
 	player.water = water
 	player.hydrants = city.hydrants
-	player.position = Vector3(-7, 0.3, -7)
-	player.rotation.y = deg_to_rad(-135)
+	# 시작 위치: 첫 블록 동쪽 인도, 북쪽을 보고 선다 (가로등 기둥에 가리지 않게)
+	player.position = Vector3(-8.5, 0.3, -14.0)
+	player.rotation.y = deg_to_rad(-20)
 	water.exclude = [player.get_rid()]
 	water.npc_hit.connect(_on_water_hit)
 
@@ -72,7 +77,7 @@ func _ready() -> void:
 	player.prompt_changed.connect(hud.set_prompt)
 	player.camera_mode_changed.connect(hud.set_camera_mode)
 	player.photo_taken.connect(_on_photo)
-	player.trash_picked.connect(func(_t): _complete("trash", "쓰레기 줍기"))
+	player.trash_picked.connect(func(t): _complete("trash", "쓰레기 줍기", t.global_position - Vector3.UP * 1.6))
 	player.hurt.connect(_on_player_hurt)
 	player.call_truck.connect(_call_truck)
 	pause.resumed.connect(func():
@@ -199,6 +204,7 @@ func _process(delta: float) -> void:
 	_combo_t -= delta
 	if _combo_t <= 0.0 and combo > 1.0:
 		combo = 1.0
+		_streak = 0
 		hud.set_combo(combo)
 
 	_update_spawns(delta)
@@ -531,6 +537,7 @@ func _on_npc_resolved(npc: Npc, task: String) -> void:
 	var reward: int = Game.reward_for(npc.kind) if task == "smoke" else Game.TASKS[task].reward
 	var name: String = {"runner": "도망자 검거!", "angry": "다혈질 진압!", "boss": "골초왕 퇴치!!"}.get(npc.kind, Game.TASKS[task].name)
 	_complete(task, name, npc.global_position, reward)
+	_cheer(npc.global_position)
 	if npc.kind == "boss":
 		hud.banner("골초왕 퇴치!", "", 2.0)
 		player.shake(0.6)
@@ -551,6 +558,15 @@ func _complete(task: String, label: String, _pos := Vector3.ZERO, reward := -1) 
 	best_combo = max(best_combo, combo)
 	reward = int(reward * (combo if task != "trash" else 1.0))
 	earned += reward
+	if _pos != Vector3.ZERO:
+		Popups.text(self, _pos + Vector3.UP * 2.4, "+%d원" % reward, Color(1, 0.88, 0.3), 80 if task != "trash" else 54, 1.6, 1.1)
+	if task != "trash":
+		_streak += 1
+		if _streak >= 2:
+			hud.announce(STREAK_NAMES[min(_streak, STREAK_NAMES.size() - 1)])
+			Sfx.play("fanfare", -8.0, 1.0 + _streak * 0.08)
+		_hitstop(0.07 if _streak < 3 else 0.12)
+		player.shake(0.25)
 	hud.set_money(Game.money + earned)
 	hud.set_combo(combo)
 	hud.hit(true)
@@ -575,6 +591,31 @@ func _complete(task: String, label: String, _pos := Vector3.ZERO, reward := -1) 
 		Sfx.play("fanfare")
 
 
+func _cheer(pos: Vector3) -> void:
+	## 근처 행인들이 박수 치며 좋아한다
+	var n := 0
+	for p in npcs.get_children():
+		if n >= 2:
+			break
+		if p is Npc and p.kind == "ped" and p.state == Npc.State.WALK and p.global_position.distance_to(pos) < 14.0 and randf() < 0.7:
+			n += 1
+			var who: Npc = p
+			get_tree().create_timer(randf_range(0.3, 0.9)).timeout.connect(func():
+				if is_instance_valid(who) and who.state == Npc.State.WALK:
+					who.say(CHEERS.pick_random(), Color(0.7, 1, 0.7))
+					who._play("emote-yes", 0.1)
+					get_tree().create_timer(0.9).timeout.connect(func():
+						if is_instance_valid(who) and who.state == Npc.State.WALK:
+							who._play("walk")))
+
+
+func _hitstop(duration: float) -> void:
+	## 단속 순간 아주 잠깐 멈칫 (타격감)
+	Engine.time_scale = 0.08
+	await get_tree().create_timer(duration, true, false, true).timeout
+	Engine.time_scale = 1.0
+
+
 func _on_photo(targets: Array) -> void:
 	hud.camera_flash()
 	var names := []
@@ -587,11 +628,16 @@ func _on_photo(targets: Array) -> void:
 	# 찍힌 화면을 폴라로이드로 (그려진 다음 프레임에서 캡처)
 	var tex: Texture2D = null
 	if DisplayServer.get_name() != "headless":
+		# 사진에는 HUD 없이 거리만 담는다
+		hud.visible = false
 		await RenderingServer.frame_post_draw
 		var img := get_viewport().get_texture().get_image()
+		hud.visible = true
 		if img and not img.is_empty():
 			img.resize(int(img.get_width() * 0.3), int(img.get_height() * 0.3), Image.INTERPOLATE_BILINEAR)
 			tex = ImageTexture.create_from_image(img)
+	if tex and not names.is_empty() and photos.size() < 6:
+		photos.append(tex)
 	if names.is_empty():
 		hud.show_polaroid(tex, "신고할 만한 게 안 찍혔어요", false)
 	else:
@@ -654,6 +700,19 @@ func _end_shift(success: bool, fail_reason: String) -> void:
 	playing = false
 	player.input_enabled = false
 	player.set_camera_mode(false)
+	var grade := "F"
+	var bonus := 0
+	if success:
+		if complaints == 0 and best_combo >= 1.75:
+			grade = "S"
+			bonus = 200
+		elif complaints <= 1:
+			grade = "A"
+			bonus = 100
+		else:
+			grade = "B"
+	earned += bonus
+	var old_rank := Game.rank_index(Game.day)
 	var final_earned: int = earned if success else max(earned / 2, 0)
 	Game.money = max(Game.money + final_earned, 0)
 	var day_text := "%d일차 · %s" % [Game.day, cfg.title]
@@ -667,6 +726,9 @@ func _end_shift(success: bool, fail_reason: String) -> void:
 		"success": success, "fail_reason": fail_reason, "day_text": day_text,
 		"tasks_text": " · ".join(task_lines), "resolved": total_resolved, "complaints": complaints,
 		"best_combo": best_combo, "earned": final_earned,
+		"grade": grade, "bonus": bonus, "photos": photos,
+		"promoted": success and Game.rank_index(Game.day) > old_rank,
+		"rank": Game.RANKS[Game.rank_index(Game.day)],
 	}
 	hud.banner("퇴근!" if success else fail_reason, "", 1.2)
 	await get_tree().create_timer(1.4).timeout

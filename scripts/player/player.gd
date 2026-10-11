@@ -240,6 +240,10 @@ func _update_fire(delta: float) -> void:
 			_stream_t -= w.interval
 			_fire_drops(w, w.drops)
 		_kick = max(_kick, 0.25 if current == "hose" else 0.12)
+		if current == "soaker":
+			var pump: Node3D = _models["soaker"].find_child("Pump", true, false)
+			if pump:
+				pump.position.z = -0.2 + sin(Time.get_ticks_msec() * 0.02) * 0.035
 		if current == "hose":
 			_shake = max(_shake, 0.35)
 			# 반동으로 살짝 뒤로 밀림
@@ -440,7 +444,7 @@ func shake(amount: float) -> void:
 
 func _build_models() -> void:
 	_models["spray"] = _make_spray()
-	_models["pistol"] = _make_blaster("res://assets/blaster/blaster-b.glb", 0.9, Vector3(0.2, -0.2, -0.42))
+	_models["pistol"] = _make_pistol()
 	_models["bucket"] = _make_bucket()
 	_models["soaker"] = _make_soaker()
 	_models["hose"] = _make_hose()
@@ -513,22 +517,51 @@ func _make_spray() -> Node3D:
 	return h
 
 
-func _make_blaster(path: String, scl: float, pos: Vector3) -> Node3D:
+func _make_pistol() -> Node3D:
+	## 알록달록 장난감 물총
 	var h := Node3D.new()
-	var m: Node3D = load(path).instantiate()
-	m.scale = Vector3.ONE * scl
-	m.position = pos
-	m.rotation_degrees.y = 180
-	h.add_child(m)
-	var a := _aabb(m)
-	_add_muzzle("pistol" if path.ends_with("-b.glb") else "soaker", h, pos + Vector3(0, (a.position.y + a.size.y * 0.72) * scl, -(a.size.z * 0.55) * scl))
+	var root := Node3D.new()
+	root.position = Vector3(0.22, -0.2, -0.52)
+	root.rotation_degrees = Vector3(0, 4, 0)
+	h.add_child(root)
+	var orange := _mat(Color(1, 0.5, 0.1))
+	var yellow := _mat(Color(1, 0.85, 0.15))
+	var blue := _mat(Color(0.15, 0.45, 0.95))
+	_mesh(root, _boxm(Vector3(0.075, 0.075, 0.24)), Vector3(0, 0, 0), orange)
+	_mesh(root, _cyl(0.018, 0.022, 0.12), Vector3(0, 0.012, -0.17), yellow, Vector3(90, 0, 0))
+	_mesh(root, _cyl(0.013, 0.013, 0.03), Vector3(0, 0.012, -0.24), _mat(Color(0.2, 0.8, 0.3)), Vector3(90, 0, 0))
+	_mesh(root, _boxm(Vector3(0.055, 0.13, 0.065)), Vector3(0, -0.085, 0.07), blue, Vector3(-18, 0, 0))
+	_mesh(root, _cyl(0.032, 0.032, 0.11), Vector3(0, 0.062, 0.03), _mat(Color(0.45, 0.8, 1.0, 0.75)), Vector3(90, 0, 0))
+	_mesh(root, _cyl(0.02, 0.02, 0.03), Vector3(0, 0.062, -0.035), orange, Vector3(90, 0, 0))
+	_mesh(root, _boxm(Vector3(0.02, 0.045, 0.02)), Vector3(0, -0.055, -0.01), yellow)
+	_add_muzzle("pistol", root, Vector3(0, 0.012, -0.26))
 	return h
 
 
 func _make_soaker() -> Node3D:
-	var h := _make_blaster("res://assets/blaster/blaster-d.glb", 0.75, Vector3(0.2, -0.2, -0.45))
-	# 등에 메는 물통 대신 총 위에 큰 물탱크
-	_mesh(h, _cyl(0.07, 0.07, 0.28), Vector3(0.2, -0.04, -0.4), _mat(Color(0.4, 0.75, 1.0, 0.75)), Vector3(90, 0, 0))
+	## 큰 물탱크를 얹은 펌프식 슈퍼소커
+	var h := Node3D.new()
+	var root := Node3D.new()
+	root.position = Vector3(0.24, -0.25, -0.5)
+	root.rotation_degrees = Vector3(0, 3, 0)
+	h.add_child(root)
+	var green := _mat(Color(0.35, 0.85, 0.25))
+	var orange := _mat(Color(1, 0.5, 0.1))
+	var yellow := _mat(Color(1, 0.85, 0.15))
+	_mesh(root, _boxm(Vector3(0.09, 0.09, 0.42)), Vector3(0, 0, -0.05), green)
+	_mesh(root, _cyl(0.026, 0.03, 0.16), Vector3(0, 0.01, -0.33), orange, Vector3(90, 0, 0))
+	_mesh(root, _cyl(0.016, 0.016, 0.04), Vector3(0, 0.01, -0.42), yellow, Vector3(90, 0, 0))
+	_mesh(root, _cyl(0.075, 0.075, 0.26), Vector3(0, 0.11, 0.04), _mat(Color(0.4, 0.75, 1.0, 0.55)), Vector3(90, 0, 0))
+	_mesh(root, _cyl(0.06, 0.06, 0.2), Vector3(0, 0.105, 0.04), _mat(Color(0.2, 0.55, 1.0, 0.7)), Vector3(90, 0, 0))
+	for z in [-0.09, 0.17]:
+		_mesh(root, _cyl(0.078, 0.078, 0.02), Vector3(0, 0.11, z), orange, Vector3(90, 0, 0))
+	_mesh(root, _boxm(Vector3(0.06, 0.14, 0.07)), Vector3(0, -0.1, 0.1), _mat(Color(0.15, 0.45, 0.95)), Vector3(-15, 0, 0))
+	var pump := Node3D.new()
+	pump.name = "Pump"
+	pump.position = Vector3(0, -0.065, -0.2)
+	root.add_child(pump)
+	_mesh(pump, _cyl(0.032, 0.032, 0.13), Vector3.ZERO, yellow, Vector3(90, 0, 0))
+	_add_muzzle("soaker", root, Vector3(0, 0.01, -0.45))
 	return h
 
 

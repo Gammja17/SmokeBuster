@@ -23,10 +23,10 @@ anchor_left = 0.5
 anchor_top = 0.5
 anchor_right = 0.5
 anchor_bottom = 0.5
-offset_left = -340.0
-offset_top = -290.0
-offset_right = 340.0
-offset_bottom = 290.0
+offset_left = -380.0
+offset_top = -340.0
+offset_right = 380.0
+offset_bottom = 340.0
 grow_horizontal = 2
 grow_vertical = 2
 
@@ -41,6 +41,23 @@ theme_override_colors/font_color = Color(1, 0.9, 0.35, 1)
 theme_override_fonts/font = ExtResource("2_title")
 theme_override_font_sizes/font_size = 56
 text = "근무 완료!"
+horizontal_alignment = 1
+
+[node name="Grade" type="Label" parent="Panel/V"]
+layout_mode = 2
+theme_override_colors/font_color = Color(1, 0.3, 0.3, 1)
+theme_override_colors/font_outline_color = Color(0.35, 0, 0, 1)
+theme_override_constants/outline_size = 18
+theme_override_fonts/font = ExtResource("2_title")
+theme_override_font_sizes/font_size = 96
+text = "S"
+horizontal_alignment = 1
+
+[node name="Rank" type="Label" parent="Panel/V"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.6, 1, 0.65, 1)
+theme_override_font_sizes/font_size = 26
+text = "승진! 경장"
 horizontal_alignment = 1
 
 [node name="Sub" type="Label" parent="Panel/V"]
@@ -58,6 +75,11 @@ text = "단속 5 / 5
 민원 0
 번 돈 300원"
 horizontal_alignment = 1
+
+[node name="Photos" type="HBoxContainer" parent="Panel/V"]
+layout_mode = 2
+theme_override_constants/separation = 8
+alignment = 1
 
 [node name="Next" type="Button" parent="Panel/V"]
 layout_mode = 2

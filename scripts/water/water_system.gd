@@ -25,9 +25,11 @@ var _splash: FxPool
 var _mist: FxPool
 var _puddles: Array[MeshInstance3D] = []
 var _puddle_i := 0
+var _wet_spots: Array = []   # [위치, 반지름, 마를 시각] 사람이 미끄러지는 곳
 
 
 func _ready() -> void:
+	add_to_group("water_system")
 	var water_mat := StandardMaterial3D.new()
 	water_mat.albedo_color = Color(0.55, 0.82, 1.0, 0.7)
 	water_mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
@@ -68,7 +70,7 @@ func _ready() -> void:
 
 	# 양동이/호스 물보라 (하얀 안개)
 	var mist_mat := StandardMaterial3D.new()
-	mist_mat.albedo_texture = load("res://assets/fx/smoke_04.png")
+	mist_mat.albedo_texture = FxPool.soft_puff()
 	mist_mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
 	mist_mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
 	mist_mat.billboard_mode = BaseMaterial3D.BILLBOARD_ENABLED
@@ -154,8 +156,8 @@ func _on_hit(i: int, hit: Dictionary) -> void:
 		_burst(point, -v.normalized() * 0.5 + Vector3.UP, 4, 2.5)
 	else:
 		_burst(point, normal + v.normalized() * 0.3, 2, 2.0)
-		if normal.y > 0.7 and randf() < 0.12:
-			_puddle(point, randf_range(0.6, 1.4))
+		if normal.y > 0.7 and randf() < 0.18:
+			_puddle(point, randf_range(0.8, 1.6))
 
 
 func _area_splash(point: Vector3, radius: float, soak: float, knock: float) -> void:
@@ -188,7 +190,22 @@ func mist_at(point: Vector3, vel: Vector3) -> void:
 	_mist.emit(point, vel, randf_range(0.5, 1.0))
 
 
+func is_wet(p: Vector3) -> bool:
+	var now := Time.get_ticks_msec() / 1000.0
+	for i in range(_wet_spots.size() - 1, -1, -1):
+		var w: Array = _wet_spots[i]
+		if now > w[2]:
+			_wet_spots.remove_at(i)
+			continue
+		if Vector2(p.x - w[0].x, p.z - w[0].z).length() < w[1]:
+			return true
+	return false
+
+
 func _puddle(point: Vector3, size: float) -> void:
+	_wet_spots.append([point, size * 0.5, Time.get_ticks_msec() / 1000.0 + 8.0])
+	if _wet_spots.size() > 80:
+		_wet_spots.pop_front()
 	var p := _puddles[_puddle_i]
 	_puddle_i = (_puddle_i + 1) % _puddles.size()
 	p.visible = true

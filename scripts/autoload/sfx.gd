@@ -26,6 +26,12 @@ const SOUNDS := {
 	"fanfare": ["res://assets/sfx/maximize_006.ogg"],
 	"shutter": ["res://assets/sfx/shutter.wav"],
 	"spark": ["res://assets/sfx/spark.wav"],
+	"voice_adult": ["res://assets/sfx/voice_ah.wav", "res://assets/sfx/voice_ugh.wav", "res://assets/sfx/voice_hey.wav", "res://assets/sfx/voice_ow.wav"],
+	"voice_kid": ["res://assets/sfx/voice_kid.wav", "res://assets/sfx/voice_kid2.wav"],
+	"voice_scream": ["res://assets/sfx/voice_scream.wav"],
+	"voice_boss": ["res://assets/sfx/voice_boss.wav"],
+	"voice_achoo": ["res://assets/sfx/voice_achoo.wav"],
+	"slip": ["res://assets/sfx/impactSoft_heavy_000.ogg"],
 }
 const LOOPS := {
 	"stream": "res://assets/sfx/stream_loop.wav",

@@ -11,7 +11,7 @@ signal annoyed(npc: Npc, minor: bool)
 signal hurt_player(npc: Npc, amount: int)
 signal dropped_trash(pos: Vector3)
 
-enum State { WALK, SMOKING, FLEE, CHARGE, LEAVING, STAGGER, CROSSING, HANGOUT }
+enum State { WALK, SMOKING, FLEE, CHARGE, LEAVING, STAGGER, CROSSING, HANGOUT, DOWN }
 
 const MODELS := ["a", "b", "c", "d", "e", "f", "g", "h", "i", "j", "k", "l", "m", "n", "o", "p", "q", "r"]
 const ADULT_SMOKERS := ["normal", "runner", "angry", "boss"]
@@ -29,7 +29,11 @@ const LINES := {
 	"bully_caught": ["야 튀어!", "찍혔다!", "학교에 알려진다!"],
 	"victim": ["감사합니다!", "살았다...", "고맙습니다 아저씨!"],
 	"victim_help": ["도와주세요!", "그만해...", "아파..."],
+	"wet1": ["앗 차가!", "뭐, 뭐야?!", "비 와?"],
+	"wet2": ["으아 차가워!!", "그만 쏴!!", "옷 다 젖잖아!"],
+	"wet3": ["살려줘어!!", "알았어 알았다고!!", "으아아아!!"],
 }
+const SPLAT := ["철퍽!", "촥!", "쏴아!", "푸확!", "첨벙!"]
 ## 머리 위 글씨. 담배 피는 사람은 글씨 대신 연기로 알아본다.
 const LABELS := {
 	"boss": "골초왕", "litter": "무단투기", "jaywalker": "무단횡단!", "teen_drinker": "미성년 음주",
@@ -77,6 +81,21 @@ var _cross_to := Vector3.ZERO
 var _spot: Dictionary = {}
 var _puff_t := 0.0
 var _scale := 0.65
+
+# 맞을 때 반응
+var _voice_cd := 0.0
+var _voice_pitch := 1.0
+var _squash_cd := 0.0
+var _splat_cd := 0.0
+var _shield_t := 0.0
+var _line_stage := 0
+var _down_t := 0.0
+var _down_cd := 0.0
+var _slip_cd := 0.0
+var _prev_state := State.WALK
+var _leave_after_down := false
+var _drip: CPUParticles3D
+var _water: Node
 
 
 func setup(p_kind: String, p_city: CityBuilder, p_player: Node3D) -> void:
@@ -134,6 +153,9 @@ func _ready() -> void:
 	for m in _meshes:
 		# 멀리 있는 사람은 그리지 않는다
 		m.visibility_range_end = 75.0
+
+	_voice_pitch = randf_range(0.85, 1.2) * (0.75 if kind == "boss" else 1.0)
+	_build_drip()
 
 	_say = _make_label(Color.WHITE, 40)
 	_say.position.y = _head_y() + 0.45
@@ -255,11 +277,10 @@ func occupy(spot: Dictionary) -> void:
 # ---------------------------------------------------------------- 물 맞기
 
 func soak(amount: float, dir: Vector3, knock: float) -> void:
-	if state == State.LEAVING:
+	_hit_react(amount, dir, knock)
+	if state == State.LEAVING or done:
 		return
 	_last_hit = 0.0
-	if knock > 0.0:
-		_knock += Vector3(dir.x, 0, dir.z).normalized() * knock / (_scale / 0.65)
 	if not wants_water():
 		# 물로 해결하는 대상이 아님 → 민원
 		wet = min(wet + amount, 1.0)
@@ -279,6 +300,7 @@ func soak(amount: float, dir: Vector3, knock: float) -> void:
 	if wet >= need:
 		_finish_water()
 		return
+	_escalate_lines()
 	match kind:
 		"runner":
 			if state == State.SMOKING:
@@ -306,9 +328,14 @@ func _finish_water() -> void:
 		_cig = null
 	if _bar_bg:
 		_bar_bg.visible = false
-	say((LINES.litter_done if kind == "litter" else LINES.done).pick_random(), Color(0.7, 0.9, 1))
-	_play("emote-no", 0.1)
-	_resolve(1.4, false)
+	# 단속 완료: 비명 지르며 꽈당 넘어졌다가 일어나 도망
+	Popups.text(self, global_position + Vector3.UP * _head_y(), "치이익!" if kind in ADULT_SMOKERS else "철퍽!", Color(0.75, 0.92, 1), 90)
+	Sfx.play_at("voice_scream" if kind != "boss" else "voice_boss", global_position + Vector3.UP * 1.5, 0.0, _voice_pitch)
+	_knockdown(global_basis.z if _knock.length() < 0.1 else _knock.normalized(), 3.5)
+	_resolve(0.0, true)
+	get_tree().create_timer(1.2).timeout.connect(func():
+		if is_instance_valid(self):
+			say((LINES.litter_done if kind == "litter" else LINES.done).pick_random(), Color(0.7, 0.9, 1)))
 
 
 func _resolve(leave_delay: float, run: bool) -> void:
@@ -329,7 +356,10 @@ func _resolve(leave_delay: float, run: bool) -> void:
 	_timer = leave_delay
 	if run:
 		walk_speed = run_speed / 1.4
-	_set_state(State.LEAVING)
+	if state == State.DOWN:
+		_leave_after_down = true
+	else:
+		_set_state(State.LEAVING)
 
 
 # ---------------------------------------------------------------- 촬영
@@ -419,6 +449,17 @@ func _physics_process(delta: float) -> void:
 	_annoy_cd -= delta
 	_kick_cd -= delta
 	_timer -= delta
+	_voice_cd -= delta
+	_squash_cd -= delta
+	_splat_cd -= delta
+	_down_cd -= delta
+	_slip_cd -= delta
+	if _shield_t > 0.0:
+		_shield_t -= delta
+		if _shield_t <= 0.0 and state != State.DOWN:
+			_resume_anim()
+	if _drip and _drip.emitting and _last_hit > 3.0 and not done:
+		_drip.emitting = false
 
 	if not is_on_floor():
 		velocity.y -= 20.0 * delta
@@ -445,16 +486,21 @@ func _physics_process(delta: float) -> void:
 				start_walking(city.nearest_nav(global_position))
 		State.LEAVING:
 			move = _leave_step()
+		State.DOWN:
+			move = _down_step(delta)
+	if _shield_t > 0.0 and state in [State.WALK, State.CROSSING]:
+		move *= 0.2
+	_check_slip()
 
 	# 마르기 (보스 제외)
 	if is_smoking() and kind != "boss" and _last_hit > 2.0 and wet > 0.0:
 		wet = max(wet - 0.08 * delta, 0.0)
 		_update_wet_visual()
 
-	_knock = _knock.move_toward(Vector3.ZERO, 12.0 * delta)
+	_knock = _knock.move_toward(Vector3.ZERO, (5.0 if state == State.DOWN else 12.0) * delta)
 	velocity.x = move.x + _knock.x
 	velocity.z = move.z + _knock.z
-	if move.length_squared() > 0.01:
+	if move.length_squared() > 0.01 and _shield_t <= 0.0:
 		var target_yaw := atan2(-move.x, -move.z)
 		rotation.y = lerp_angle(rotation.y, target_yaw, 10.0 * delta)
 	move_and_slide()
@@ -633,6 +679,147 @@ func _puff_out() -> void:
 	_puff.restart()
 
 
+# ---------------------------------------------------------------- 맞을 때 반응
+
+func _hit_react(amount: float, dir: Vector3, knock: float) -> void:
+	var flat := Vector3(dir.x, 0, dir.z)
+	if flat.length_squared() < 0.001:
+		flat = global_basis.z
+	flat = flat.normalized()
+	var weight := _scale / 0.65
+	# 물살에 밀린다 (분무기도 살짝)
+	_knock += flat * (0.25 + knock) / weight
+	_knock = _knock.limit_length(7.0)
+	# 움찔 (납작했다가 튕겨 돌아옴)
+	if _squash_cd <= 0.0:
+		_squash_cd = 0.14
+		var tw := create_tween()
+		tw.tween_property(_model, "scale", Vector3(1.18, 0.8, 1.18) * _scale, 0.05)
+		tw.tween_property(_model, "scale", Vector3.ONE * _scale, 0.25).set_trans(Tween.TRANS_ELASTIC).set_ease(Tween.EASE_OUT)
+	# 비명
+	if _voice_cd <= 0.0 and state != State.DOWN:
+		_voice_cd = randf_range(0.7, 1.2)
+		var v := "voice_boss" if kind == "boss" else ("voice_kid" if is_minor() else "voice_adult")
+		Sfx.play_at(v, global_position + Vector3.UP * _head_y(), -1.0, _voice_pitch)
+	# 철퍽! 글자 (센 물줄기일수록 자주)
+	if _splat_cd <= 0.0 and (amount >= 0.05 or knock >= 1.0 or _last_hit > 1.5):
+		_splat_cd = 0.6
+		Popups.text(self, global_position + Vector3.UP * (_head_y() + 0.2), SPLAT.pick_random(), Color(0.55, 0.85, 1), 64, 0.8, 0.6)
+	# 물방울 뚝뚝
+	if _drip and not _drip.emitting:
+		_drip.emitting = true
+	# 팔로 얼굴 가리며 물줄기 쪽을 본다
+	if state in [State.WALK, State.SMOKING, State.HANGOUT, State.CROSSING, State.STAGGER]:
+		if _shield_t <= 0.0:
+			_play("holding-both", 0.06)
+		_shield_t = 0.45
+		rotation.y = atan2(flat.x, flat.z)
+	# 소방호스/양동이는 사람을 넘어뜨린다
+	if knock >= 2.0 and _down_cd <= 0.0 and state != State.DOWN:
+		Popups.text(self, global_position + Vector3.UP * _head_y(), "꽈당!", Color(1, 0.85, 0.3), 84)
+		Sfx.play_at("voice_scream", global_position + Vector3.UP * 1.5, 0.0, _voice_pitch)
+		_knockdown(flat, knock)
+
+
+func _escalate_lines() -> void:
+	var r := wet / need
+	var stage := 3 if r > 0.75 else (2 if r > 0.45 else (1 if r > 0.1 else 0))
+	if stage > _line_stage:
+		_line_stage = stage
+		say(LINES["wet%d" % stage].pick_random(), Color(0.75, 0.9, 1))
+
+
+func _knockdown(dir: Vector3, power: float) -> void:
+	if state == State.DOWN:
+		return
+	_prev_state = state if state != State.STAGGER else State.WALK
+	state = State.DOWN
+	_shield_t = 0.0
+	_down_t = 1.4 + min(power * 0.15, 0.8)
+	_knock = dir.normalized() * (2.5 + power * 1.2) / (_scale / 0.65)
+	_play("die", 0.05)
+	Sfx.play_at("slip", global_position, -2.0)
+
+
+func _down_step(delta: float) -> Vector3:
+	_down_t -= delta
+	if _down_t <= 0.0 and _anim.current_animation != "pick-up":
+		_play("pick-up", 0.15)
+		get_tree().create_timer(0.45).timeout.connect(_get_up)
+	return Vector3.ZERO
+
+
+func _get_up() -> void:
+	if not is_instance_valid(self) or state != State.DOWN:
+		return
+	_down_cd = 2.5
+	if _leave_after_down or done:
+		_leave_after_down = false
+		Sfx.play_at("voice_achoo", global_position + Vector3.UP * 1.5, -2.0, _voice_pitch)
+		Popups.text(self, global_position + Vector3.UP * _head_y(), "에취!", Color(1, 1, 1), 70)
+		_timer = 0.0
+		_set_state(State.LEAVING)
+		return
+	_set_state(_prev_state)
+	if _prev_state == State.WALK:
+		start_walking(city.nearest_nav(global_position))
+
+
+func _resume_anim() -> void:
+	match state:
+		State.WALK, State.CROSSING:
+			_play("walk")
+		State.SMOKING, State.HANGOUT, State.STAGGER:
+			_play("idle")
+		State.FLEE, State.CHARGE:
+			_play("sprint")
+
+
+func _check_slip() -> void:
+	## 물웅덩이 위를 뛰다가 미끄러진다
+	if _slip_cd > 0.0 or state == State.DOWN:
+		return
+	var hv := Vector2(velocity.x, velocity.z).length()
+	if hv < 3.0:
+		return
+	_slip_cd = 0.25
+	if _water == null:
+		_water = get_tree().get_first_node_in_group("water_system")
+	if _water and _water.is_wet(global_position):
+		_slip_cd = 3.0
+		Popups.text(self, global_position + Vector3.UP * _head_y(), "미끄덩!", Color(0.6, 1, 0.9), 80)
+		Sfx.play_at("voice_scream", global_position + Vector3.UP * 1.5, -2.0, _voice_pitch * 1.1)
+		_knockdown(Vector3(velocity.x, 0, velocity.z), 2.0)
+
+
+func _build_drip() -> void:
+	_drip = CPUParticles3D.new()
+	_drip.emitting = false
+	_drip.amount = 12
+	_drip.lifetime = 0.6
+	_drip.local_coords = false
+	_drip.emission_shape = CPUParticles3D.EMISSION_SHAPE_BOX
+	_drip.emission_box_extents = Vector3(0.25, 0.5, 0.15) * (_scale / 0.65)
+	_drip.direction = Vector3.DOWN
+	_drip.spread = 10
+	_drip.initial_velocity_min = 0.2
+	_drip.initial_velocity_max = 0.6
+	_drip.gravity = Vector3(0, -9.8, 0)
+	var m := SphereMesh.new()
+	m.radius = 0.025
+	m.height = 0.06
+	m.radial_segments = 4
+	m.rings = 2
+	var mat := StandardMaterial3D.new()
+	mat.albedo_color = Color(0.6, 0.85, 1, 0.8)
+	mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	m.material = mat
+	_drip.mesh = m
+	_drip.position.y = 1.0 * _scale / 0.65
+	add_child(_drip)
+
+
 func say(text: String, color := Color.WHITE) -> void:
 	_say.text = text
 	_say.modulate = color
@@ -732,33 +919,37 @@ func _build_cigarette() -> void:
 	_cig.add_child(ember)
 
 	var smoke_mat := StandardMaterial3D.new()
-	smoke_mat.albedo_texture = load("res://assets/fx/smoke_07.png")
-	smoke_mat.albedo_color = Color(0.78, 0.78, 0.8, 0.75)
+	smoke_mat.albedo_texture = FxPool.soft_puff()
+	smoke_mat.albedo_color = Color(0.72, 0.72, 0.75, 0.75)
 	smoke_mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
 	smoke_mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
 	smoke_mat.billboard_mode = BaseMaterial3D.BILLBOARD_PARTICLES
 	smoke_mat.vertex_color_use_as_albedo = true
 	var quad := QuadMesh.new()
-	quad.size = Vector2(0.5, 0.5)
+	quad.size = Vector2(0.75, 0.75)
 	quad.material = smoke_mat
 	var fade := Gradient.new()
 	fade.set_color(0, Color(1, 1, 1, 0.8))
 	fade.set_color(1, Color(1, 1, 1, 0))
 	var grow := Curve.new()
+	grow.max_value = 4.0
 	grow.add_point(Vector2(0, 0.3))
 	grow.add_point(Vector2(1, 3.2))
 
 	_smoke = CPUParticles3D.new()
 	# 멀리서도 보이게 길고 굵게 피어오르는 연기
-	_smoke.amount = 26
-	_smoke.lifetime = 4.5
+	_smoke.amount = 34
+	_smoke.lifetime = 3.5
+	_smoke.preprocess = 3.5   # 미리 데워두지 않으면 시작점에 검은 덩어리가 생긴다
 	_smoke.local_coords = false
 	_smoke.mesh = quad
 	_smoke.direction = Vector3.UP
 	_smoke.spread = 12.0
-	_smoke.initial_velocity_min = 0.5
-	_smoke.initial_velocity_max = 0.9
-	_smoke.gravity = Vector3(0.2, 0.45, 0)
+	_smoke.emission_shape = CPUParticles3D.EMISSION_SHAPE_SPHERE
+	_smoke.emission_sphere_radius = 0.04
+	_smoke.initial_velocity_min = 0.35
+	_smoke.initial_velocity_max = 0.6
+	_smoke.gravity = Vector3(0.2, 0.2, 0)
 	_smoke.color_ramp = fade
 	_smoke.scale_amount_curve = grow
 	_smoke.angle_min = -180
@@ -769,6 +960,7 @@ func _build_cigarette() -> void:
 	_puff = _smoke.duplicate()
 	_puff.emitting = false
 	_puff.one_shot = true
+	_puff.preprocess = 0.0
 	_puff.explosiveness = 0.85
 	_puff.amount = 14 if kind != "boss" else 40
 	_puff.lifetime = 2.2
@@ -831,6 +1023,7 @@ func _make_steam() -> CPUParticles3D:
 	var p: CPUParticles3D = _smoke.duplicate()
 	p.amount = 24
 	p.lifetime = 1.2
+	p.preprocess = 0.0
 	p.one_shot = true
 	p.explosiveness = 0.9
 	p.initial_velocity_min = 1.0
