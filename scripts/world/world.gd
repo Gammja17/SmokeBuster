@@ -15,6 +15,8 @@ const HINTS := [
 	"뛰는 사람 앞 바닥에 물을 깔아두면 미끄러져요.",
 	"길가 순찰차에 다가가 F로 타요. 운전 중 H는 사이렌, F로 내려요.",
 	"V로 3인칭 시점! 전력질주하다 문제아에게 부딪히면 태클로 잡아요.",
+	"무전 출동이 오면 파란 빛기둥이 현장이에요. 순찰차로 달려가세요!",
+	"파출소 문 앞에서 E: 휴식(멘탈, 물 회복)과 장비실. 편의점 30원, 병원 100원.",
 	"Tab: 장비실 · 물이 떨어지면 빨간 소화전 옆에서 E를 꾹",
 ]
 const EVENTS := [
@@ -67,9 +69,10 @@ func _ready() -> void:
 
 	player.water = water
 	player.hydrants = city.hydrants
+	player.doors = city.doors
 	# 시작 위치: 첫 블록 동쪽 인도, 북쪽을 보고 선다
-	player.position = Vector3(-8.5, 0.3, -14.0)
-	player.rotation.y = deg_to_rad(-20)
+	player.position = SPAWN
+	player.rotation.y = PI
 	water.exclude = [player.get_rid()]
 	water.npc_hit.connect(_on_water_hit)
 
@@ -81,6 +84,7 @@ func _ready() -> void:
 	player.camera_mode_changed.connect(hud.set_camera_mode)
 	player.photo_taken.connect(_on_photo)
 	player.trash_picked.connect(_on_picked)
+	player.use_door.connect(_use_door)
 	player.hurt.connect(_on_player_hurt)
 	player.interact_vehicle.connect(_toggle_vehicle)
 	player.tackled.connect(func(n):
@@ -116,6 +120,8 @@ func _ready() -> void:
 		_spawn_shop()
 	_spawn_vehicles()
 	_spawn_props(22)
+	_decorate_station()
+	hud.radar.range_m = 75.0 if Game.upgrades.cctv > 0 else 45.0
 	# 시작하자마자 근처에 흡연자 둘
 	for i in 2:
 		_spawn_at_spot("normal", 6.0)
@@ -191,6 +197,8 @@ func _close_shop() -> void:
 	player.equip(Game.owned[Game.owned.size() - 1])
 	if Game.has_truck and get_tree().get_nodes_in_group("vehicle").filter(func(v): return v.kind == "firetruck").is_empty():
 		_spawn_vehicles()
+	_decorate_station()
+	hud.radar.range_m = 75.0 if Game.upgrades.cctv > 0 else 45.0
 	player.capture_mouse()
 	_capture_grace = 1.0
 
@@ -217,6 +225,7 @@ func _process(delta: float) -> void:
 	_update_events(delta)
 	_update_boss_smoke()
 	_update_hints(delta)
+	_update_mission(delta)
 
 
 func _update_hints(delta: float) -> void:
@@ -780,7 +789,7 @@ func _faint() -> void:
 	await get_tree().create_timer(2.2).timeout
 	if vehicle:
 		_toggle_vehicle()
-	player.global_position = Vector3(-8.5, 0.3, -14.0)
+	player.global_position = SPAWN
 	player.mental = Game.max_mental()
 	hud.set_mental(player.mental, Game.max_mental())
 	hud.set_money(Game.money)
@@ -795,14 +804,15 @@ func _spawn_vehicles() -> void:
 	for v in get_tree().get_nodes_in_group("vehicle"):
 		have[v.kind] = true
 	if not have.has("police"):
-		_add_vehicle("police", Vector3(-3.6, 0.3, -24.0), 0.0)
+		_add_vehicle("police", Vector3(-13.0, 0.3, -3.6), -PI / 2)
 	if Game.has_truck and not have.has("firetruck"):
-		_add_vehicle("firetruck", Vector3(3.6, 0.3, -24.0), 0.0)
+		_add_vehicle("firetruck", Vector3(-23.0, 0.3, -3.6), -PI / 2)
 
 
 func _add_vehicle(kind: String, pos: Vector3, yaw: float, model := "") -> Vehicle:
 	var v := Vehicle.new()
 	v.kind = kind
+	v.speed_mult = 1.15 if Game.upgrades.garage > 0 else 1.0
 	v.model_name = model
 	v.water = water
 	v.position = pos
@@ -987,7 +997,7 @@ func _spawn_props(count: int) -> void:
 	## 물줄기와 차에 날아가는 라바콘, 쓰레기통, 박스
 	for i in count:
 		var p := city.random_sidewalk_point()
-		if p.distance_to(Vector3(-8.5, 0, -14)) < 4.0:
+		if p.distance_to(SPAWN) < 4.0:
 			continue
 		var body := RigidBody3D.new()
 		body.collision_layer = 1
@@ -1044,3 +1054,324 @@ func _later(t: float, fn: Callable) -> void:
 	var tw := create_tween()
 	tw.tween_interval(t)
 	tw.tween_callback(fn)
+
+
+# ---------------------------------------------------------------- 거점, 건물 이용
+
+const SPAWN := Vector3(-17.0, 0.3, -7.2)     # 파출소 정문 앞
+var _deco: Array[Node] = []
+
+
+func _use_door(door: Dictionary) -> void:
+	match door.role:
+		"station":
+			player.mental = Game.max_mental()
+			hud.set_mental(player.mental, Game.max_mental())
+			player.refill_all()
+			hud.add_feed("파출소에서 쉬었어요 (멘탈, 물 회복)", Color(0.6, 0.9, 1))
+			_open_shop()
+		"store":
+			if Game.money < 30:
+				hud.add_feed("돈이 모자라요 (30원)", Color(1, 0.5, 0.4))
+				Sfx.play("error", -4.0)
+				return
+			Game.money -= 30
+			player.refill_all()
+			player.mental = min(player.mental + 1, Game.max_mental())
+			hud.set_mental(player.mental, Game.max_mental())
+			hud.set_money(Game.money)
+			hud.add_feed("편의점: 생수와 에너지 음료 (-30원)", Color(0.6, 1, 0.6))
+			Sfx.play("buy")
+		"hospital":
+			if player.mental >= Game.max_mental():
+				hud.add_feed("멘탈이 멀쩡해요", Color(0.8, 0.8, 0.8))
+				return
+			if Game.money < 100:
+				hud.add_feed("돈이 모자라요 (100원)", Color(1, 0.5, 0.4))
+				Sfx.play("error", -4.0)
+				return
+			Game.money -= 100
+			player.mental = Game.max_mental()
+			hud.set_mental(player.mental, Game.max_mental())
+			hud.set_money(Game.money)
+			hud.add_feed("병원: 멘탈 완전 회복 (-100원)", Color(0.6, 1, 0.6))
+			Sfx.play("buy")
+		"school":
+			hud.add_feed("교문이 닫혀 있어요. 근처 학생들 비행을 잘 지켜보세요", Color(0.8, 0.85, 1))
+
+
+func _decorate_station() -> void:
+	## 파출소 업그레이드가 눈에 보이게 (CCTV, 안테나, 정비고 간판)
+	for n in _deco:
+		if is_instance_valid(n):
+			n.queue_free()
+	_deco.clear()
+	var st: Node3D = city.station_node
+	if st == null:
+		return
+	var mat := StandardMaterial3D.new()
+	mat.albedo_color = Color(0.85, 0.86, 0.88)
+	mat.metallic = 0.4
+	if Game.upgrades.cctv > 0:
+		for x in [-6.5, 6.5]:
+			var cam := MeshInstance3D.new()
+			var bm := BoxMesh.new()
+			bm.size = Vector3(0.25, 0.25, 0.6)
+			bm.material = mat
+			cam.mesh = bm
+			cam.position = Vector3(x, 4.0, 7.6)
+			cam.rotation_degrees.x = -25
+			st.add_child(cam)
+			_deco.append(cam)
+	if Game.upgrades.ops > 0:
+		var dish := MeshInstance3D.new()
+		var cm := CylinderMesh.new()
+		cm.top_radius = 1.2
+		cm.bottom_radius = 0.2
+		cm.height = 0.5
+		cm.material = mat
+		dish.mesh = cm
+		dish.position = Vector3(-4, 11.6, -3)
+		dish.rotation_degrees = Vector3(-35, 30, 0)
+		st.add_child(dish)
+		_deco.append(dish)
+	if Game.upgrades.garage > 0:
+		var l := Label3D.new()
+		l.text = "정비고"
+		l.font = load("res://assets/fonts/Pretendard-ExtraBold.otf")
+		l.font_size = 90
+		l.pixel_size = 0.006
+		l.modulate = Color(1, 0.85, 0.2)
+		l.position = Vector3(3.2, 3.15, 7.75)
+		st.add_child(l)
+		_deco.append(l)
+
+
+# ---------------------------------------------------------------- 무전 출동
+
+const MISSIONS := {
+	"smoke": {"title": "흡연 민원 다수", "time": 90.0, "reward": 300, "rank": 0},
+	"trash": {"title": "쓰레기 무단투기 대청소", "time": 90.0, "reward": 250, "rank": 0},
+	"thief": {"title": "소매치기 신고", "time": 70.0, "reward": 450, "rank": 0},
+	"fight": {"title": "길거리 싸움 신고", "time": 75.0, "reward": 350, "rank": 1},
+	"shop": {"title": "불법업소 영업 신고", "time": 120.0, "reward": 500, "rank": 1},
+	"drunk": {"title": "음주운전 차량 추격", "time": 90.0, "reward": 700, "rank": 2},
+	"school": {"title": "학교 앞 학생 비행", "time": 90.0, "reward": 450, "rank": 2},
+}
+
+var mission := {}               # 진행 중인 출동 {type, title, place, deadline, targets, reward, beacon}
+var force_mission_type := ""    # 테스트용: 다음 출동 종류 고정
+var _mission_t := 20.0
+
+
+func _update_mission(delta: float) -> void:
+	if mission.is_empty():
+		_mission_t -= delta
+		if _mission_t <= 0.0:
+			_mission_t = randf_range(25.0, 45.0)
+			_start_mission()
+		return
+	var left: float = mission.deadline - Time.get_ticks_msec() / 1000.0
+	var alive := []
+	for t in mission.targets:
+		if is_instance_valid(t) and not (t.get("done") == true) and not (t.has_method("pick") and t.get("_picked") == true):
+			alive.append(t)
+	var pos: Vector3 = mission.pos
+	if not alive.is_empty():
+		pos = alive[0].global_position
+	if is_instance_valid(mission.beacon):
+		mission.beacon.global_position = Vector3(pos.x, 0, pos.z)
+	mission.pos = pos
+	var dist := player.global_position.distance_to(pos)
+	hud.set_mission(mission.title, mission.place, left, dist, mission.targets.size() - alive.size(), mission.targets.size())
+	if alive.is_empty():
+		_finish_mission(true, left)
+	elif left <= 0.0:
+		_finish_mission(false, 0.0)
+
+
+func _start_mission() -> void:
+	var options := []
+	for k in MISSIONS:
+		if rank >= MISSIONS[k].rank and (k != "school" or city.in_zone(_school_pos())):
+			options.append(k)
+	var type: String = force_mission_type if force_mission_type != "" else options.pick_random()
+	var info: Dictionary = MISSIONS[type]
+	var targets: Array = []
+	var pos := Vector3.ZERO
+	match type:
+		"smoke":
+			var spot := _far_spot([])
+			if spot.is_empty():
+				return
+			pos = spot.pos
+			for i in 3:
+				var n := _new_npc("normal" if i > 0 or not cfg.weights.has("runner") else "runner")
+				var a := TAU * i / 3.0
+				n.position = pos + Vector3(cos(a), 0.05, sin(a)) * 1.2
+				n.rotation.y = randf() * TAU
+				npcs.add_child(n)
+				targets.append(n)
+		"trash":
+			pos = _far_point()
+			for i in 8:
+				var t := Trash.new()
+				t.position = pos + Vector3(randf_range(-3, 3), 0.06, randf_range(-3, 3))
+				add_child(t)
+				targets.append(t)
+		"thief":
+			var idx := _far_nav(45.0)
+			if idx < 0:
+				return
+			pos = city.nav_nodes[idx]
+			var victim := _new_npc("ped")
+			victim.position = pos
+			npcs.add_child(victim)
+			victim.start_walking(idx)
+			var th := _new_npc("thief")
+			th.position = pos + Vector3(1, 0, 0)
+			th.run_speed = 6.6
+			npcs.add_child(th)
+			th.start_walking(idx)
+			th._snatch_t = 0.0
+			targets.append(th)
+		"fight":
+			var spot := _far_spot(["street", "corner", "busstop", "cafe", "park"])
+			if spot.is_empty():
+				return
+			pos = spot.pos
+			for i in 2:
+				var f := _new_npc("fighter")
+				f.position = pos + Vector3(-0.7 + i * 1.4, 0.05, 0)
+				npcs.add_child(f)
+				targets.append(f)
+			targets[0].partner = targets[1]
+			targets[1].partner = targets[0]
+		"shop":
+			var before := get_children().filter(func(c): return c is IllegalShop).size()
+			_spawn_shop()
+			var shops := get_children().filter(func(c): return c is IllegalShop and not c.done)
+			if shops.size() <= before:
+				return
+			targets.append(shops[-1])
+			pos = shops[-1].global_position
+		"drunk":
+			_spawn_drunk_car()
+			for c in get_children():
+				if c is TrafficCar and c.drunk and not c.done:
+					c.speed = 15.0
+					targets.append(c)
+					pos = c.global_position
+					break
+			if targets.is_empty():
+				return
+		"school":
+			pos = _school_pos()
+			for i in 2:
+				var n := _spawn_at_spot("teen_smoker", 0.0, ["school"])
+				if n:
+					targets.append(n)
+			if targets.is_empty():
+				return
+	var reward := int(info.reward * (1.3 if Game.upgrades.ops > 0 else 1.0))
+	mission = {
+		"type": type, "title": info.title, "place": _place_name(pos), "pos": pos,
+		"deadline": Time.get_ticks_msec() / 1000.0 + info.time, "targets": targets,
+		"reward": reward, "beacon": _make_beacon(pos),
+	}
+	Sfx.play("radio", 2.0)
+	hud.banner("무전: " + info.title, "%s · 제한 %d초 · 보상 %d원" % [mission.place, int(info.time), reward], 2.6)
+	hud.add_feed("출동 요청: " + info.title, Color(0.5, 0.8, 1))
+
+
+func _finish_mission(success: bool, left: float) -> void:
+	if is_instance_valid(mission.beacon):
+		mission.beacon.queue_free()
+	hud.set_mission("", "", 0, 0, 0, 0)
+	if success:
+		var bonus := int(left * 3.0)
+		var total: int = mission.reward + bonus
+		Game.money += total
+		hud.set_money(Game.money)
+		_add_xp(total)
+		hud.banner("출동 완료!", "+%d원 (시간 보너스 +%d)" % [total, bonus], 2.2)
+		Sfx.play("fanfare", 0.0)
+		player.shake(0.3)
+	else:
+		hud.banner("출동 실패...", "현장은 다른 순찰차가 정리했어요", 1.8)
+		Sfx.play("error", -2.0)
+	mission = {}
+	_mission_t = randf_range(20.0, 35.0)
+
+
+func _make_beacon(pos: Vector3) -> Node3D:
+	## 멀리서도 보이는 현장 표시 빛기둥
+	var b := MeshInstance3D.new()
+	var cm := CylinderMesh.new()
+	cm.top_radius = 0.8
+	cm.bottom_radius = 1.6
+	cm.height = 60.0
+	cm.radial_segments = 16
+	var mat := StandardMaterial3D.new()
+	mat.albedo_color = Color(0.3, 0.6, 1.0, 0.18)
+	mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	mat.emission_enabled = true
+	mat.emission = Color(0.3, 0.6, 1.0)
+	mat.cull_mode = BaseMaterial3D.CULL_DISABLED
+	cm.material = mat
+	b.mesh = cm
+	b.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	add_child(b)
+	b.global_position = Vector3(pos.x, 30.0, pos.z)
+	var holder := Node3D.new()
+	add_child(holder)
+	holder.global_position = Vector3(pos.x, 0, pos.z)
+	b.reparent(holder)
+	var tw := b.create_tween().set_loops()
+	tw.tween_property(mat, "albedo_color:a", 0.32, 0.6)
+	tw.tween_property(mat, "albedo_color:a", 0.14, 0.6)
+	return holder
+
+
+func _far_nav(min_dist: float) -> int:
+	var ok: Array = city.allowed_nodes.filter(func(i): return city.nav_nodes[i].distance_to(player.global_position) > min_dist)
+	if ok.is_empty():
+		ok = city.allowed_nodes.filter(func(i): return city.nav_nodes[i].distance_to(player.global_position) > 15.0)
+	return ok.pick_random() if not ok.is_empty() else -1
+
+
+func _far_spot(kinds: Array) -> Dictionary:
+	var ok := city.spots.filter(func(s): return not s.busy and (kinds.is_empty() or s.kind in kinds) and s.pos.distance_to(player.global_position) > 40.0)
+	if ok.is_empty():
+		ok = city.spots.filter(func(s): return not s.busy and (kinds.is_empty() or s.kind in kinds) and s.pos.distance_to(player.global_position) > 15.0)
+	return ok.pick_random() if not ok.is_empty() else {}
+
+
+func _far_point() -> Vector3:
+	for tries in 20:
+		var p := city.random_sidewalk_point()
+		if p.distance_to(player.global_position) > 40.0:
+			return p
+	return city.random_sidewalk_point()
+
+
+func _school_pos() -> Vector3:
+	for d in city.doors:
+		if d.role == "school":
+			return d.pos
+	return Vector3(9999, 0, 9999)
+
+
+func _place_name(pos: Vector3) -> String:
+	## 현장 근처 가게 이름으로 위치를 부른다 ("편의점 앞")
+	var best := ""
+	var bd := INF
+	for b in city.buildings:
+		if not is_instance_valid(b.node):
+			continue
+		var d: float = b.node.global_position.distance_to(pos)
+		if d < bd:
+			bd = d
+			best = b.name
+	return (best + " 근처") if best != "" else "관할 구역 안"

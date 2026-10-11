@@ -48,13 +48,16 @@ const UPGRADES := {
 	"pressure": {"name": "수압", "desc": "적시는 힘 +20%, 사거리 +10%", "prices": [250, 550, 1100]},
 	"speed": {"name": "운동화", "desc": "이동 속도 +10%", "prices": [150, 350, 700]},
 	"mental": {"name": "강철 멘탈", "desc": "멘탈 최대치 +1", "prices": [300, 700]},
+	"cctv": {"name": "파출소 CCTV 관제실", "desc": "레이더 범위가 넓어진다 (45m -> 75m)", "prices": [600]},
+	"ops": {"name": "파출소 상황실", "desc": "무전 출동 보상 +30%", "prices": [900]},
+	"garage": {"name": "파출소 정비고", "desc": "차 최고 속도 +15%", "prices": [700]},
 }
 const TRUCK_PRICE := 3000
 
 var money := 0
 var xp := 0                  # 실적. 쌓이면 승진하고 관할 구역이 넓어진다
 var owned: Array = ["spray"]
-var upgrades := {"tank": 0, "pressure": 0, "speed": 0, "mental": 0}
+var upgrades := {"tank": 0, "pressure": 0, "speed": 0, "mental": 0, "cctv": 0, "ops": 0, "garage": 0}
 var has_truck := false
 var total_caught := 0
 
@@ -174,7 +177,7 @@ func new_game() -> void:
 	money = 0
 	xp = 0
 	owned = ["spray"]
-	upgrades = {"tank": 0, "pressure": 0, "speed": 0, "mental": 0}
+	upgrades = {"tank": 0, "pressure": 0, "speed": 0, "mental": 0, "cctv": 0, "ops": 0, "garage": 0}
 	has_truck = false
 	total_caught = 0
 	save_game()

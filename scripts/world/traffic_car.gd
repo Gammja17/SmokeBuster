@@ -168,6 +168,15 @@ func on_photographed() -> void:
 	get_tree().create_timer(9.0).timeout.connect(_fade)
 
 
+## 순찰차로 들이받아 세운다
+func on_rammed() -> void:
+	if not drunk or done:
+		return
+	Popups.text(self, global_position + Vector3.UP * 3.0, "검거!", Color(1, 0.85, 0.3), 110, 1.0, 1.5)
+	Sfx.play_at("thud", global_position, 6.0)
+	on_photographed()
+
+
 func _chase(target_car: TrafficCar) -> void:
 	# 경찰차는 음주 차 6m 뒤에서 멈춘다
 	while is_instance_valid(target_car) and is_inside_tree():

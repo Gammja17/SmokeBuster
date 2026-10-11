@@ -3,13 +3,13 @@
 importer="scene"
 importer_version=1
 type="PackedScene"
-uid="uid://dw6klhh57urmo"
-path="res://.godot/imported/light-square.glb-e7e324e66dc3ccad9dfd1a9360c74624.scn"
+uid="uid://do660b5c8vccm"
+path="res://.godot/imported/street_lamp_01.gltf-389540a0dd6d658973bcc83c01d3fe56.scn"
 
 [deps]
 
-source_file="res://assets/roads/light-square.glb"
-dest_files=["res://.godot/imported/light-square.glb-e7e324e66dc3ccad9dfd1a9360c74624.scn"]
+source_file="res://assets/ph/street_lamp_01/street_lamp_01.gltf"
+dest_files=["res://.godot/imported/street_lamp_01.gltf-389540a0dd6d658973bcc83c01d3fe56.scn"]
 
 [params]
 

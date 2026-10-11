@@ -18,6 +18,20 @@ func _draw() -> void:
 		return
 	var rect := get_viewport_rect().grow(-60)
 	var center := rect.get_center()
+	var w = player.get_parent()
+	if w and "mission" in w and w.mission.size() > 0:
+		var mp: Vector3 = w.mission.pos + Vector3.UP * 2.0
+		if cam.is_position_behind(mp) or not rect.has_point(cam.unproject_position(mp)):
+			var sp := cam.unproject_position(mp)
+			var dir := (sp - center)
+			if cam.is_position_behind(mp):
+				dir = -dir
+			dir = dir.normalized() if dir.length() > 1.0 else Vector2.DOWN
+			var t: float = min(abs(rect.size.x / 2 / dir.x) if dir.x != 0 else INF, abs(rect.size.y / 2 / dir.y) if dir.y != 0 else INF)
+			var pos := center + dir * t
+			var col := Color(0.35, 0.7, 1)
+			draw_colored_polygon(PackedVector2Array([pos + dir * 22, pos - dir * 8 + dir.orthogonal() * 16, pos - dir * 8 - dir.orthogonal() * 16]), col)
+			draw_string(get_theme_default_font(), pos - dir * 50 - Vector2(55, -6), "출동 %dm" % int(mp.distance_to(player.global_position)), HORIZONTAL_ALIGNMENT_CENTER, 110, 20, col)
 	for n in get_tree().get_nodes_in_group("incident"):
 		if not n.is_active_incident():
 			continue

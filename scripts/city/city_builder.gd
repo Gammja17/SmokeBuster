@@ -12,7 +12,7 @@ const EDGE := 63.0           # 바깥 인도 끝
 
 const GRAFFITI := ["흡연금지", "CCTV 작동중", "쓰레기 버리지 마시오", "XX 참교육", "민지 사랑해", "여기서 담배 피면 벌금"]
 ## 순찰차/소방차 자리 (x, z): 여기엔 주차된 차를 두지 않는다
-const RESERVED := [Vector2(-3.6, -24.0), Vector2(3.6, -24.0)]
+const RESERVED := [Vector2(-13.0, -3.6), Vector2(-23.0, -3.6)]
 const PARKED := ["sedan", "suv", "taxi", "van", "hatchback-sports", "sedan-sports", "suv-luxury", "delivery", "truck"]
 
 var root: Node3D
@@ -53,7 +53,8 @@ func build(parent: Node3D, seed_value := 1234) -> void:
 		if c == park_center:
 			_park(c)
 		else:
-			_building_block(c, rng.randi_range(0, 3))
+			var bi := block_centers.find(c)
+			_building_block(c, 0 if bi <= 1 else rng.randi_range(0, 3), bi)
 		_sidewalk_props(c)
 	_outer_ring()
 	_parked_cars()
@@ -171,7 +172,7 @@ func _block_slab(c: Vector2) -> void:
 
 # ---------------------------------------------------------------- 건물 블록
 
-func _building_block(c: Vector2, turn: int) -> void:
+func _building_block(c: Vector2, turn: int, bi := -1) -> void:
 	## 네 귀퉁이에 건물, 가운데를 T자 골목이 가른다 (남북으로 관통 + 동쪽 출구).
 	## turn 만큼 90도씩 돌려서 블록마다 골목 방향이 다르다.
 	var block := Node3D.new()
@@ -184,8 +185,9 @@ func _building_block(c: Vector2, turn: int) -> void:
 	for q in [Vector2(-1, -1), Vector2(1, -1), Vector2(-1, 1), Vector2(1, 1)]:
 		var pos := Vector3(q.x * 10.0, 0, q.y * 10.0)
 		var rot := 180.0 if q.y < 0 else 0.0
-		_building(block, pos, rot, 16.0 - 0.6)
-		_shop_slot(block, pos, rot, 16.0)
+		_role_building(block, bi, q, pos, rot, 16.0 - 0.6)
+		if ROLES.get("%d_%d_%d" % [bi, int(q.x), int(q.y)], "") == "":
+			_shop_slot(block, pos, rot, 16.0)
 	_alley(block)
 
 
@@ -543,12 +545,12 @@ func _park(c: Vector2) -> void:
 
 
 func _tree(parent: Node3D, p: Vector3) -> void:
-	var t := _prop_in(parent, "suburban/tree-large" if rng.randf() < 0.6 else "suburban/tree-small", p, rng.randf() * 360.0, rng.randf_range(8.0, 10.0), false)
+	_proc_tree(parent, p, rng.randf_range(1.2, 1.6))
 	var body := StaticBody3D.new()
 	body.position = p + Vector3(0, 1.5, 0)
 	var shape := CollisionShape3D.new()
 	var cyl := CylinderShape3D.new()
-	cyl.radius = 0.35
+	cyl.radius = 0.3
 	cyl.height = 3.0
 	shape.shape = cyl
 	body.add_child(shape)
@@ -556,14 +558,16 @@ func _tree(parent: Node3D, p: Vector3) -> void:
 
 
 func _bench(parent: Node3D, p: Vector3, rot: float) -> void:
-	var b := Node3D.new()
-	b.position = p
-	b.rotation_degrees.y = rot
-	parent.add_child(b)
-	_box_in(b, Vector3(2.0, 0.1, 0.55), Vector3(0, 0.48, 0), Color(0.55, 0.35, 0.2), true)
-	_box_in(b, Vector3(2.0, 0.5, 0.08), Vector3(0, 0.78, 0.25), Color(0.55, 0.35, 0.2), false)
-	for s in [-1, 1]:
-		_box_in(b, Vector3(0.08, 0.45, 0.5), Vector3(s * 0.85, 0.22, 0), Color(0.2, 0.2, 0.22), false)
+	_ph(parent, "painted_wooden_bench", p, rot + 180.0, 1.6)
+	var body := StaticBody3D.new()
+	body.position = p + Vector3(0, 0.4, 0)
+	body.rotation_degrees.y = rot
+	var shape := CollisionShape3D.new()
+	var bs := BoxShape3D.new()
+	bs.size = Vector3(1.8, 0.8, 0.7)
+	shape.shape = bs
+	body.add_child(shape)
+	parent.add_child(body)
 
 
 # ---------------------------------------------------------------- 인도 소품
@@ -572,7 +576,7 @@ func _sidewalk_props(c: Vector2) -> void:
 	var cw := Vector3(c.x, 0.06, c.y)
 	# 가로등: 모서리마다
 	for q in [Vector2(-1, -1), Vector2(1, -1), Vector2(-1, 1), Vector2(1, 1)]:
-		_prop("roads/light-square", cw + Vector3(q.x * 21.2, 0, q.y * 21.2), 45.0 + _quad_angle(q), Vector3.ONE * 7.0, false)
+		_ph(root, "street_lamp_01", cw + Vector3(q.x * 21.2, 0, q.y * 21.2), 45.0 + _quad_angle(q) + 180.0, 1.7)
 	# 변마다 가로수/벤치/쓰레기통/소화전
 	for side in 4:
 		var ang := side * 90.0
@@ -608,7 +612,7 @@ func _quad_angle(q: Vector2) -> float:
 func _planter_tree(p: Vector3) -> void:
 	_box(Vector3(0.9, 0.35, 0.9), p + Vector3(0, 0.17, 0), Color(0.45, 0.42, 0.4), true)
 	_box(Vector3(0.75, 0.05, 0.75), p + Vector3(0, 0.36, 0), Color(0.3, 0.22, 0.15), false)
-	_prop("suburban/tree-small", p + Vector3(0, 0.35, 0), rng.randf() * 360.0, Vector3.ONE * 7.0, false)
+	_proc_tree(root, p + Vector3(0, 0.35, 0), rng.randf_range(0.9, 1.1))
 
 
 func _bus_stop(p: Vector3, ang: float) -> void:
@@ -645,12 +649,16 @@ func _trash_can(p: Vector3) -> void:
 
 
 func _hydrant(p: Vector3) -> void:
-	var red := Color(0.85, 0.12, 0.1)
-	_cyl(0.18, 0.75, p + Vector3(0, 0.37, 0), red, true)
-	_cyl(0.22, 0.08, p + Vector3(0, 0.76, 0), red, false)
-	_cyl(0.12, 0.18, p + Vector3(0, 0.88, 0), red, false)
-	var nub := _box(Vector3(0.5, 0.12, 0.12), p + Vector3(0, 0.5, 0), Color(0.75, 0.1, 0.08), false)
-	nub.name = "HydrantNub"
+	_ph(root, "fire_hydrant", p, rng.randf() * 360.0, 1.1)
+	var body := StaticBody3D.new()
+	body.position = p + Vector3(0, 0.4, 0)
+	var shape := CollisionShape3D.new()
+	var cs := CylinderShape3D.new()
+	cs.radius = 0.2
+	cs.height = 0.8
+	shape.shape = cs
+	body.add_child(shape)
+	root.add_child(body)
 	hydrants.append(p)
 
 
@@ -701,7 +709,7 @@ func _outer_ring() -> void:
 	for s in [-1, 1]:
 		for i in 6:
 			var z := -50.0 + i * 20.0
-			_prop("roads/light-square", Vector3(s * (EDGE - 0.6), 0.06, z), -90.0 * s, Vector3.ONE * 7.0, false)
+			_ph(root, "street_lamp_01", Vector3(s * (EDGE - 0.6), 0.06, z), -90.0 * s + 180.0, 1.7)
 
 
 func _parked_cars() -> void:
@@ -716,7 +724,7 @@ func _parked_cars() -> void:
 				var off: float = side * 3.6
 				if not _reserved(Vector2(c + off, along)):
 					_prop("cars/" + model, Vector3(c + off, 0.02, along), 0.0 if side > 0 else 180.0, Vector3.ONE * 1.6, true)
-				if rng.randf() < 0.5:
+				if rng.randf() < 0.5 and not _reserved(Vector2(along, c + off)):
 					_prop("cars/" + PARKED[rng.randi_range(0, PARKED.size() - 1)], Vector3(along, 0.02, c + off), 90.0 if side > 0 else -90.0, Vector3.ONE * 1.6, true)
 
 
@@ -1055,3 +1063,152 @@ func _wall(size: Vector3, pos: Vector3) -> void:
 	shape.shape = bs
 	body.add_child(shape)
 	root.add_child(body)
+
+
+# ---------------------------------------------------------------- 거점, 역할 건물
+
+## 블록 번호, 사분면 -> 역할 (블록 0 = 첫 블록, 블록 1 = 학교가 있는 블록)
+const ROLES := {
+	"0_1_1": "station", "0_-1_1": "store", "0_1_-1": "hospital",
+	"1_1_-1": "school",
+}
+const ROLE_NAMES := {"store": "편의점", "hospital": "병원", "school": "물대포중학교"}
+
+var doors: Array = []          # 들어갈 수 있는 건물 {role, pos, normal, name}
+var station_front := Vector3.ZERO
+var station_node: Node3D
+
+
+func _role_building(block: Node3D, bi: int, q: Vector2, pos: Vector3, rot: float, slot: float) -> void:
+	var role: String = ROLES.get("%d_%d_%d" % [bi, int(q.x), int(q.y)], "")
+	var facing := Basis(Vector3.UP, deg_to_rad(rot)) * Vector3(0, 0, 1)
+	var front := _local_to_world(block, pos + facing * (slot / 2 + 0.6))
+	var normal := Basis.from_euler(block.rotation) * facing
+	match role:
+		"station":
+			station_node = _police_station(block, pos, rot, slot)
+			station_front = front
+			doors.append({"role": "station", "pos": front, "normal": normal, "name": "파출소"})
+		"store", "hospital", "school":
+			var b := _building(block, pos, rot, slot, ROLE_NAMES[role])
+			doors.append({"role": role, "pos": front, "normal": normal, "name": ROLE_NAMES[role]})
+			if role == "hospital":
+				# 병원: 빨간 십자가
+				var cross := Mats.sign_board(Color(0.9, 0.1, 0.1))
+				_box_m(b, Vector3(1.6, 0.45, 0.2), Vector3(slot / 2 - 2.0, 6.0, slot / 2 + 0.2), cross, false)
+				_box_m(b, Vector3(0.45, 1.6, 0.2), Vector3(slot / 2 - 2.0, 6.0, slot / 2 + 0.2), cross, false)
+			if role == "school":
+				for p in [Vector3(-3, 0, 2.5), Vector3(3, 0, 3.5), Vector3(0, 0, 4.5)]:
+					spots.append({"pos": _local_to_world(block, pos + Basis(Vector3.UP, deg_to_rad(rot)) * (p + Vector3(0, 0, slot / 2))), "kind": "school", "busy": false})
+		_:
+			_building(block, pos, rot, slot)
+
+
+func _police_station(parent: Node3D, pos: Vector3, rot: float, slot: float) -> Node3D:
+	## 파란 1층, 흰 위층, 경광등, '파출소' 간판, 셔터 내린 차고
+	var b := Node3D.new()
+	b.position = pos
+	b.rotation_degrees.y = rot
+	b.name = "PoliceStation"
+	parent.add_child(b)
+	var w := slot - 0.3
+	var d := slot - 0.3
+	var h := 4.2 + 2 * 3.2
+	var blue := Mats.pbr("plaster", 3.0, Color(0.25, 0.4, 0.75))
+	var white := Mats.pbr("plaster", 3.0, Color(0.95, 0.96, 0.97))
+	_box_m(b, Vector3(w, 4.2, d), Vector3(0, 2.1, 0), blue, false)
+	_box_m(b, Vector3(w, h - 4.2, d), Vector3(0, 4.2 + (h - 4.2) / 2, 0), white, false)
+	var fz := d / 2
+	# 정문 (유리문), 차고 셔터
+	_box_m(b, Vector3(3.0, 2.8, 0.08), Vector3(-2.5, 1.5, fz + 0.03), Mats.shop_glass(), false)
+	var shutter := Mats.flat(Color(0.7, 0.72, 0.75), 0.4, 0.6)
+	for i in 8:
+		_box_m(b, Vector3(4.2, 0.3, 0.1), Vector3(3.2, 0.2 + i * 0.36, fz + 0.04), shutter, false)
+	# 간판
+	_box_m(b, Vector3(w - 0.4, 1.1, 0.3), Vector3(0, 3.6, fz + 0.16), Mats.sign_board(Color(0.08, 0.18, 0.45)), false)
+	var l := Label3D.new()
+	l.text = "물대포 파출소  POLICE"
+	l.font = load("res://assets/fonts/Pretendard-ExtraBold.otf")
+	l.font_size = 120
+	l.pixel_size = 0.0065
+	l.outline_size = 0
+	l.position = Vector3(0, 3.6, fz + 0.32)
+	b.add_child(l)
+	# 지붕 경광등 (빨강/파랑)
+	for s in [-1, 1]:
+		var lm := MeshInstance3D.new()
+		var lb := BoxMesh.new()
+		lb.size = Vector3(1.2, 0.4, 0.4)
+		var lmat := StandardMaterial3D.new()
+		lmat.albedo_color = Color(1, 0.15, 0.1) if s < 0 else Color(0.2, 0.35, 1)
+		lmat.emission_enabled = true
+		lmat.emission = lmat.albedo_color
+		lmat.emission_energy_multiplier = 3.0
+		lb.material = lmat
+		lm.mesh = lb
+		lm.position = Vector3(s * 0.7, h + 0.2, fz - 0.6)
+		b.add_child(lm)
+	# 위층 창문
+	for f in range(1, 3):
+		var y := 4.2 + (f - 1) * 3.2 + 1.65
+		for c in 5:
+			var x := -5.2 + c * 2.6
+			_box_m(b, Vector3(1.6, 1.7, 0.1), Vector3(x, y, fz + 0.02), Mats.glass(), false)
+	# 국기 게양대
+	_cyl_in(b, 0.05, 6.0, Vector3(w / 2 - 0.5, 3.0, fz + 1.5), Color(0.8, 0.8, 0.82), false)
+	_box_m(b, Vector3(1.2, 0.8, 0.02), Vector3(w / 2 - 1.1, 5.5, fz + 1.5), Mats.flat(Color(0.95, 0.95, 0.95)), false)
+	var body := StaticBody3D.new()
+	body.position = Vector3(0, h / 2, 0)
+	var shape := CollisionShape3D.new()
+	var bs := BoxShape3D.new()
+	bs.size = Vector3(w, h, d)
+	shape.shape = bs
+	body.add_child(shape)
+	b.add_child(body)
+	return b
+
+
+# ---------------------------------------------------------------- 실사 소품 (Poly Haven)
+
+func _ph(parent: Node3D, name: String, pos: Vector3, rot: float, scl: float) -> Node3D:
+	var n: Node3D = load("res://assets/ph/%s/%s.gltf" % [name, name]).instantiate()
+	n.position = pos
+	n.rotation_degrees.y = rot
+	n.scale = Vector3.ONE * scl
+	parent.add_child(n)
+	return n
+
+
+func _proc_tree(parent: Node3D, p: Vector3, size := 1.0) -> void:
+	## 줄기 + 잎 덩어리 여러 개 (잎은 잔디 질감으로 우툴두툴하게)
+	var t := Node3D.new()
+	t.position = p
+	t.rotation.y = rng.randf() * TAU
+	t.scale = Vector3.ONE * size
+	parent.add_child(t)
+	var bark := Mats.flat(Color(0.33, 0.24, 0.17), 0.9)
+	var trunk := MeshInstance3D.new()
+	var tm := CylinderMesh.new()
+	tm.top_radius = 0.1
+	tm.bottom_radius = 0.17
+	tm.height = 2.6
+	tm.radial_segments = 8
+	trunk.mesh = tm
+	trunk.material_override = bark
+	trunk.position.y = 1.3
+	t.add_child(trunk)
+	var leaf := Mats.pbr("grass", 1.2, [Color(0.55, 0.85, 0.45), Color(0.45, 0.75, 0.35), Color(0.6, 0.8, 0.4)][rng.randi() % 3])
+	for i in 7:
+		var c := MeshInstance3D.new()
+		var sm := SphereMesh.new()
+		var r := rng.randf_range(0.7, 1.15)
+		sm.radius = r
+		sm.height = r * 1.7
+		sm.radial_segments = 10
+		sm.rings = 6
+		c.mesh = sm
+		c.material_override = leaf
+		var a := TAU * i / 7.0 + rng.randf_range(-0.3, 0.3)
+		var rad := 0.0 if i == 0 else rng.randf_range(0.55, 0.95)
+		c.position = Vector3(cos(a) * rad, (3.6 if i == 0 else rng.randf_range(2.6, 3.4)), sin(a) * rad)
+		t.add_child(c)

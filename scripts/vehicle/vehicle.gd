@@ -17,6 +17,7 @@ var model_name := ""
 var water: WaterSystem
 var driver: Node3D = null
 var speed := 0.0
+var speed_mult := 1.0
 
 var camera: Camera3D
 var _pivot: Node3D
@@ -151,7 +152,7 @@ func _physics_process(delta: float) -> void:
 		handbrake = Input.is_key_pressed(KEY_SPACE)
 
 	if throttle > 0.0:
-		speed = move_toward(speed, st.max, st.accel * delta * (1.0 if speed >= 0.0 else 2.0))
+		speed = move_toward(speed, st.max * speed_mult, st.accel * delta * (1.0 if speed >= 0.0 else 2.0))
 	elif throttle < 0.0:
 		speed = move_toward(speed, -st.max * 0.4, st.accel * delta * (2.0 if speed > 0.0 else 1.0))
 	else:
@@ -204,6 +205,10 @@ func _handle_collisions(before: float) -> void:
 		if other is RigidBody3D:
 			other.apply_central_impulse(-c.get_normal() * max(abs(before), 2.0) * 1.5)
 			continue
+		if other and other.has_method("on_rammed") and abs(before) > 4.0:
+			other.on_rammed()
+			if driver and driver.has_method("shake"):
+				driver.shake(0.8)
 		# 벽에 세게 부딪치면 튕긴다
 		if abs(c.get_normal().y) < 0.5 and abs(before) > 6.0 and _bump_cd <= 0.0:
 			_bump_cd = 0.4

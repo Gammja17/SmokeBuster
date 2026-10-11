@@ -1,7 +1,7 @@
 extends Control
 ## 오른쪽 위 원형 레이더. 플레이어가 위를 보도록 돌려서 사건(업무별 색), 쓰레기(연두), 행인(회색), 소화전(파랑)을 찍는다.
 
-const RANGE := 45.0
+var range_m := 45.0
 
 var world: Node
 var player: Node3D
@@ -37,13 +37,20 @@ func _draw() -> void:
 		var big: bool = n is Npc and n.kind == "boss"
 		var size := 7.0 if big else 4.5
 		_dot(c, r, p, yaw, n.global_position, col, size, true)
+	# 출동 현장 (파란 네모)
+	if world.mission.size() > 0:
+		var mp: Vector3 = world.mission.pos
+		var d := Vector2(mp.x - p.x, mp.z - p.z).rotated(yaw) / range_m * r
+		if d.length() > r - 8:
+			d = d.normalized() * (r - 8)
+		draw_rect(Rect2(c + d - Vector2(7, 7), Vector2(14, 14)), Color(0.3, 0.65, 1, blink))
 	# 플레이어 화살표
 	draw_colored_polygon(PackedVector2Array([c + Vector2(0, -9), c + Vector2(6, 6), c + Vector2(-6, 6)]), Color(1, 1, 1))
 
 
 func _dot(c: Vector2, r: float, p: Vector3, yaw: float, w: Vector3, color: Color, size_px: float, clamp_edge := false) -> void:
 	var d := Vector2(w.x - p.x, w.z - p.z).rotated(yaw)
-	var v := d / RANGE * r
+	var v := d / range_m * r
 	if v.length() > r - 6:
 		if not clamp_edge:
 			return

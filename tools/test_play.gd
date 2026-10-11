@@ -281,6 +281,76 @@ func _run() -> void:
 	check(player._body.visible and player.camera.position.distance_to(Vector3(0, 1.62, 0)) > 0.4, "V로 3인칭 전환")
 	player.set_third_person(false)
 
+	# ---- 거점과 건물 문
+	check(world.city.station_node != null, "파출소 건물")
+	var roles: Array = world.city.doors.map(func(d): return d.role)
+	check("station" in roles and "store" in roles and "hospital" in roles, "파출소/편의점/병원 문 (%s)" % str(roles))
+	var store: Dictionary = world.city.doors.filter(func(d): return d.role == "store")[0]
+	game.money = 500
+	player.mental = 1
+	player.global_position = store.pos + Vector3(0, 0.3, 0)
+	await frames(3)
+	check(not player._nearest_door().is_empty(), "편의점 문 앞에서 E 안내")
+	player._try_pickup()
+	await frames(2)
+	check(game.money == 470 and player.mental == 2, "편의점: 30원, 멘탈 +1")
+	var station: Dictionary = world.city.doors.filter(func(d): return d.role == "station")[0]
+	player.global_position = station.pos + Vector3(0, 0.3, 0)
+	await frames(3)
+	player._try_pickup()
+	await frames(2)
+	check(player.mental == game.max_mental() and world.shop_layer.visible, "파출소: 회복하고 장비실 열림")
+	world._close_shop()
+	await frames(2)
+
+	# ---- 무전 출동: 종류마다 현장이 생기는지
+	world.rank = 3
+	for k in world.MISSIONS:
+		if world.mission.size() > 0:
+			world._finish_mission(false, 0)
+		world.force_mission_type = k
+		for tries in 5:
+			if world.mission.is_empty():
+				world._start_mission()
+		check(world.mission.size() > 0 and world.mission.type == k and world.mission.targets.size() > 0, "출동 '%s' 현장 생성 (대상 %d)" % [k, world.mission.targets.size() if world.mission.size() > 0 else 0])
+	# 마지막 출동(학교)을 사진으로 해결
+	if world.mission.size() > 0:
+		var xpm: int = game.xp
+		for t in world.mission.targets:
+			if t.has_method("on_photographed"):
+				t.on_photographed()
+		await frames(70)
+		check(world.mission.is_empty() and game.xp > xpm, "출동 완료 보상 (+%d)" % (game.xp - xpm))
+
+	# 음주운전 출동: 순찰차로 들이받기
+	world.force_mission_type = "drunk"
+	world._start_mission()
+	var dcar = world.mission.targets[0] if world.mission.size() > 0 else null
+	check(dcar != null, "음주운전 추격 출동")
+	if dcar:
+		dcar.on_rammed()
+		await frames(70)
+		check(dcar.done and world.mission.is_empty(), "순찰차로 들이받아 음주운전 검거")
+
+	# 시간 초과
+	world.force_mission_type = "smoke"
+	world._start_mission()
+	if world.mission.size() > 0:
+		world.mission.deadline = 0.0
+		await frames(5)
+		check(world.mission.is_empty(), "제한 시간 지나면 출동 실패")
+	world.force_mission_type = ""
+
+	# ---- 파출소 업그레이드
+	game.upgrades.cctv = 1
+	game.upgrades.garage = 1
+	world._close_shop()
+	await frames(3)
+	check(world.hud.radar.range_m > 60.0, "CCTV: 레이더 범위 증가")
+	check(world._deco.size() >= 2, "업그레이드가 파출소에 보인다")
+	game.upgrades.cctv = 0
+	game.upgrades.garage = 0
+
 	# ---- 진행 저장 → 다시 열면 계급 유지
 	game.save_game()
 	var xp_saved: int = game.xp

@@ -2,16 +2,16 @@
 
 importer="texture"
 type="CompressedTexture2D"
-uid="uid://0adji7entva1"
-path="res://.godot/imported/colormap.png-426ac12922616bcec0703d68d2bc22d3.ctex"
+uid="uid://1cf17c5jy4xn"
+path="res://.godot/imported/planter_box_01_arm_1k.jpg-8f42dd23464681ef16b75dd2fc770e71.ctex"
 metadata={
 "vram_texture": false
 }
 
 [deps]
 
-source_file="res://assets/suburban/Textures/colormap.png"
-dest_files=["res://.godot/imported/colormap.png-426ac12922616bcec0703d68d2bc22d3.ctex"]
+source_file="res://assets/ph/planter_box_01/textures/planter_box_01_arm_1k.jpg"
+dest_files=["res://.godot/imported/planter_box_01_arm_1k.jpg-8f42dd23464681ef16b75dd2fc770e71.ctex"]
 
 [params]
 

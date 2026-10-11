@@ -14,6 +14,7 @@ signal trash_picked(trash: Node3D)
 signal hurt(amount: int)
 signal interact_vehicle
 signal tackled(npc: Node)
+signal use_door(door: Dictionary)
 
 const WALK_SPEED := 5.0
 const SPRINT_MULT := 1.55
@@ -22,6 +23,7 @@ const MOUSE_SENS := 0.0022
 
 var water: WaterSystem
 var hydrants: Array[Vector3] = []
+var doors: Array = []
 var input_enabled := true
 var slowed := false
 
@@ -379,8 +381,20 @@ func _nearest_trash() -> Node3D:
 	return best
 
 
+func _nearest_door() -> Dictionary:
+	for d in doors:
+		if Vector2(d.pos.x - global_position.x, d.pos.z - global_position.z).length() < 2.6:
+			return d
+	return {}
+
+
 func _try_pickup() -> void:
 	var t := _nearest_trash()
+	if t == null:
+		var door := _nearest_door()
+		if not door.is_empty():
+			use_door.emit(door)
+		return
 	if t and t.pick():
 		Sfx.play("refill", -4.0, 1.4)
 		_kick = 0.4
@@ -393,6 +407,8 @@ func _update_prompt() -> void:
 		text = ""
 	elif _nearest_trash():
 		text = "E  가방 주워 돌려주기" if _nearest_trash().is_in_group("bag") else "E  쓰레기 줍기"
+	elif not _nearest_door().is_empty():
+		text = "E  " + {"station": "파출소 (휴식, 장비실)", "store": "편의점 (물 + 멘탈1, 30원)", "hospital": "병원 (멘탈 회복, 100원)", "school": "학교"}[_nearest_door().role]
 	elif _near_vehicle():
 		text = "F  " + ("소방차" if _near_vehicle().kind == "firetruck" else ("순찰차" if _near_vehicle().kind == "police" else "차 뺏기")) + " 타기"
 	elif _near_hydrant:

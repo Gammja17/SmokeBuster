@@ -32,6 +32,7 @@ const SOUNDS := {
 	"voice_boss": ["res://assets/sfx/voice_boss.wav"],
 	"voice_achoo": ["res://assets/sfx/voice_achoo.wav"],
 	"slip": ["res://assets/sfx/impactSoft_heavy_000.ogg"],
+	"radio": ["res://assets/sfx/radio.wav"],
 }
 const LOOPS := {
 	"stream": "res://assets/sfx/stream_loop.wav",

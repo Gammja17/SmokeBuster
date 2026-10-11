@@ -202,6 +202,39 @@ grow_horizontal = 0
 mouse_filter = 2
 script = ExtResource("2_radar")
 
+[node name="Mission" type="PanelContainer" parent="."]
+visible = false
+anchors_preset = 1
+anchor_left = 1.0
+anchor_right = 1.0
+offset_left = -334.0
+offset_top = 224.0
+offset_right = -14.0
+offset_bottom = 330.0
+grow_horizontal = 0
+mouse_filter = 2
+
+[node name="V" type="VBoxContainer" parent="Mission"]
+layout_mode = 2
+theme_override_constants/separation = 2
+
+[node name="Head" type="Label" parent="Mission/V"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.45, 0.75, 1, 1)
+theme_override_font_sizes/font_size = 16
+text = "무전 출동"
+
+[node name="Title" type="Label" parent="Mission/V"]
+layout_mode = 2
+theme_override_fonts/font = ExtResource("4_title")
+theme_override_font_sizes/font_size = 24
+text = "흡연 민원 다수"
+
+[node name="Info" type="Label" parent="Mission/V"]
+layout_mode = 2
+theme_override_font_sizes/font_size = 18
+text = "편의점 근처 · 120m · 남은 시간 1:20"
+
 [node name="BottomLeft" type="PanelContainer" parent="."]
 anchors_preset = 2
 anchor_top = 1.0

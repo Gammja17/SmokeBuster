@@ -31,6 +31,9 @@ extends CanvasLayer
 @onready var polaroid_photo: TextureRect = $Polaroid/V/Photo
 @onready var polaroid_caption: Label = $Polaroid/V/Caption
 @onready var announce_label: Label = $Announce
+@onready var mission_box: PanelContainer = $Mission
+@onready var mission_title: Label = $Mission/V/Title
+@onready var mission_info: Label = $Mission/V/Info
 @onready var banner_big: Label = $Banner/Big
 @onready var banner_small: Label = $Banner/Small
 
@@ -47,6 +50,17 @@ func bind(world: Node, player: Node3D) -> void:
 	radar.player = player
 	indicators.player = player
 	_player = player
+
+
+func set_mission(title: String, place: String, left: float, dist: float, done: int, total: int) -> void:
+	## 오른쪽 위 출동 정보 (빈 제목이면 숨김)
+	mission_box.visible = title != ""
+	if title == "":
+		return
+	mission_title.text = title
+	var s := int(max(left, 0.0))
+	mission_info.text = "%s · %dm · %d:%02d · %d/%d" % [place, int(dist), s / 60, s % 60, done, total]
+	mission_info.modulate = Color(1, 0.45, 0.4) if s <= 15 and s % 2 == 0 else Color.WHITE
 
 
 func set_driving(on: bool, kind := "") -> void:

@@ -11,7 +11,7 @@ func _init():
 	for dir in OS.get_cmdline_user_args():
 		var d := DirAccess.open(dir)
 		for f in d.get_files():
-			if f.ends_with(".glb"): files.append(dir + "/" + f)
+			if f.ends_with(".glb") or f.ends_with(".gltf"): files.append(dir + "/" + f)
 	for f in files:
 		var s = load(f)
 		if s == null: print(f, " LOAD FAIL"); continue

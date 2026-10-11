@@ -67,3 +67,13 @@ burst = rng.uniform(-1, 1, n) * np.exp(-np.arange(n) / (SR * 0.06))
 burst = resonator(burst, 2500, 900) * 0.4 + voice(0.22, [320, 200], ["u"])
 save("voice_achoo", np.concatenate([a, np.zeros(1500), b, np.zeros(800), burst]))
 print("voices done")
+
+# 무전기 삐빅 + 지직
+n1 = int(SR * 0.09)
+beep = np.sin(2 * np.pi * 1400 * np.arange(n1) / SR) * 0.5
+gap = np.zeros(int(SR * 0.05))
+beep2 = np.sin(2 * np.pi * 1800 * np.arange(n1) / SR) * 0.5
+st = rng.uniform(-1, 1, int(SR * 0.35))
+st = resonator(st, 1800, 1500) * np.linspace(1, 0, len(st)) ** 2 * 0.6
+save("radio", np.concatenate([beep, gap, beep2, gap, st]))
+print("radio done")
