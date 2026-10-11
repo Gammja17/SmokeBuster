@@ -16,6 +16,8 @@ const BUILDINGS := [
 ]
 const TALL := ["building-skyscraper-a", "building-skyscraper-b", "building-skyscraper-c", "building-skyscraper-e"]
 const GRAFFITI := ["흡연금지", "CCTV 작동중", "쓰레기 버리지 마시오", "XX 참교육", "민지 사랑해", "여기서 담배 피면 벌금"]
+## 순찰차/소방차 자리 (x, z): 여기엔 주차된 차를 두지 않는다
+const RESERVED := [Vector2(-3.6, -24.0), Vector2(3.6, -24.0)]
 const PARKED := ["sedan", "suv", "taxi", "van", "hatchback-sports", "sedan-sports", "suv-luxury", "delivery", "truck"]
 
 var root: Node3D
@@ -595,9 +597,31 @@ func _parked_cars() -> void:
 					continue
 				var model: String = PARKED[rng.randi_range(0, PARKED.size() - 1)]
 				var off: float = side * 3.6
-				_prop("cars/" + model, Vector3(c + off, 0.02, along), 0.0 if side > 0 else 180.0, Vector3.ONE * 1.6, true)
+				if not _reserved(Vector2(c + off, along)):
+					_prop("cars/" + model, Vector3(c + off, 0.02, along), 0.0 if side > 0 else 180.0, Vector3.ONE * 1.6, true)
 				if rng.randf() < 0.5:
 					_prop("cars/" + PARKED[rng.randi_range(0, PARKED.size() - 1)], Vector3(along, 0.02, c + off), 90.0 if side > 0 else -90.0, Vector3.ONE * 1.6, true)
+
+
+func _reserved(p: Vector2) -> bool:
+	for r in RESERVED:
+		if p.distance_to(r) < 6.0:
+			return true
+	return false
+
+
+## 불법주차 자리 후보: 가운데 도로 횡단보도 위 [위치, 방향(도)]
+func parking_candidates() -> Array:
+	var list := []
+	for inter in [-PITCH, 0.0, PITCH]:
+		for s in [-1, 1]:
+			var along: float = inter + s * 10.5
+			if abs(along) > PITCH:
+				continue
+			for lane in [-2.0, 2.0]:
+				list.append([Vector3(lane, 0.02, along), 0.0 if lane > 0 else 180.0])
+				list.append([Vector3(along, 0.02, lane), 90.0 if lane > 0 else -90.0])
+	return list.filter(func(c): return in_zone(c[0]))
 
 
 # ---------------------------------------------------------------- 보행자 길

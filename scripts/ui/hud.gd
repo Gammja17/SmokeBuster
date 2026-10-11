@@ -49,6 +49,12 @@ func bind(world: Node, player: Node3D) -> void:
 	_player = player
 
 
+func set_driving(on: bool, kind := "") -> void:
+	## 운전 중엔 무기 칸을 숨기고, 소방차일 때만 조준점
+	$BottomRight.visible = not on
+	crosshair.visible = not on or kind == "firetruck"
+
+
 func set_camera_mode(on: bool) -> void:
 	viewfinder.visible = on
 	crosshair.visible = not on
@@ -165,7 +171,7 @@ func set_ammo(id: String, cur: float, maximum: float) -> void:
 
 
 func set_truck(charge: float) -> void:
-	truck_box.visible = Game.has_truck
+	truck_box.visible = false
 	truck_bar.value = charge
 	truck_box.modulate = Color(1, 1, 1) if charge >= 1.0 else Color(1, 1, 1, 0.6)
 

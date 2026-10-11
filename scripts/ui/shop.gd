@@ -57,7 +57,7 @@ func _refresh() -> void:
 
 	var truck := ITEM.instantiate()
 	_weapons.add_child(truck)
-	truck.setup("소방차 호출", "흡연자 6명 단속마다 충전. F를 누르면 소방차가 길을 쓸고 지나간다!",
+	truck.setup("소방차 키", "파출소 앞에 소방차가 생긴다. F로 타서 운전하며 지붕 물대포를 쏜다!",
 		"보유중" if Game.has_truck else "%d원" % Game.TRUCK_PRICE, not Game.has_truck and Game.money >= Game.TRUCK_PRICE)
 	truck.buy.connect(_buy_truck)
 

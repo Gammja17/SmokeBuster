@@ -3,7 +3,6 @@ extends Node3D
 ## 사건은 플레이어 근처에 계속 생기고, 실적이 쌓이면 그 자리에서 승진하며 관할 구역이 넓어진다.
 
 const COMBO_WINDOW := 8.0
-const TRUCK_NEED := 6.0
 const NEAR := 12.0               # 사건이 생기는 거리 (플레이어 기준)
 const FAR := 42.0
 const STREAK_NAMES := ["", "", "더블!", "트리플!", "물벼락!", "싹쓸이!!", "동네 평화!!!"]
@@ -14,6 +13,8 @@ const HINTS := [
 	"오른쪽 위 레이더의 색 점이 사건이에요. 화면 가장자리 화살표도 따라가 보세요.",
 	"행인이나 학생에게 물을 뿌리면 민원(-20원)! 학생 비행은 우클릭 카메라로 찍어 신고해요.",
 	"뛰는 사람 앞 바닥에 물을 깔아두면 미끄러져요.",
+	"길가 순찰차에 다가가 F로 타요. 운전 중 H는 사이렌, F로 내려요.",
+	"V로 3인칭 시점! 전력질주하다 문제아에게 부딪히면 태클로 잡아요.",
 	"Tab: 장비실 · 물이 떨어지면 빨간 소화전 옆에서 E를 꾹",
 ]
 const EVENTS := [
@@ -22,6 +23,8 @@ const EVENTS := [
 	["shop", "불법업소 기습 개업!", "네온 간판에 물을 뿌려 합선시키세요"],
 	["bully", "학교폭력 신고 접수!", "현장을 찾아 사진으로 남기세요"],
 	["rush", "퇴근길 흡연 러시!", "30초 동안 흡연자가 쏟아져요 (보상 2배)"],
+	["thief", "소매치기 주의보!", "도둑 둘이 동네에 숨어들었어요"],
+	["parking", "불법주차 신고 폭주!", "횡단보도를 막은 차들을 찍어 견인시키세요"],
 	["boss", "골초왕 출현!", "공원 쪽에서 엄청난 연기가..."],
 ]
 
@@ -36,13 +39,13 @@ const EVENTS := [
 var city := CityBuilder.new()
 var cfg := {}
 var rank := 0
+var vehicle: Vehicle = null      # 지금 타고 있는 차
 
 var playing := false
 var complaints := 0
 var combo := 1.0
 var _combo_t := 0.0
 var _streak := 0
-var truck_charge := 0.0
 var _timers := {}
 var _group_seq := 0
 var _event_t := 50.0
@@ -77,9 +80,13 @@ func _ready() -> void:
 	player.prompt_changed.connect(hud.set_prompt)
 	player.camera_mode_changed.connect(hud.set_camera_mode)
 	player.photo_taken.connect(_on_photo)
-	player.trash_picked.connect(func(t): _complete("trash", "쓰레기 줍기", t.global_position - Vector3.UP * 1.6))
+	player.trash_picked.connect(_on_picked)
 	player.hurt.connect(_on_player_hurt)
-	player.call_truck.connect(_call_truck)
+	player.interact_vehicle.connect(_toggle_vehicle)
+	player.tackled.connect(func(n):
+		var dir: Vector3 = n.global_position - player.global_position
+		dir.y = 0
+		n.caught("tackle", dir.normalized()))
 	pause.resumed.connect(func():
 		player.input_enabled = playing
 		_capture_grace = 1.0)
@@ -93,7 +100,6 @@ func _ready() -> void:
 	hud.set_mental(player.mental, Game.max_mental())
 	hud.set_complaints(0, 0)
 	hud.set_weapon(player.current)
-	hud.set_truck(0.0)
 	player.equip(Game.owned[Game.owned.size() - 1] if Game.owned.size() > 0 else "spray")
 
 	for lane in city.ring_lanes:
@@ -108,6 +114,8 @@ func _ready() -> void:
 		_spawn_trash(city.random_sidewalk_point())
 	for i in cfg.shops:
 		_spawn_shop()
+	_spawn_vehicles()
+	_spawn_props(22)
 	# 시작하자마자 근처에 흡연자 둘
 	for i in 2:
 		_spawn_at_spot("normal", 6.0)
@@ -176,8 +184,9 @@ func _close_shop() -> void:
 	player.mental = Game.max_mental()
 	hud.set_mental(player.mental, Game.max_mental())
 	hud.set_money(Game.money)
-	hud.set_truck(truck_charge)
 	player.equip(Game.owned[Game.owned.size() - 1])
+	if Game.has_truck and get_tree().get_nodes_in_group("vehicle").filter(func(v): return v.kind == "firetruck").is_empty():
+		_spawn_vehicles()
 	player.capture_mouse()
 	_capture_grace = 1.0
 
@@ -248,12 +257,17 @@ func _spawn_random_incident() -> void:
 	var pool := []
 	for s in cfg.spawns:
 		match s:
-			"smoke": pool.append_array(["smoke", "smoke", "smoke", "smoke"])
+			"smoke": pool.append_array(["smoke", "smoke"])
 			"litter": pool.append_array(["litter", "litter"])
 			"jaywalk": pool.append_array(["jaywalk", "jaywalk"])
 			"teen_smoke": pool.append_array(["teen_smoke", "teen_smoke"])
 			"teen_drink": pool.append("teen_drink")
 			"bully": pool.append("bully")
+			"thief": pool.append_array(["thief", "thief"])
+			"pee": pool.append("pee")
+			"fight": pool.append_array(["fight", "fight"])
+			"graffiti": pool.append("graffiti")
+			"parking": pool.append("parking")
 	if _rush_t > 0.0:
 		pool = ["smoke"]
 	match pool.pick_random():
@@ -274,6 +288,21 @@ func _spawn_random_incident() -> void:
 		"bully":
 			if _active("bully") == 0:
 				_spawn_bullying()
+		"thief":
+			if _count_kind("thief") < 2:
+				_spawn_walker("thief")
+		"pee":
+			if _active("pee") < 1:
+				_spawn_wall_npc("pee")
+		"fight":
+			if _active("fight") < 2:
+				_spawn_fight()
+		"graffiti":
+			if _active("graffiti") < 1:
+				_spawn_wall_npc("tagger")
+		"parking":
+			if _active("parking") < 2:
+				_spawn_parking()
 
 
 func _update_events(delta: float) -> void:
@@ -287,8 +316,11 @@ func _update_events(delta: float) -> void:
 	var options := []
 	for e in EVENTS:
 		match e[0]:
-			"group", "rush":
+			"group", "rush", "thief":
 				options.append(e)
+			"parking":
+				if "parking" in cfg.spawns:
+					options.append(e)
 			"drunk", "bully":
 				if e[0] in cfg.spawns:
 					options.append(e)
@@ -310,6 +342,12 @@ func _update_events(delta: float) -> void:
 		"bully": _spawn_bullying()
 		"rush": _rush_t = 30.0
 		"boss": _spawn_boss()
+		"thief":
+			_spawn_walker("thief")
+			_spawn_walker("thief")
+		"parking":
+			for i in 3:
+				_spawn_parking()
 
 
 func _tick(key: String, delta: float, every: float, action: Callable) -> void:
@@ -322,7 +360,7 @@ func _tick(key: String, delta: float, every: float, action: Callable) -> void:
 func _active_total() -> int:
 	var c := 0
 	for n in get_tree().get_nodes_in_group("incident"):
-		if not n.done and n.task() != "shop" and n.task() != "drunk":
+		if not n.done and not n.task() in ["shop", "drunk", "parking"]:
 			c += 1
 	return c
 
@@ -358,6 +396,11 @@ func _new_npc(kind: String) -> Npc:
 	n.annoyed.connect(_on_annoyed)
 	n.dropped_trash.connect(func(pos): if get_tree().get_nodes_in_group("trash").size() < 25: _spawn_trash(pos))
 	n.hurt_player.connect(func(npc, amount): player.take_hit(amount, npc.global_position))
+	n.dropped_bag.connect(_spawn_bag)
+	n.shout.connect(func(who, text):
+		hud.add_feed(text, Color(1, 0.4, 0.35))
+		if text == "도둑이야!!" and who.global_position.distance_to(player.global_position) < 45.0:
+			hud.banner("도둑이야!!", "복면 쓴 소매치기를 쫓아가 잡으세요", 1.8))
 	return n
 
 
@@ -469,7 +512,7 @@ func _spawn_group() -> void:
 		n.position = spot.pos + Vector3(cos(a), 0.05, sin(a)) * 1.0
 		n.rotation.y = -a - PI / 2
 		npcs.add_child(n)
-	get_tree().create_timer(20.0).timeout.connect(func(): spot.busy = false)
+	_later(20.0, func(): spot.busy = false)
 
 
 func _spawn_circle(kind: String, center: Vector3, count: int, radius: float, group: String) -> Array:
@@ -494,7 +537,7 @@ func _spawn_teen_drinkers() -> void:
 	_group_seq += 1
 	spot.busy = true
 	_spawn_circle("teen_drinker", spot.pos, 3, 0.9, "teen_drink_%d" % _group_seq)
-	get_tree().create_timer(30.0).timeout.connect(func(): spot.busy = false)
+	_later(30.0, func(): spot.busy = false)
 
 
 func _spawn_bullying() -> void:
@@ -511,7 +554,7 @@ func _spawn_bullying() -> void:
 	npcs.add_child(victim)
 	for b in _spawn_circle("bully", spot.pos, 3, 1.1, group):
 		b.victim = victim
-	get_tree().create_timer(30.0).timeout.connect(func(): spot.busy = false)
+	_later(30.0, func(): spot.busy = false)
 
 
 func _spawn_jaywalker() -> void:
@@ -580,7 +623,7 @@ func _on_npc_resolved(npc: Npc, task: String) -> void:
 	var reward: int = Game.reward_for(npc.kind) if task == "smoke" else Game.TASKS[task].reward
 	if _rush_t > 0.0 and task == "smoke":
 		reward *= 2
-	var name: String = {"runner": "도망자 검거!", "angry": "다혈질 진압!", "boss": "골초왕 퇴치!!"}.get(npc.kind, Game.TASKS[task].name)
+	var name: String = {"runner": "도망자 검거!", "angry": "다혈질 진압!", "boss": "골초왕 퇴치!!", "thief": "소매치기 검거!"}.get(npc.kind, Game.TASKS[task].name)
 	_complete(task, name, npc.global_position, reward)
 	_cheer(npc.global_position)
 	if npc.kind == "boss":
@@ -617,11 +660,6 @@ func _complete(task: String, label: String, pos := Vector3.ZERO, reward := -1) -
 		player.shake(0.25)
 	_add_xp(reward)
 
-	if Game.has_truck and task == "smoke":
-		truck_charge = min(truck_charge + 1.0 / TRUCK_NEED, 1.0)
-		hud.set_truck(truck_charge)
-		if truck_charge >= 1.0:
-			hud.add_feed("소방차 준비 완료! F", Color(1, 0.4, 0.3))
 
 
 func _add_xp(amount: int) -> void:
@@ -649,6 +687,8 @@ func _promote(new_rank: int) -> void:
 		lines.append("새로 나타남: " + ", ".join(news))
 	for i in cfg.shops - old_cfg.shops:
 		_spawn_shop()
+	if cfg.zone != old_cfg.zone:
+		_spawn_props(10)
 	hud.banner("승진! %s" % Game.rank_name(), "\n".join(lines), 3.0)
 	Sfx.play("fanfare", 0.0)
 	player.mental = Game.max_mental()
@@ -665,11 +705,11 @@ func _cheer(pos: Vector3) -> void:
 		if p is Npc and p.kind == "ped" and p.state == Npc.State.WALK and p.global_position.distance_to(pos) < 14.0 and randf() < 0.7:
 			n += 1
 			var who: Npc = p
-			get_tree().create_timer(randf_range(0.3, 0.9)).timeout.connect(func():
+			_later(randf_range(0.3, 0.9), func():
 				if is_instance_valid(who) and who.state == Npc.State.WALK:
 					who.say(CHEERS.pick_random(), Color(0.7, 1, 0.7))
 					who._play("emote-yes", 0.1)
-					get_tree().create_timer(0.9).timeout.connect(func():
+					_later(0.9, func():
 						if is_instance_valid(who) and who.state == Npc.State.WALK:
 							who._play("walk")))
 
@@ -734,6 +774,8 @@ func _faint() -> void:
 	hud.banner("멘탈 붕괴...", "파출소에서 정신 차리는 중 (-%d원)" % lost, 2.0)
 	hud.damage_flash(0.8)
 	await get_tree().create_timer(2.2).timeout
+	if vehicle:
+		_toggle_vehicle()
 	player.global_position = Vector3(-8.5, 0.3, -14.0)
 	player.mental = Game.max_mental()
 	hud.set_mental(player.mental, Game.max_mental())
@@ -741,28 +783,260 @@ func _faint() -> void:
 	player.input_enabled = true
 
 
-func _call_truck() -> void:
-	if truck_charge < 1.0 or not playing:
+# ---------------------------------------------------------------- 차
+
+func _spawn_vehicles() -> void:
+	## 파출소 앞 길가에 순찰차 (소방차 키가 있으면 소방차도)
+	var have := {}
+	for v in get_tree().get_nodes_in_group("vehicle"):
+		have[v.kind] = true
+	if not have.has("police"):
+		_add_vehicle("police", Vector3(-3.6, 0.3, -24.0), 0.0)
+	if Game.has_truck and not have.has("firetruck"):
+		_add_vehicle("firetruck", Vector3(3.6, 0.3, -24.0), 0.0)
+
+
+func _add_vehicle(kind: String, pos: Vector3, yaw: float, model := "") -> Vehicle:
+	var v := Vehicle.new()
+	v.kind = kind
+	v.model_name = model
+	v.water = water
+	v.position = pos
+	v.rotation.y = yaw
+	add_child(v)
+	v.hit_npc.connect(_on_vehicle_hit.bind(v))
+	return v
+
+
+func _toggle_vehicle() -> void:
+	if vehicle:
+		var out := vehicle.exit()
+		player.global_position = out
+		player.rotation.y = vehicle.rotation.y
+		player.set_driving(false)
+		vehicle = null
+		hud.set_driving(false)
+		player.capture_mouse()
+		hud.set_hint("")
 		return
-	truck_charge = 0.0
-	hud.set_truck(0.0)
-	var p := player.global_position
-	var best_d := INF
-	var along_x := false
-	var line := 0.0
-	for c in [-CityBuilder.PITCH, 0.0, CityBuilder.PITCH]:
-		if abs(p.x - c) < best_d:
-			best_d = abs(p.x - c)
-			along_x = false
-			line = c
-		if abs(p.z - c) < best_d:
-			best_d = abs(p.z - c)
-			along_x = true
-			line = c
-	var lane: float = 2.5 * (sign((p.z if along_x else p.x) - line) if best_d > 0.5 else 1.0)
-	var truck := FireTruck.new()
-	truck.water = water
-	truck.player = player
-	add_child(truck)
-	truck.launch(along_x, line, lane)
-	hud.banner("소방차 출동!", "", 1.5)
+	if player.camera_mode or not player.input_enabled:
+		return
+	for v in get_tree().get_nodes_in_group("vehicle"):
+		if v.can_enter(player):
+			_enter(v)
+			return
+	# 지나가는 차 뺏기
+	for t in get_tree().get_nodes_in_group("traffic"):
+		if t.global_position.distance_to(player.global_position) < 3.4:
+			_hijack(t)
+			return
+
+
+func _enter(v: Vehicle) -> void:
+	vehicle = v
+	player.set_driving(true)
+	v.enter(player)
+	hud.set_driving(true, v.kind)
+	var keys := "W/S 가속·후진 · A/D 조향 · Space 브레이크 · F 내리기"
+	match v.kind:
+		"police": keys += " · H 사이렌"
+		"firetruck": keys += " · 좌클릭 물대포 · H 경적"
+		_: keys += " · H 경적"
+	hud.set_hint(keys)
+
+
+func _hijack(t: TrafficCar) -> void:
+	## 지나가는 차를 세우고 운전자를 내리게 한다 (민원!)
+	var pos := t.global_position + Vector3.UP * 0.3
+	var yaw := t.rotation.y
+	var model := t.model_name
+	t.queue_free()
+	var v := _add_vehicle("civilian", pos, yaw, model)
+	var d := _new_npc("ped")
+	d.position = pos + v.global_basis.x * 2.4
+	npcs.add_child(d)
+	d.start_walking(city.nearest_nav(d.position))
+	d.say(["내 차!!", "도둑이야!!", "경찰 맞아요?!"].pick_random(), Color(1, 0.5, 0.4))
+	_on_annoyed(d, false)
+	_enter(v)
+
+
+func _on_vehicle_hit(n: Node, spd: float, v: Vehicle) -> void:
+	if not is_instance_valid(n) or n.state == Npc.State.DOWN:
+		return
+	var dir: Vector3 = n.global_position - v.global_position
+	dir.y = 0
+	dir = dir.normalized()
+	if n.can_be_caught():
+		n.caught("car", dir)
+		hud.announce("차로 검거!", Color(0.5, 0.9, 1))
+	else:
+		n.run_over(dir, spd)
+		if not n.done:
+			_on_annoyed(n, n.is_minor())
+	v.speed *= 0.7
+	player.shake(0.5)
+
+
+# ---------------------------------------------------------------- 도둑 가방, 줍기
+
+func _spawn_bag(pos: Vector3, owner_npc: Node) -> void:
+	var b := StolenBag.new()
+	b.victim = owner_npc
+	b.position = Vector3(pos.x, 0.06, pos.z)
+	add_child(b)
+
+
+func _on_picked(t: Node3D) -> void:
+	if t is StolenBag:
+		_complete("trash", "가방 돌려주기", t.global_position - Vector3.UP * 1.6, 150)
+		if is_instance_valid(t.victim) and t.victim is Npc and not t.victim.done:
+			t.victim.say(["감사합니다!!", "제 가방이에요!", "역시 경찰관님!"].pick_random(), Color(0.7, 1, 0.7))
+			t.victim._play("emote-yes", 0.1)
+	else:
+		_complete("trash", "쓰레기 줍기", t.global_position - Vector3.UP * 1.6)
+
+
+# ---------------------------------------------------------------- 싸움, 낙서, 노상방뇨, 불법주차
+
+func _spawn_fight() -> void:
+	var spot := _free_spot(["street", "corner", "busstop", "cafe", "park"])
+	if spot.is_empty():
+		return
+	spot.busy = true
+	var a := _new_npc("fighter")
+	var b := _new_npc("fighter")
+	var off := Vector3(randf_range(-1, 1), 0, randf_range(-1, 1)).normalized() * 0.7
+	a.position = spot.pos + off + Vector3.UP * 0.05
+	b.position = spot.pos - off + Vector3.UP * 0.05
+	a.partner = b
+	b.partner = a
+	npcs.add_child(a)
+	npcs.add_child(b)
+	_later(25.0, func(): spot.busy = false)
+
+
+func _spawn_wall_npc(kind: String) -> void:
+	## 벽 앞에 붙어서는 사람 (낙서범, 노상방뇨)
+	var spot := _free_spot(["alley"])
+	if spot.is_empty():
+		return
+	var space := get_world_3d().direct_space_state
+	var best: Dictionary = {}
+	var bd := INF
+	for k in 8:
+		var dir := Vector3.FORWARD.rotated(Vector3.UP, TAU * k / 8.0)
+		var from: Vector3 = spot.pos + Vector3.UP * 1.0
+		var q := PhysicsRayQueryParameters3D.create(from, from + dir * 4.0, 1)
+		var hit := space.intersect_ray(q)
+		if not hit.is_empty() and abs(hit.normal.y) < 0.3:
+			var d: float = from.distance_to(hit.position)
+			if d < bd:
+				bd = d
+				best = hit
+	if best.is_empty():
+		return
+	var normal: Vector3 = best.normal
+	var n := _new_npc(kind)
+	n.position = Vector3(best.position.x, spot.pos.y + 0.05, best.position.z) + normal * 0.6
+	n.rotation.y = atan2(normal.x, normal.z) + PI
+	npcs.add_child(n)
+	n.occupy(spot)
+	if kind == "tagger":
+		var g := Label3D.new()
+		g.text = ["YOLO", "낙서왕", "ㅋㅋㅋ", "ART", "왔다감"].pick_random()
+		g.font = load("res://assets/fonts/Pretendard-ExtraBold.otf")
+		g.font_size = 120
+		g.pixel_size = 0.008
+		g.outline_size = 0
+		g.modulate = [Color(1, 0.2, 0.4), Color(0.2, 1, 0.5), Color(0.3, 0.6, 1), Color(1, 0.8, 0.1)].pick_random()
+		add_child(g)
+		g.global_position = Vector3(best.position.x, 1.7, best.position.z) + normal * 0.03
+		g.rotation = Vector3(0, atan2(normal.x, normal.z), deg_to_rad(randf_range(-10, 10)))
+		g.scale = Vector3.ONE * 0.2
+		n.graffiti = g
+
+
+func _spawn_parking() -> void:
+	var used := []
+	for c in get_children():
+		if c is IllegalParking:
+			used.append(c.global_position)
+	var options := city.parking_candidates().filter(func(c):
+		for u in used:
+			if u.distance_to(c[0]) < 4.0:
+				return false
+		return c[0].distance_to(player.global_position) > 8.0)
+	if options.is_empty():
+		return
+	var c: Array = options.pick_random()
+	var car := IllegalParking.new()
+	add_child(car)
+	car.global_position = c[0]
+	car.rotation_degrees.y = c[1]
+	car.resolved.connect(func(p, task): _complete(task, Game.TASKS[task].name, p.global_position))
+
+
+# ---------------------------------------------------------------- 물리 소품
+
+func _spawn_props(count: int) -> void:
+	## 물줄기와 차에 날아가는 라바콘, 쓰레기통, 박스
+	for i in count:
+		var p := city.random_sidewalk_point()
+		if p.distance_to(Vector3(-8.5, 0, -14)) < 4.0:
+			continue
+		var body := RigidBody3D.new()
+		body.collision_layer = 1
+		body.collision_mask = 1
+		var shape := CollisionShape3D.new()
+		var kind := randi() % 3
+		match kind:
+			0:
+				var m: Node3D = load("res://assets/cars/cone.glb").instantiate()
+				m.scale = Vector3.ONE * 1.3
+				body.add_child(m)
+				var cs := CylinderShape3D.new()
+				cs.radius = 0.25
+				cs.height = 0.75
+				shape.shape = cs
+				shape.position.y = 0.38
+				body.mass = 2.0
+			1:
+				var mi := MeshInstance3D.new()
+				var cm := CylinderMesh.new()
+				cm.top_radius = 0.3
+				cm.bottom_radius = 0.26
+				cm.height = 0.85
+				var mat := StandardMaterial3D.new()
+				mat.albedo_color = Color(0.2, 0.5, 0.35)
+				cm.material = mat
+				mi.mesh = cm
+				mi.position.y = 0.43
+				body.add_child(mi)
+				var cs := CylinderShape3D.new()
+				cs.radius = 0.3
+				cs.height = 0.85
+				shape.shape = cs
+				shape.position.y = 0.43
+				body.mass = 4.0
+			_:
+				var m: Node3D = load("res://assets/cars/box.glb").instantiate()
+				m.scale = Vector3.ONE * 0.9
+				body.add_child(m)
+				var bs := BoxShape3D.new()
+				bs.size = Vector3.ONE * 0.64
+				shape.shape = bs
+				shape.position.y = 0.32
+				body.mass = 1.5
+		body.add_child(shape)
+		body.position = p + Vector3.UP * 0.05
+		body.rotation.y = randf() * TAU
+		body.can_sleep = true
+		add_child(body)
+
+
+## t초 뒤에 fn 실행. 이 노드가 사라지면 같이 취소된다.
+func _later(t: float, fn: Callable) -> void:
+	var tw := create_tween()
+	tw.tween_interval(t)
+	tw.tween_callback(fn)

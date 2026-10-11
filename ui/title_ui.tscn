@@ -64,7 +64,7 @@ layout_mode = 2
 theme_override_colors/font_color = Color(0.8, 0.88, 1, 1)
 theme_override_font_sizes/font_size = 19
 text = "WASD 이동 · Shift 달리기 · 마우스 조준 · 좌클릭 물 뿌리기
-1~5 / 휠 무기 · 우클릭 카메라 신고 · E 줍기/물 채우기 · Tab 장비실
+1~5 / 휠 무기 · 우클릭 카메라 · E 줍기 · F 차 타기 · V 3인칭 · Tab 장비실
 정해진 일은 없어요. 동네를 돌며 마음대로 단속하세요!"
 
 [node name="Credit" type="Label" parent="."]

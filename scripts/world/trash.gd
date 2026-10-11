@@ -7,6 +7,7 @@ var _picked := false
 
 func _ready() -> void:
 	add_to_group("trash")
+	add_to_group("pickup")
 	var mi := MeshInstance3D.new()
 	var mat := StandardMaterial3D.new()
 	match randi() % 5:
@@ -63,6 +64,7 @@ func pick() -> bool:
 		return false
 	_picked = true
 	remove_from_group("trash")
+	remove_from_group("pickup")
 	var tw := create_tween()
 	tw.tween_property(self, "position:y", position.y + 0.8, 0.15)
 	tw.parallel().tween_property(self, "scale", Vector3.ONE * 0.1, 0.2)

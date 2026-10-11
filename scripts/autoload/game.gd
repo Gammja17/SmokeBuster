@@ -74,6 +74,11 @@ const TASKS := {
 	"bully": {"name": "학교폭력 신고", "short": "학폭", "reward": 200, "how": "photo", "color": Color(1, 0.2, 0.55)},
 	"drunk": {"name": "음주운전 신고", "short": "음주운전", "reward": 250, "how": "photo", "color": Color(0.3, 0.9, 1)},
 	"shop": {"name": "불법업소 철거", "short": "불법업소", "reward": 300, "how": "break", "color": Color(1, 0.35, 0.95)},
+	"thief": {"name": "소매치기 검거", "short": "도둑", "reward": 250, "how": "chase", "color": Color(1, 0.12, 0.12)},
+	"fight": {"name": "싸움 말리기", "short": "싸움", "reward": 90, "how": "water", "color": Color(1, 0.55, 0.35)},
+	"graffiti": {"name": "낙서범 단속", "short": "낙서", "reward": 80, "how": "water", "color": Color(0.4, 1, 0.6)},
+	"pee": {"name": "노상방뇨 단속", "short": "노상방뇨", "reward": 60, "how": "water", "color": Color(0.95, 0.85, 0.3)},
+	"parking": {"name": "불법주차 신고", "short": "불법주차", "reward": 100, "how": "photo", "color": Color(0.5, 0.7, 1)},
 }
 ## 관할 구역 (x, z 사각형). 승진하면 넓어진다.
 const ZONES := [
@@ -83,10 +88,11 @@ const ZONES := [
 ]
 const RANKS := ["순경", "경장", "경사", "경위", "경감", "경정", "총경"]
 const RANK_XP := [0, 400, 1100, 2400, 4500, 7500, 12000]   # 이 실적부터 그 계급
-const HOW_TEXT := {"water": "물", "photo": "촬영", "pickup": "E 줍기", "break": "간판에 물"}
+const HOW_TEXT := {"water": "물", "photo": "촬영", "pickup": "E 줍기", "break": "간판에 물", "chase": "추격"}
 const SPAWN_NAMES := {
 	"smoke": "흡연자", "trash": "쓰레기", "litter": "무단투기범", "jaywalk": "무단횡단", "teen_smoke": "담배 피는 학생",
 	"shop": "불법업소", "teen_drink": "술 마시는 학생", "bully": "학교폭력", "drunk": "음주운전",
+	"thief": "소매치기", "fight": "길거리 싸움", "graffiti": "낙서범", "pee": "노상방뇨", "parking": "불법주차",
 }
 
 
@@ -115,10 +121,10 @@ func zone_for_rank(r: int) -> int:
 
 ## 계급별로 동네에 나오는 사건과 밀도
 func patrol_config(r: int) -> Dictionary:
-	var spawns := ["smoke", "trash", "litter"]
+	var spawns := ["smoke", "trash", "litter", "thief", "pee"]
 	var weights := {"normal": 1.0}
 	if r >= 1:
-		spawns.append_array(["jaywalk", "teen_smoke", "shop"])
+		spawns.append_array(["jaywalk", "teen_smoke", "shop", "fight", "graffiti", "parking"])
 		weights = {"normal": 1.0, "runner": 0.5}
 	if r >= 2:
 		spawns.append_array(["teen_drink", "bully", "drunk"])
@@ -128,7 +134,7 @@ func patrol_config(r: int) -> Dictionary:
 		"spawns": spawns,
 		"weights": weights,
 		"zone": zone,
-		"incidents": min(5 + r * 2, 13),        # 동시에 진행 중인 사건 수 목표
+		"incidents": min(6 + r * 2, 14),        # 동시에 진행 중인 사건 수 목표
 		"pedestrians": [9, 14, 20][zone],
 		"shops": [0, 1, 2][zone],
 		"events": r >= 1,

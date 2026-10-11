@@ -159,6 +159,108 @@ func _run() -> void:
 	await frames(3)
 	check(game.xp > x1, "E로 쓰레기 줍기")
 
+	_clear(world)
+	await frames(5)
+	player.global_position = Vector3(-8.5, 0.2, -14)
+	player.rotation.y = 0
+	player.camera.rotation = Vector3.ZERO
+	await frames(3)
+
+	# ---- 도둑: 행인 가방을 낚아채고 도망 → 태클 → 가방 돌려주기
+	var victim = world._new_npc("ped")
+	victim.position = player.global_position + Vector3(0, 0, -8)
+	world.npcs.add_child(victim)
+	victim.start_walking(world.city.nearest_nav(victim.position))
+	var thief = world._new_npc("thief")
+	thief.position = victim.position + Vector3(1.0, 0, 0)
+	world.npcs.add_child(thief)
+	thief.start_walking(world.city.nearest_nav(thief.position))
+	thief._snatch_t = 0.0
+	await frames(10)
+	check(thief._stolen and thief.is_active_incident(), "도둑이 가방을 낚아챔")
+	check(thief.state == 2, "도둑이 달아남")
+	await frames(30)
+	var xp_b: int = game.xp
+	player.global_position = thief.global_position + Vector3(0, 0.2, 1.0)
+	player.velocity = Vector3(0, 0, -8)
+	player._tackle_cd = 0
+	player._check_tackle(0.016, 8.0)
+	await frames(5)
+	check(thief.done, "달리다 부딪혀 태클로 검거")
+	await frames(10)
+	var bags: Array = world.get_tree().get_nodes_in_group("bag")
+	check(bags.size() == 1, "도둑이 가방을 떨어뜨림")
+	if bags.size() == 1:
+		player.global_position = bags[0].global_position + Vector3(0.5, 0.2, 0)
+		await frames(3)
+		player._try_pickup()
+		await frames(3)
+	check(game.xp > xp_b + 300, "가방 돌려주기 보상 (+%d)" % (game.xp - xp_b))
+
+	# ---- 싸움, 낙서, 노상방뇨, 불법주차
+	world._spawn_fight()
+	world._spawn_wall_npc("tagger")
+	world._spawn_wall_npc("pee")
+	world._spawn_parking()
+	await frames(10)
+	check(world._active("fight") == 2, "길거리 싸움 2명")
+	check(world._active("graffiti") == 1 and world._active("pee") == 1, "낙서범, 노상방뇨 등장")
+	check(world._active("parking") >= 1, "불법주차 차량 등장")
+	for c in world.get_children():
+		if c.has_method("task") and c.task() == "parking" and not c.done:
+			c.on_photographed()
+	await frames(3)
+	check(world._active("parking") == 0, "불법주차 촬영 → 견인")
+
+	# ---- 운전: 순찰차 타고 달려서 문제아를 들이받기
+	var cars: Array = world.get_tree().get_nodes_in_group("vehicle")
+	check(cars.size() >= 1, "순찰차가 길가에 있음")
+	var car = cars[0]
+	player.global_position = car.global_position + Vector3(2.0, 0, 0)
+	await frames(3)
+	world._toggle_vehicle()
+	await frames(3)
+	check(world.vehicle == car and not player.visible, "F로 순찰차 탑승")
+	var target = world._new_npc("normal")
+	target.position = car.global_position - car.global_basis.z * 9.0
+	target.position.y = 0.1
+	world.npcs.add_child(target)
+	await frames(5)
+	car.speed = 12.0
+	for i in 120:
+		await physics_frame
+		car.speed = 12.0
+		if target.done:
+			break
+	check(target.done, "차로 들이받아 검거")
+	world._toggle_vehicle()
+	await frames(3)
+	check(world.vehicle == null and player.visible and player.input_enabled, "F로 하차")
+
+	# ---- 물리 소품이 물에 밀린다
+	var prop: RigidBody3D = null
+	for c in world.get_children():
+		if c is RigidBody3D:
+			prop = c
+			break
+	check(prop != null, "물리 소품 배치")
+	if prop:
+		var p0: Vector3 = prop.global_position
+		player.global_position = p0 + Vector3(0, 0.2, 4)
+		await frames(3)
+		_face(player, p0 + Vector3.UP * 0.4)
+		player.equip("hose")
+		for i in 60:
+			player._fire_drops(game.WEAPONS.hose, 2)
+			await physics_frame
+		check(prop.global_position.distance_to(p0) > 0.5, "소방호스에 소품이 날아감 (%.1fm)" % prop.global_position.distance_to(p0))
+
+	# ---- 3인칭
+	player.set_third_person(true)
+	await frames(20)
+	check(player._body.visible and player.camera.position.distance_to(Vector3(0, 1.62, 0)) > 0.4, "V로 3인칭 전환")
+	player.set_third_person(false)
+
 	# ---- 진행 저장 → 다시 열면 계급 유지
 	game.save_game()
 	var xp_saved: int = game.xp

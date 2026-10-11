@@ -15,6 +15,7 @@ var speed := 9.0
 var drunk := false
 var police := false
 var done := false
+var model_name := ""
 
 var _model: Node3D
 var _corners: Array[Vector3] = []
@@ -44,8 +45,10 @@ func setup(p_half: float, p_clockwise: bool, start_index: int, p_player: Node3D)
 
 func _ready() -> void:
 	sync_to_physics = false
-	var model_name: String = "police" if police else MODELS.pick_random()
+	model_name = "police" if police else MODELS.pick_random()
 	_model = load("res://assets/cars/%s.glb" % model_name).instantiate()
+	if not police and not drunk:
+		add_to_group("traffic")
 	_model.scale = Vector3.ONE * 1.6
 	_model.rotation.y = PI
 	add_child(_model)
@@ -152,7 +155,7 @@ func wants_water() -> bool:
 
 
 func on_photographed() -> void:
-	if done:
+	if done or not drunk:
 		return
 	done = true
 	_stopped = true

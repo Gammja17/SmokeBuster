@@ -48,7 +48,8 @@ theme_override_colors/font_color = Color(0.75, 0.85, 1, 1)
 theme_override_font_sizes/font_size = 20
 text = "WASD 이동 · Shift 달리기 · Space 점프
 좌클릭 물 뿌리기 · 1~5 / 휠 무기 교체
-E 쓰레기 줍기 / 소화전 물 채우기 · F 소방차
+E 줍기 / 소화전 물 채우기 · F 차 타기/내리기 · V 1인칭/3인칭
+달리다 문제아에게 부딪히면 태클 · 운전 중 H 사이렌
 우클릭 카메라 (학생 비행, 무단횡단, 음주운전 신고)
 Tab 장비실"
 horizontal_alignment = 1

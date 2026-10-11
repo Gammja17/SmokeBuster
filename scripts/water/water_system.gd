@@ -150,6 +150,10 @@ func _on_hit(i: int, hit: Dictionary) -> void:
 	if _radius[i] > 0.0:
 		_area_splash(point, _radius[i], _soak[i], _knock[i])
 		return
+	if collider is RigidBody3D:
+		collider.apply_impulse(v.normalized() * (0.25 + _knock[i] * 0.4), point - collider.global_position)
+		_burst(point, normal, 2, 2.0)
+		return
 	if collider and collider.is_in_group("soakable"):
 		collider.soak(_soak[i], v.normalized(), _knock[i])
 		npc_hit.emit(collider, _soak[i])

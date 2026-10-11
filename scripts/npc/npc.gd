@@ -3,17 +3,21 @@ extends CharacterBody3D
 ## 동네 사람. kind 에 따라 하는 짓이 다르다.
 ##   ped(행인), normal/runner/angry/boss(성인 흡연자: 물), litter(무단투기: 물),
 ##   jaywalker(무단횡단: 도로 위에서 촬영), teen_smoker/teen_drinker(미성년: 촬영),
-##   bully/victim(학교폭력 현장: 촬영)
+##   bully/victim(학교폭력 현장: 촬영), thief(소매치기: 물/태클/차로 잡고 가방 돌려주기),
+##   fighter(길거리 싸움: 물), tagger(낙서범: 물), pee(노상방뇨: 물)
 ## 미성년자와 행인에게 물을 뿌리면 민원이 들어온다.
 
 signal resolved(npc: Npc, task: String)
 signal annoyed(npc: Npc, minor: bool)
 signal hurt_player(npc: Npc, amount: int)
 signal dropped_trash(pos: Vector3)
+signal dropped_bag(pos: Vector3, owner_npc: Node)
+signal shout(npc: Npc, text: String)
 
 enum State { WALK, SMOKING, FLEE, CHARGE, LEAVING, STAGGER, CROSSING, HANGOUT, DOWN }
 
-const MODELS := ["a", "b", "c", "d", "e", "f", "g", "h", "i", "j", "k", "l", "m", "n", "o", "p", "q", "r"]
+## 사람처럼 보이는 모델만 (j=경찰 옷은 플레이어, r=복면은 도둑 전용)
+const MODELS := ["a", "b", "c", "e", "f", "i", "k", "m", "n", "p", "q"]
 const ADULT_SMOKERS := ["normal", "runner", "angry", "boss"]
 const MINORS := ["teen_smoker", "teen_drinker", "bully", "victim"]
 const LINES := {
@@ -32,12 +36,21 @@ const LINES := {
 	"wet1": ["앗 차가!", "뭐, 뭐야?!", "비 와?"],
 	"wet2": ["으아 차가워!!", "그만 쏴!!", "옷 다 젖잖아!"],
 	"wet3": ["살려줘어!!", "알았어 알았다고!!", "으아아아!!"],
+	"thief": ["못 잡지롱~", "비켜비켜!", "헉헉..."],
+	"thief_done": ["잘못했어요!!", "가방 돌려드릴게요...", "으악 잡혔다!"],
+	"robbed": ["도둑이야!!", "내 가방!!", "저 사람 잡아요!!"],
+	"fight": ["이 자식이!", "너 몇 살이야!", "한 대 맞아볼래?", "덤벼!"],
+	"fight_done": ["진정할게요...", "형이 참는다", "추워..."],
+	"tagger_done": ["예술을 모르시네!", "으악 내 스프레이!", "튀어!"],
+	"pee": ["♪~", "후아~", "급해서..."],
+	"pee_done": ["으악 바지!!", "다 젖었잖아!", "죄송합니다!!"],
+	"hit_by_car": ["으악!", "운전 똑바로 해요!!", "사람 쳤어!!"],
 }
 const SPLAT := ["철퍽!", "촥!", "쏴아!", "푸확!", "첨벙!"]
 ## 머리 위 글씨. 담배 피는 사람은 글씨 대신 연기로 알아본다.
 const LABELS := {
 	"boss": "골초왕", "litter": "무단투기", "jaywalker": "무단횡단!", "teen_drinker": "미성년 음주",
-	"victim": "학폭 현장!",
+	"victim": "학폭 현장!", "fighter": "싸움!", "tagger": "낙서 중", "pee": "노상방뇨",
 }
 
 var kind := "ped"
@@ -46,6 +59,9 @@ var player: Node3D
 var state := State.WALK
 var group_id := 0           # 같은 무리 (음주 미자, 학폭)
 var victim: Npc             # 학폭 가해자가 노리는 대상
+var partner: Npc            # 싸움 상대
+var graffiti: Label3D       # 낙서범이 그리는 낙서
+var stolen_from: Node       # 도둑이 가방을 뺏은 사람
 
 var need := 1.0
 var wet := 0.0
@@ -124,6 +140,14 @@ func _ready() -> void:
 			_litter_t = randf_range(3.0, 6.0)
 		"jaywalker":
 			walk_speed = 1.25
+		"thief":
+			need = 1.3
+			run_speed = 6.3
+			_snatch_t = randf_range(4.0, 9.0)
+		"fighter", "tagger":
+			need = 0.9
+		"pee":
+			need = 0.6
 	if is_minor():
 		_scale = 0.48
 		walk_speed = 1.9
@@ -136,7 +160,7 @@ func _ready() -> void:
 	col.position.y = cap.height / 2
 	add_child(col)
 
-	_model = load("res://assets/chars/character-%s.glb" % MODELS.pick_random()).instantiate()
+	_model = load("res://assets/chars/character-%s.glb" % ("r" if kind == "thief" else MODELS.pick_random())).instantiate()
 	_model.scale = Vector3.ONE * _scale
 	_model.rotation.y = PI
 	add_child(_model)
@@ -169,8 +193,10 @@ func _ready() -> void:
 		add_to_group("smoker")
 	if kind == "teen_drinker":
 		_build_bottle()
-	if kind in ADULT_SMOKERS or kind == "litter":
+	if kind in ADULT_SMOKERS or kind in ["litter", "thief", "fighter", "tagger", "pee"]:
 		_build_bar()
+	if kind == "tagger":
+		_build_spray_can()
 	if task() != "":
 		add_to_group("incident")
 	if LABELS.has(kind):
@@ -186,7 +212,7 @@ func _ready() -> void:
 	match kind:
 		"normal", "runner", "angry", "boss", "teen_smoker":
 			_set_state(State.SMOKING)
-		"teen_drinker", "bully", "victim":
+		"teen_drinker", "bully", "victim", "fighter", "tagger", "pee":
 			_set_state(State.HANGOUT)
 		_:
 			_set_state(State.WALK)
@@ -219,6 +245,10 @@ func task() -> String:
 		"teen_smoker": return "teen_smoke"
 		"teen_drinker": return "teen_drink"
 		"bully", "victim": return "bully"
+		"thief": return "thief"
+		"fighter": return "fight"
+		"tagger": return "graffiti"
+		"pee": return "pee"
 	return ""
 
 
@@ -227,6 +257,8 @@ func is_active_incident() -> bool:
 		return false
 	if kind == "jaywalker":
 		return state == State.CROSSING and city.is_on_road(global_position)
+	if kind == "thief":
+		return _stolen
 	return true
 
 
@@ -242,7 +274,12 @@ func photo_task() -> String:
 
 
 func wants_water() -> bool:
-	return is_active_incident() and Game.TASKS[task()].how == "water"
+	return is_active_incident() and Game.TASKS[task()].how in ["water", "chase"]
+
+
+## 차로 들이받거나 태클로 잡을 수 있는 사람 (어른 문제아만)
+func can_be_caught() -> bool:
+	return wants_water() and not is_minor()
 
 
 ## 걷는 행인이 그 자리에서 담배를 꺼내 문다.
@@ -333,9 +370,10 @@ func _finish_water() -> void:
 	Sfx.play_at("voice_scream" if kind != "boss" else "voice_boss", global_position + Vector3.UP * 1.5, 0.0, _voice_pitch)
 	_knockdown(global_basis.z if _knock.length() < 0.1 else _knock.normalized(), 3.5)
 	_resolve(0.0, true)
-	get_tree().create_timer(1.2).timeout.connect(func():
+	_later(1.2, func():
 		if is_instance_valid(self):
-			say((LINES.litter_done if kind == "litter" else LINES.done).pick_random(), Color(0.7, 0.9, 1)))
+			say(_done_line(), Color(0.7, 0.9, 1)))
+	_drop_bag()
 
 
 func _resolve(leave_delay: float, run: bool) -> void:
@@ -477,7 +515,7 @@ func _physics_process(delta: float) -> void:
 		State.CROSSING:
 			move = _cross_step()
 		State.FLEE:
-			move = _flee_step()
+			move = _thief_step() if kind == "thief" else _flee_step()
 		State.CHARGE:
 			move = _charge_step()
 		State.STAGGER:
@@ -507,13 +545,18 @@ func _physics_process(delta: float) -> void:
 
 
 func _walk_step(delta: float) -> Vector3:
+	if kind == "thief" and not done and not _stolen:
+		_snatch_t -= delta
+		if _snatch_t <= 0.0:
+			_snatch_t = 2.0
+			_try_snatch()
 	if kind == "litter" and not done:
 		_litter_t -= delta
 		if _litter_t <= 0.0:
 			_litter_t = randf_range(5.0, 9.0)
 			_play("interact-right", 0.1)
 			dropped_trash.emit(global_position + global_basis.z * -0.4 + Vector3.UP * 0.05)
-			get_tree().create_timer(0.6).timeout.connect(func():
+			_later(0.6, func():
 				if is_instance_valid(self) and state == State.WALK:
 					_play("walk"))
 	if _to_node < 0:
@@ -563,7 +606,7 @@ func _smoke_step(delta: float) -> Vector3:
 	if _puff_t <= 0.0:
 		_puff_t = randf_range(2.5, 4.5)
 		_play("interact-right", 0.15)
-		get_tree().create_timer(0.5).timeout.connect(_puff_out)
+		_later(0.5, _puff_out)
 	if not _anim.is_playing():
 		_play("idle")
 	if kind == "runner" and player:
@@ -593,6 +636,14 @@ func _hangout_step(delta: float) -> Vector3:
 			if _puff_t <= 0.0:
 				_puff_t = randf_range(3.0, 5.0)
 				say(LINES.victim_help.pick_random(), Color(1, 0.85, 0.85))
+		"fighter":
+			_fight_step()
+		"tagger":
+			_tag_step()
+		"pee":
+			if _puff_t <= 0.0:
+				_puff_t = randf_range(3.0, 6.0)
+				say(LINES.pee.pick_random(), Color(1, 0.95, 0.6))
 	if not _anim.is_playing():
 		_play("idle")
 	return Vector3.ZERO
@@ -655,7 +706,7 @@ func _charge_step() -> Vector3:
 		if _kick_cd <= 0.0:
 			_kick_cd = 1.6 if kind == "angry" else 2.2
 			_play("attack-kick-right", 0.05)
-			get_tree().create_timer(0.25).timeout.connect(_kick_land)
+			_later(0.25, _kick_land)
 		rotation.y = lerp_angle(rotation.y, atan2(-to.x, -to.z), 0.3)
 		return Vector3.ZERO
 	if _anim.current_animation != "sprint" and _kick_cd < 1.0:
@@ -746,7 +797,7 @@ func _down_step(delta: float) -> Vector3:
 	if _down_t <= 0.0:
 		_down_t = 99.0   # 일어나는 중 (한 번만)
 		_play("pick-up", 0.15)
-		get_tree().create_timer(0.45).timeout.connect(_get_up)
+		_later(0.45, _get_up)
 	return Vector3.ZERO
 
 
@@ -819,6 +870,198 @@ func _build_drip() -> void:
 	_drip.mesh = m
 	_drip.position.y = 1.0 * _scale / 0.65
 	add_child(_drip)
+
+
+# ---------------------------------------------------------------- 도둑, 싸움, 낙서, 노상방뇨
+
+var _snatch_t := 0.0
+var _stolen := false
+var _bag: Node3D
+var _escape_t := 0.0
+var _hit_t := 0.0
+var _spray_fx: CPUParticles3D
+
+
+func _done_line() -> String:
+	match kind:
+		"litter": return LINES.litter_done.pick_random()
+		"thief": return LINES.thief_done.pick_random()
+		"fighter": return LINES.fight_done.pick_random()
+		"tagger": return LINES.tagger_done.pick_random()
+		"pee": return LINES.pee_done.pick_random()
+	return LINES.done.pick_random()
+
+
+## 차에 치이거나 태클 당해 잡힌다
+func caught(by: String, dir: Vector3) -> void:
+	if done:
+		return
+	Popups.text(self, global_position + Vector3.UP * _head_y(), "태클!" if by == "tackle" else "쾅!", Color(1, 0.8, 0.3), 96)
+	Sfx.play_at("voice_scream", global_position + Vector3.UP * 1.5, 0.0, _voice_pitch)
+	Sfx.play_at("kick", global_position, 4.0)
+	_knockdown(dir, 5.0)
+	_resolve(0.0, true)
+	if _smoke:
+		_smoke.emitting = false
+	_later(1.0, func():
+		if is_instance_valid(self):
+			say(_done_line(), Color(0.7, 0.9, 1)))
+	_drop_bag()
+
+
+## 행인이 차에 치였다 (넘어지고 화낸다)
+func run_over(dir: Vector3, spd: float) -> void:
+	if state == State.DOWN:
+		return
+	Popups.text(self, global_position + Vector3.UP * _head_y(), "꽈당!", Color(1, 0.6, 0.4), 84)
+	Sfx.play_at("voice_scream", global_position + Vector3.UP * 1.5, 0.0, _voice_pitch)
+	Sfx.play_at("thud", global_position, 4.0)
+	_knockdown(dir, min(spd * 0.4, 6.0))
+	_later(1.6, func():
+		if is_instance_valid(self):
+			say(LINES.hit_by_car.pick_random(), Color(1, 0.6, 0.5)))
+
+
+func _try_snatch() -> void:
+	## 근처 행인의 가방을 낚아채서 달아난다
+	var best: Npc = null
+	var bd := 4.0
+	for n in get_parent().get_children():
+		if n is Npc and n != self and n.kind == "ped" and n.state == State.WALK:
+			var d: float = n.global_position.distance_to(global_position)
+			if d < bd:
+				bd = d
+				best = n
+	if best == null:
+		return
+	_stolen = true
+	stolen_from = best
+	add_to_group("incident")
+	best.say(LINES.robbed.pick_random(), Color(1, 0.4, 0.4))
+	best._play("emote-no", 0.05)
+	shout.emit(best, "도둑이야!!")
+	Sfx.play_at("voice_scream", best.global_position + Vector3.UP * 1.5, 4.0, 1.2)
+	# 손에 가방
+	var hand: Array = _hand_tip()
+	_bag = MeshInstance3D.new()
+	var bm := BoxMesh.new()
+	bm.size = Vector3(0.4, 0.3, 0.15) / _scale
+	var mat := StandardMaterial3D.new()
+	mat.albedo_color = Color(0.75, 0.2, 0.35)
+	bm.material = mat
+	(_bag as MeshInstance3D).mesh = bm
+	hand[0].add_child(_bag)
+	_bag.position = hand[1]
+	_label = _make_label(Game.TASKS.thief.color, 44)
+	_label.position.y = _head_y() + 0.3
+	_label.text = "도둑!"
+	_escape_t = 0.0
+	_to_node = -1
+	_set_state(State.FLEE)
+
+
+func _thief_step() -> Vector3:
+	## 길을 따라 플레이어에게서 먼 쪽으로 달린다. 오래 못 잡으면 사라진다.
+	_escape_t += get_physics_process_delta_time()
+	if _escape_t > 50.0 and global_position.distance_to(player.global_position) > 35.0:
+		done = true
+		remove_from_group("incident")
+		shout.emit(self, "도둑을 놓쳤어요...")
+		queue_free()
+		return Vector3.ZERO
+	if _to_node < 0 or Vector2(global_position.x - _target.x, global_position.z - _target.z).length() < 0.8:
+		var cur := city.nearest_nav(global_position) if _to_node < 0 else _to_node
+		var best := cur
+		var bd := -1.0
+		for j in city.nav_edges[cur]:
+			var d: float = city.nav_nodes[j].distance_to(player.global_position) + randf() * 6.0
+			if d > bd:
+				bd = d
+				best = j
+		_from_node = cur
+		_to_node = best
+		_target = city.nav_nodes[best]
+		if randf() < 0.3:
+			say(LINES.thief.pick_random(), Color(1, 0.6, 0.6))
+	var to := _target - global_position
+	to.y = 0
+	return to.normalized() * run_speed
+
+
+func _drop_bag() -> void:
+	if _bag == null:
+		return
+	_bag.queue_free()
+	_bag = null
+	dropped_bag.emit(global_position + global_basis.z * 0.6, stolen_from)
+
+
+func _fight_step() -> void:
+	if partner == null or not is_instance_valid(partner) or partner.done:
+		return
+	var to := partner.global_position - global_position
+	rotation.y = lerp_angle(rotation.y, atan2(-to.x, -to.z), 0.2)
+	if _puff_t <= 0.0:
+		_puff_t = randf_range(0.8, 1.6)
+		_play(["attack-melee-right", "attack-melee-left", "attack-kick-right"].pick_random(), 0.05)
+		_later(0.2, func():
+			if is_instance_valid(partner) and not partner.done and partner.state == State.HANGOUT:
+				partner._hit_react(0.0, partner.global_position - global_position, 0.0)
+				Sfx.play_at("kick", partner.global_position + Vector3.UP, -2.0))
+		if randf() < 0.35:
+			say(LINES.fight.pick_random(), Color(1, 0.6, 0.4))
+
+
+func _tag_step() -> void:
+	if _puff_t <= 0.0:
+		_puff_t = randf_range(0.3, 0.6)
+		_play("interact-right", 0.1)
+		if _spray_fx:
+			_spray_fx.restart()
+		# 낙서가 점점 커진다
+		if graffiti and is_instance_valid(graffiti):
+			graffiti.scale = (graffiti.scale + Vector3.ONE * 0.06).clamp(Vector3.ONE * 0.2, Vector3.ONE * 1.4)
+
+
+func _build_spray_can() -> void:
+	var hand: Array = _hand_tip()
+	var can := MeshInstance3D.new()
+	var cm := CylinderMesh.new()
+	cm.top_radius = 0.035
+	cm.bottom_radius = 0.035
+	cm.height = 0.16
+	var mat := StandardMaterial3D.new()
+	var col: Color = [Color(1, 0.2, 0.3), Color(0.2, 0.8, 1), Color(1, 0.85, 0.1)].pick_random()
+	mat.albedo_color = col
+	cm.material = mat
+	can.mesh = cm
+	can.scale = Vector3.ONE / _scale
+	hand[0].add_child(can)
+	can.position = hand[1]
+	_spray_fx = CPUParticles3D.new()
+	_spray_fx.emitting = false
+	_spray_fx.one_shot = true
+	_spray_fx.explosiveness = 0.5
+	_spray_fx.amount = 16
+	_spray_fx.lifetime = 0.5
+	_spray_fx.local_coords = false
+	_spray_fx.direction = Vector3(0, 0, -1)
+	_spray_fx.spread = 15
+	_spray_fx.initial_velocity_min = 2.0
+	_spray_fx.initial_velocity_max = 3.0
+	_spray_fx.gravity = Vector3.ZERO
+	var pm := SphereMesh.new()
+	pm.radius = 0.03
+	pm.height = 0.06
+	pm.radial_segments = 4
+	pm.rings = 2
+	var pmat := StandardMaterial3D.new()
+	pmat.albedo_color = col
+	pmat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	pm.material = pmat
+	_spray_fx.mesh = pm
+	_spray_fx.position = Vector3(0, 1.3 * _scale / 0.65, -0.3)
+	add_child(_spray_fx)
 
 
 func say(text: String, color := Color.WHITE) -> void:
@@ -1033,3 +1276,10 @@ func _make_steam() -> CPUParticles3D:
 	get_tree().current_scene.add_child(p)
 	get_tree().create_timer(2.0).timeout.connect(p.queue_free)
 	return p
+
+
+## t초 뒤에 fn 실행. 이 노드가 사라지면 같이 취소된다.
+func _later(t: float, fn: Callable) -> void:
+	var tw := create_tween()
+	tw.tween_interval(t)
+	tw.tween_callback(fn)

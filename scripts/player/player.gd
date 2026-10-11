@@ -1,6 +1,7 @@
 class_name Player
 extends CharacterBody3D
-## 1인칭 단속반원. WASD/Shift/Space, 좌클릭 발사, 1~5/휠 무기 교체, E 줍기/소화전, F 소방차.
+## 단속반원. WASD/Shift/Space, 좌클릭 발사, 1~5/휠 무기 교체, E 줍기/소화전, F 차 타기, V 1인칭/3인칭.
+## 달리다 문제아에게 부딪히면 태클.
 ## 우클릭을 누르고 있으면 카메라 모드: 좌클릭으로 촬영해서 신고한다.
 
 signal ammo_changed(id: String, current: float, maximum: float)
@@ -11,7 +12,8 @@ signal camera_mode_changed(on: bool)
 signal photo_taken(targets: Array)
 signal trash_picked(trash: Node3D)
 signal hurt(amount: int)
-signal call_truck
+signal interact_vehicle
+signal tackled(npc: Node)
 
 const WALK_SPEED := 5.0
 const SPRINT_MULT := 1.55
@@ -44,6 +46,12 @@ var _knock := Vector3.ZERO
 var _near_hydrant := false
 var _prompt := ""
 var camera_mode := false
+var third_person := false
+var driving := false
+var _body: Node3D
+var _body_anim: AnimationPlayer
+var _body_muzzle: Marker3D
+var _tackle_cd := 0.0
 var _photo_cd := 0.0
 var _refilling := false
 
@@ -69,6 +77,7 @@ func _ready() -> void:
 	_view = Node3D.new()
 	camera.add_child(_view)
 	_build_models()
+	_build_body()
 
 	mental = Game.max_mental()
 	for id in Game.WEAPON_ORDER:
@@ -98,8 +107,10 @@ func _unhandled_input(event: InputEvent) -> void:
 			var id: String = Game.WEAPON_ORDER[k - KEY_1]
 			if id in Game.owned:
 				equip(id)
-		elif k == KEY_F and Game.has_truck:
-			call_truck.emit()
+		elif k == KEY_F:
+			interact_vehicle.emit()
+		elif k == KEY_V:
+			set_third_person(not third_person)
 		elif k == KEY_E:
 			_try_pickup()
 	elif event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_RIGHT:
@@ -183,6 +194,8 @@ func _physics_process(delta: float) -> void:
 	_update_prompt()
 	_update_fire(delta)
 	_update_view(delta, hspeed)
+	_update_body(hspeed, sprint)
+	_check_tackle(delta, hspeed)
 
 
 func _update_view(delta: float, hspeed: float) -> void:
@@ -195,6 +208,18 @@ func _update_view(delta: float, hspeed: float) -> void:
 	_shake = max(_shake - delta * 2.0, 0.0)
 	camera.h_offset = randf_range(-1, 1) * _shake * _shake * 0.15
 	camera.v_offset = randf_range(-1, 1) * _shake * _shake * 0.15
+	# 3인칭: 어깨 너머 카메라, 벽에 막히면 당겨온다
+	var want := Vector3(0.0, 1.62, 0.0)
+	if third_person and not camera_mode:
+		var head := global_position + Vector3.UP * 1.7
+		var back := camera.global_basis.z * 3.8 + global_basis.x * 0.95 + Vector3.UP * 0.55
+		var q := PhysicsRayQueryParameters3D.create(head, head + back, 1, [get_rid()])
+		var hit := get_world_3d().direct_space_state.intersect_ray(q)
+		var dist := 1.0
+		if not hit.is_empty():
+			dist = clamp(head.distance_to(hit.position) / back.length() - 0.08, 0.1, 1.0)
+		want = to_local(head + back * dist)
+	camera.position = camera.position.lerp(want, 14.0 * delta)
 
 
 # ---------------------------------------------------------------- 발사
@@ -272,7 +297,7 @@ func _aim_point() -> Vector3:
 
 
 func _fire_drops(w: Dictionary, count: int) -> void:
-	var muzzle: Vector3 = _muzzles[current].global_position
+	var muzzle: Vector3 = _body_muzzle.global_position if third_person else _muzzles[current].global_position
 	var target := _aim_point()
 	var base_dir := (target - muzzle).normalized()
 	# 너무 가까운 곳을 볼 때 총구 방향이 꺾이지 않게
@@ -295,7 +320,7 @@ func _throw_bucket(w: Dictionary) -> void:
 	var tw := create_tween()
 	tw.tween_property(model, "rotation:x", deg_to_rad(-70), 0.12)
 	tw.tween_property(model, "rotation:x", 0.0, 0.35)
-	var muzzle: Vector3 = _muzzles["bucket"].global_position
+	var muzzle: Vector3 = _body_muzzle.global_position if third_person else _muzzles["bucket"].global_position
 	var dir := (_aim_point() - muzzle).normalized()
 	var v := dir * Game.weapon_stat("bucket", "speed") + Vector3.UP * 3.0
 	water.spawn(muzzle, v, Game.weapon_stat("bucket", "soak"), w.knock, w.gravity, w.radius, 0.3)
@@ -344,7 +369,7 @@ func _update_hydrant(delta: float) -> void:
 func _nearest_trash() -> Node3D:
 	var best: Node3D = null
 	var bd := 2.4
-	for t in get_tree().get_nodes_in_group("trash"):
+	for t in get_tree().get_nodes_in_group("pickup"):
 		var d := Vector2(t.global_position.x - global_position.x, t.global_position.z - global_position.z).length()
 		if d < bd:
 			bd = d
@@ -365,7 +390,9 @@ func _update_prompt() -> void:
 	if camera_mode:
 		text = ""
 	elif _nearest_trash():
-		text = "E  쓰레기 줍기"
+		text = "E  가방 주워 돌려주기" if _nearest_trash().is_in_group("bag") else "E  쓰레기 줍기"
+	elif _near_vehicle():
+		text = "F  " + ("소방차" if _near_vehicle().kind == "firetruck" else ("순찰차" if _near_vehicle().kind == "police" else "차 뺏기")) + " 타기"
 	elif _near_hydrant:
 		text = "E 꾹  물 채우기"
 	if text != _prompt:
@@ -375,12 +402,90 @@ func _update_prompt() -> void:
 
 # ---------------------------------------------------------------- 카메라
 
+func _near_vehicle() -> Node3D:
+	for v in get_tree().get_nodes_in_group("vehicle"):
+		if v.can_enter(self):
+			return v
+	for v in get_tree().get_nodes_in_group("traffic"):
+		if v.global_position.distance_to(global_position) < 3.4:
+			return v
+	return null
+
+
+# ---------------------------------------------------------------- 3인칭 몸, 태클, 운전
+
+func _build_body() -> void:
+	_body = load("res://assets/chars/character-j.glb").instantiate()
+	_body.scale = Vector3.ONE * 0.65
+	_body.rotation.y = PI
+	_body.visible = false
+	add_child(_body)
+	_body_anim = _body.find_child("AnimationPlayer", true, false)
+	for a in ["idle", "walk", "sprint"]:
+		_body_anim.get_animation(a).loop_mode = Animation.LOOP_LINEAR
+	_body_muzzle = Marker3D.new()
+	_body_muzzle.position = Vector3(0.3, 1.25, -0.5)
+	add_child(_body_muzzle)
+
+
+func set_third_person(on: bool) -> void:
+	third_person = on
+	_body.visible = on and not driving
+	_view.visible = not on and not camera_mode
+	Sfx.play("switch", -8.0)
+
+
+func _update_body(hspeed: float, sprint: bool) -> void:
+	if not _body.visible:
+		return
+	var anim := "idle"
+	if _wants_fire() or _fire_cd > 0.0:
+		anim = "holding-both-shoot"
+	elif hspeed > 0.5:
+		anim = "sprint" if sprint else "walk"
+	if _body_anim.current_animation != anim:
+		_body_anim.play(anim, 0.15)
+
+
+func _check_tackle(delta: float, hspeed: float) -> void:
+	## 전력질주하다 문제아에게 부딪히면 태클로 잡는다
+	_tackle_cd -= delta
+	if _tackle_cd > 0.0 or hspeed < 6.5:
+		return
+	for n in get_tree().get_nodes_in_group("npc"):
+		if n.global_position.distance_to(global_position) < 1.4 and n.has_method("can_be_caught") and n.can_be_caught():
+			_tackle_cd = 1.0
+			_knock = -velocity * 0.4
+			shake(0.6)
+			tackled.emit(n)
+			return
+
+
+## 차에 탔다/내렸다
+func set_driving(on: bool) -> void:
+	driving = on
+	set_camera_mode(false)
+	_stop_loops()
+	visible = not on
+	input_enabled = not on
+	collision_layer = 0 if on else 4
+	collision_mask = 0 if on else (1 | 2)
+	set_physics_process(not on)
+	if not on:
+		camera.current = true
+		_body.visible = third_person
+	prompt_changed.emit("")
+	_prompt = ""
+
+
 func set_camera_mode(on: bool) -> void:
 	if on == camera_mode:
 		return
 	camera_mode = on
 	_stop_loops()
-	_view.visible = not on
+	_view.visible = not on and not third_person
+	if third_person:
+		_body.visible = not on
 	Sfx.play("switch", -8.0, 1.3 if on else 1.0)
 	camera_mode_changed.emit(on)
 
