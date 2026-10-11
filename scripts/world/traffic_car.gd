@@ -23,7 +23,6 @@ var _next := 0
 var _cur_speed := 0.0
 var _honk_cd := 0.0
 var _t := 0.0
-var _label: Label3D
 var _stopped := false
 
 
@@ -65,16 +64,6 @@ func _ready() -> void:
 
 	if drunk:
 		add_to_group("incident")
-		_label = Label3D.new()
-		_label.font = load("res://assets/fonts/Pretendard-ExtraBold.otf")
-		_label.text = "비틀비틀 (음주운전 의심)"
-		_label.font_size = 56
-		_label.pixel_size = 0.008
-		_label.outline_size = 12
-		_label.modulate = Game.TASKS.drunk.color
-		_label.billboard = BaseMaterial3D.BILLBOARD_ENABLED
-		_label.position.y = 3.4
-		add_child(_label)
 		speed = 10.0
 	if police:
 		var light := OmniLight3D.new()
@@ -160,8 +149,7 @@ func on_photographed() -> void:
 	done = true
 	_stopped = true
 	remove_from_group("incident")
-	_label.text = "신고 접수! 경찰 출동"
-	_label.modulate = Color(0.6, 1, 0.6)
+	Popups.text(self, global_position + Vector3.UP * 3.0, "신고 접수! 경찰 출동", Color(0.6, 1, 0.6), 72, 1.0, 2.0)
 	resolved.emit(self, "drunk")
 	# 뒤에서 경찰차가 와서 세운다
 	var cop := TrafficCar.new()

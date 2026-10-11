@@ -47,11 +47,9 @@ const LINES := {
 	"hit_by_car": ["으악!", "운전 똑바로 해요!!", "사람 쳤어!!"],
 }
 const SPLAT := ["철퍽!", "촥!", "쏴아!", "푸확!", "첨벙!"]
-## 머리 위 글씨. 담배 피는 사람은 글씨 대신 연기로 알아본다.
-const LABELS := {
-	"boss": "골초왕", "litter": "무단투기", "jaywalker": "무단횡단!", "teen_drinker": "미성년 음주",
-	"victim": "학폭 현장!", "fighter": "싸움!", "tagger": "낙서 중", "pee": "노상방뇨",
-}
+## 머리 위 글씨는 없다. 연기, 쓰레기 버리기, 스프레이, 가방 들고 뛰기 같은 행동으로 알아본다.
+## (골초왕만 이름표)
+const LABELS := {"boss": "골초왕"}
 
 var kind := "ped"
 var city: CityBuilder
@@ -952,9 +950,6 @@ func _try_snatch() -> void:
 	(_bag as MeshInstance3D).mesh = bm
 	hand[0].add_child(_bag)
 	_bag.position = hand[1]
-	_label = _make_label(Game.TASKS.thief.color, 44)
-	_label.position.y = _head_y() + 0.3
-	_label.text = "도둑!"
 	_escape_t = 0.0
 	_to_node = -1
 	_set_state(State.FLEE)

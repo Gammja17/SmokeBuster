@@ -39,9 +39,8 @@ func _draw() -> void:
 		var t: float = min(abs(rect.size.x / 2 / dir.x) if dir.x != 0 else INF, abs(rect.size.y / 2 / dir.y) if dir.y != 0 else INF)
 		var pos := center + dir * t
 		var a := 1.0 - dist / RANGE * 0.6
-		var col: Color = Game.TASKS[n.task()].color
-		col.a = a
+		var col := Color(1, 0.55, 0.25, a)
 		var tip := pos + dir * 16
 		var side := dir.orthogonal() * 12
 		draw_colored_polygon(PackedVector2Array([tip, pos - dir * 6 + side, pos - dir * 6 - side]), col)
-		draw_string(get_theme_default_font(), pos - dir * 40 - Vector2(45, -6), "%s %dm" % [Game.TASKS[n.task()].short, int(dist)], HORIZONTAL_ALIGNMENT_CENTER, 90, 16, col)
+		draw_string(get_theme_default_font(), pos - dir * 40 - Vector2(45, -6), "! %dm" % int(dist), HORIZONTAL_ALIGNMENT_CENTER, 90, 16, col)

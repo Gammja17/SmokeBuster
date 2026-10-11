@@ -8,10 +8,10 @@ const FAR := 42.0
 const STREAK_NAMES := ["", "", "더블!", "트리플!", "물벼락!", "싹쓸이!!", "동네 평화!!!"]
 const CHEERS := ["속이 다 시원하네!", "잘한다!", "역시 단속반!", "오오~", "멋져요!", "그렇지!"]
 const HINTS := [
-	"연기 나는 사람(흡연자)에게 좌클릭으로 물을 뿌려 담배를 끄세요.",
+	"담배 연기가 피어오르는 사람을 찾아 좌클릭으로 물을 뿌려 끄세요.",
 	"길에 떨어진 쓰레기는 가까이 가서 E로 주워요.",
-	"오른쪽 위 레이더의 색 점이 사건이에요. 화면 가장자리 화살표도 따라가 보세요.",
-	"행인이나 학생에게 물을 뿌리면 민원(-20원)! 학생 비행은 우클릭 카메라로 찍어 신고해요.",
+	"레이더의 깜빡이는 점과 화면 가장자리 ! 는 수상한 사람이에요. 가서 뭘 하는지 직접 보세요.",
+	"아무 잘못 없는 행인에게 뿌리면 민원(-20원)! 가방 멘 학생의 비행은 우클릭 카메라로 찍어 신고.",
 	"뛰는 사람 앞 바닥에 물을 깔아두면 미끄러져요.",
 	"길가 순찰차에 다가가 F로 타요. 운전 중 H는 사이렌, F로 내려요.",
 	"V로 3인칭 시점! 전력질주하다 문제아에게 부딪히면 태클로 잡아요.",
@@ -155,6 +155,10 @@ func _unhandled_input(event: InputEvent) -> void:
 				_close_shop()
 			else:
 				_open_shop()
+		elif event.keycode == KEY_F and vehicle and not pause.visible and not shop_layer.visible:
+			# 운전 중엔 플레이어 입력이 꺼져 있어서 여기서 내린다
+			get_viewport().set_input_as_handled()
+			_toggle_vehicle()
 
 
 func _notification(what: int) -> void:
@@ -400,7 +404,7 @@ func _new_npc(kind: String) -> Npc:
 	n.shout.connect(func(who, text):
 		hud.add_feed(text, Color(1, 0.4, 0.35))
 		if text == "도둑이야!!" and who.global_position.distance_to(player.global_position) < 45.0:
-			hud.banner("도둑이야!!", "복면 쓴 소매치기를 쫓아가 잡으세요", 1.8))
+			hud.banner("도둑이야!!", "가방 들고 뛰어가는 사람을 쫓아가 잡으세요", 1.8))
 	return n
 
 

@@ -108,6 +108,8 @@ func _unhandled_input(event: InputEvent) -> void:
 			if id in Game.owned:
 				equip(id)
 		elif k == KEY_F:
+			# 같은 키가 월드(운전 중 내리기)까지 가서 바로 다시 내리지 않게 여기서 끝낸다
+			get_viewport().set_input_as_handled()
 			interact_vehicle.emit()
 		elif k == KEY_V:
 			set_third_person(not third_person)

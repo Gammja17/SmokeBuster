@@ -60,7 +60,7 @@ func _ready() -> void:
 	_power_label.billboard = BaseMaterial3D.BILLBOARD_ENABLED
 	_power_label.position = Vector3(0, 5.5, 0.4)
 	_power_label.modulate = Color(1, 0.9, 0.4)
-	_power_label.text = "불법영업 · 간판에 물을 뿌려 합선!"
+	_power_label.visible = false   # 물을 맞기 시작하면 합선 % 가 보인다
 	add_child(_power_label)
 
 	# 스피커 두 개
@@ -180,6 +180,7 @@ func soak(amount: float, _dir: Vector3, _knock: float) -> void:
 		_spark_cd = 0.35
 		_sparks.restart()
 		Sfx.play_at("spark", incident_pos(), -4.0, randf_range(0.9, 1.2))
+	_power_label.visible = true
 	var pct := int(clamp(power / need, 0.0, 1.0) * 100)
 	_power_label.text = "합선까지 %d%%" % pct
 	_power_label.modulate = Color(1, 0.9, 0.4).lerp(Color(1, 0.3, 0.2), 1.0 - pct / 100.0)

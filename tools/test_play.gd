@@ -26,6 +26,20 @@ func _face(player, target: Vector3) -> void:
 	player.camera.look_at(target, Vector3.UP)
 
 
+func press(key: Key) -> void:
+	## 진짜 키 입력처럼 이벤트를 흘려보낸다
+	var e := InputEventKey.new()
+	e.keycode = key
+	e.physical_keycode = key
+	e.pressed = true
+	Input.parse_input_event(e)
+	var r := InputEventKey.new()
+	r.keycode = key
+	r.physical_keycode = key
+	r.pressed = false
+	Input.parse_input_event(r)
+
+
 func _place_front(player, n, dist: float) -> void:
 	var fwd: Vector3 = -player.global_basis.z
 	fwd.y = 0
@@ -218,9 +232,9 @@ func _run() -> void:
 	var car = cars[0]
 	player.global_position = car.global_position + Vector3(2.0, 0, 0)
 	await frames(3)
-	world._toggle_vehicle()
-	await frames(3)
-	check(world.vehicle == car and not player.visible, "F로 순찰차 탑승")
+	press(KEY_F)
+	await frames(5)
+	check(world.vehicle == car and not player.visible, "F 키로 순찰차 탑승")
 	var target = world._new_npc("normal")
 	target.position = car.global_position - car.global_basis.z * 9.0
 	target.position.y = 0.1
@@ -233,9 +247,15 @@ func _run() -> void:
 		if target.done:
 			break
 	check(target.done, "차로 들이받아 검거")
-	world._toggle_vehicle()
-	await frames(3)
-	check(world.vehicle == null and player.visible and player.input_enabled, "F로 하차")
+	press(KEY_F)
+	await frames(5)
+	check(world.vehicle == null and player.visible and player.input_enabled, "F 키로 하차")
+	press(KEY_F)
+	await frames(5)
+	check(world.vehicle == car, "다시 F 키로 탑승")
+	press(KEY_F)
+	await frames(5)
+	check(world.vehicle == null, "다시 F 키로 하차")
 
 	# ---- 물리 소품이 물에 밀린다
 	var prop: RigidBody3D = null

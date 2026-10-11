@@ -44,6 +44,7 @@ func _ready() -> void:
 	tw.tween_callback(func(): for b in _blinkers: b.visible = not b.visible)
 	tw.tween_interval(0.45)
 	_label = Label3D.new()
+	_label.visible = false
 	_label.font = load("res://assets/fonts/Pretendard-ExtraBold.otf")
 	_label.text = "불법주차"
 	_label.font_size = 56
@@ -81,6 +82,7 @@ func on_photographed() -> void:
 		return
 	done = true
 	remove_from_group("incident")
+	_label.visible = true
 	_label.text = "견인합니다!"
 	_label.modulate = Color(0.6, 1, 0.6)
 	resolved.emit(self, "parking")

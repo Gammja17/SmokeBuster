@@ -33,10 +33,9 @@ func _draw() -> void:
 	for n in get_tree().get_nodes_in_group("incident"):
 		if not n.is_active_incident():
 			continue
-		var col: Color = Game.TASKS[n.task()].color
-		col.a = blink
+		var col := Color(1, 0.45, 0.2, blink)
 		var big: bool = n is Npc and n.kind == "boss"
-		var size := 8.0 if big or n.task() in ["shop", "drunk", "bully"] else 5.0
+		var size := 7.0 if big else 4.5
 		_dot(c, r, p, yaw, n.global_position, col, size, true)
 	# 플레이어 화살표
 	draw_colored_polygon(PackedVector2Array([c + Vector2(0, -9), c + Vector2(6, 6), c + Vector2(-6, 6)]), Color(1, 1, 1))
