@@ -178,12 +178,12 @@ func _start() -> void:
 	shift.begin()
 	hud.banner_box.visible = false
 	Sfx.play("bong")
-	# 첫날엔 소장님이 다가와 일을 가르쳐 준다 (튜토리얼 화면 대신 대화로)
-	if not Game.flag("intro"):
-		var chief := get_tree().get_nodes_in_group("coworker").filter(func(c): return c.role == "chief")
-		if not chief.is_empty():
-			await get_tree().create_timer(0.6).timeout
-			dialogue.start(Talks.INTRO, chief[0])
+	# 아침 조회: 소장님이 오늘의 지시를 내린다. 첫날엔 일도 가르쳐 준다 (튜토리얼 화면 대신 대화로)
+	var first := not Game.flag("intro")
+	var chief := get_tree().get_nodes_in_group("coworker").filter(func(c): return c.role == "chief")
+	if not chief.is_empty():
+		await get_tree().create_timer(0.6).timeout
+		dialogue.start(Talks.briefing(shift.order, first), chief[0])
 
 
 func _unhandled_input(event: InputEvent) -> void:
@@ -276,6 +276,7 @@ func _process(delta: float) -> void:
 func _update_day_hud() -> void:
 	hud.set_clock("DAY %d  %s%s" % [Game.day, day.clock_text(), "  ☂" if day.raining else ""])
 	hud.set_quota(shift.quota_text(), shift.quota_done())
+	hud.set_order(shift.order_text(), shift.order_cleared)
 	if inside != "":
 		hud.set_district("")
 		return
@@ -331,6 +332,10 @@ func _spawn_random_incident() -> void:
 		for s in ["fight", "pee", "teen_drink", "graffiti"]:
 			if s in cfg.spawns:
 				pool.append_array([s, s])
+	# 오늘의 지시 대상은 더 자주
+	for s in shift.order.get("boost", []):
+		if s in cfg.spawns:
+			pool.append_array([s, s, s])
 	if _rush_t > 0.0:
 		pool = ["smoke"]
 	match pool.pick_random():
@@ -726,6 +731,8 @@ func _complete(task: String, label: String, pos := Vector3.ZERO, reward := -1, s
 			combo = min(combo + 0.25, 3.0)
 		_combo_t = COMBO_WINDOW
 	reward = int(reward * (combo if big else 1.0))
+	if shift and shift.is_order_task(task):
+		reward = int(reward * Shift.ORDER_MULT)
 	Game.money += reward
 	hud.set_money(Game.money)
 	hud.set_combo(combo)
@@ -742,6 +749,18 @@ func _complete(task: String, label: String, pos := Vector3.ZERO, reward := -1, s
 	if shift:
 		shift.record_catch(task, reward)
 
+
+func order_cleared(order: Dictionary) -> void:
+	## 소장님 특별 지시 완수: 보너스 + 무전으로 칭찬
+	var bonus: int = shift.order_bonus()
+	Game.money += bonus
+	hud.set_money(Game.money)
+	hud.money_delta(bonus)
+	_add_xp(bonus)
+	hud.banner("지시 완수!", order.title, 2.2)
+	hud.radio(["허허, 역시 내 눈이 정확했어! 수고했네.", "벌써 다 했나? 오늘 저녁은 내가 사지!", "구청장님이 직접 전화하셨더군. 잘했네!"].pick_random(), "소장님")
+	Sfx.play("fanfare", 0.0)
+	player.shake(0.3)
 
 
 func _add_xp(amount: int) -> void:

@@ -5,6 +5,21 @@ extends Node
 const START_HOUR := 10.0
 const END_HOUR := 26.0          # 새벽 2시
 const GRADE_PAY := {"S": 2.0, "A": 1.5, "B": 1.0, "C": 0.6}
+## 아침 조회에서 소장님이 내리는 오늘의 특별 지시.
+## 해당 단속은 보상 1.5배에 더 자주 생기고, 목표를 채우면 보너스.
+const ORDER_MULT := 1.5
+const ORDERS := [
+	{"id": "smoke", "title": "흡연 집중 단속", "tasks": ["smoke"], "goal": 6, "boost": ["smoke"], "rank": 0,
+		"line": "오늘은 흡연 집중 단속일세. 연기 피우는 사람 보이면 사정 봐주지 말게!"},
+	{"id": "street", "title": "거리 질서 확립", "tasks": ["litter", "pee", "graffiti"], "goal": 4, "boost": ["litter", "pee", "graffiti"], "rank": 0,
+		"line": "꽁초 투기에 노상방뇨 민원이 구청까지 들어갔네. 거리 질서 좀 잡아 주게."},
+	{"id": "thief", "title": "소매치기 소탕", "tasks": ["thief"], "goal": 2, "boost": ["thief"], "rank": 0,
+		"line": "소매치기가 기승이야. 가방 들고 뛰는 놈 보이면 달려가서 태클로 잡게!"},
+	{"id": "camera", "title": "찰칵 단속의 날", "tasks": ["jaywalk", "parking", "teen_smoke", "teen_drink", "bully", "drunk"], "goal": 4, "boost": ["jaywalk", "parking", "teen_smoke"], "rank": 1,
+		"line": "사진 단속 실적이 모자라다는군. 무단횡단, 불법주차, 학생 비행... 찰칵찰칵 찍어 오게."},
+	{"id": "night", "title": "밤거리 안전", "tasks": ["fight", "pee", "graffiti", "teen_drink"], "goal": 4, "boost": ["fight", "graffiti"], "rank": 1,
+		"line": "밤마다 싸움판이야. 해 지면 열 받은 사람들 물로 단단히 식혀 주게."},
+]
 
 var world: Node
 var day: DayCycle
@@ -19,6 +34,9 @@ var earned := 0
 var raid_today := -1            # 오늘 급습한 조직 번호
 var clean_start: Array = []
 var ended := false
+var order := {}                 # 오늘의 지시 (ORDERS 중 하나)
+var order_count := 0
+var order_cleared := false
 var _rain_tomorrow := false
 
 
@@ -35,6 +53,18 @@ func start(w: Node, d: DayCycle) -> void:
 	day.rain = 1.0 if day.raining else 0.0
 	_rain_tomorrow = randf() < 0.35
 	day.hour_passed.connect(_on_hour)
+	order = _pick_order(r)
+
+
+func _pick_order(r: int) -> Dictionary:
+	## 첫날은 흡연 단속. 그 뒤로는 계급에 맞는 것 중 어제와 다른 것
+	if Game.day <= 1:
+		return ORDERS[0]
+	var last: String = Game.flags.get("last_order", "")
+	var ok := ORDERS.filter(func(o): return o.rank <= r and o.id != last)
+	var o: Dictionary = ok.pick_random()
+	Game.flags["last_order"] = o.id
+	return o
 
 
 func begin() -> void:
@@ -45,15 +75,36 @@ func is_night() -> bool:
 	return day.daylight() < 0.3
 
 
+func is_order_task(task: String) -> bool:
+	return not order.is_empty() and task in order.tasks
+
+
 func record_catch(task: String, reward: int) -> void:
 	if task != "trash":
 		caught += 1
 		by_task[task] = by_task.get(task, 0) + 1
 	earned += reward
+	if is_order_task(task) and not order_cleared:
+		order_count += 1
+		if order_count < order.goal:
+			world.hud.add_feed(order_text(), Color(1, 0.831, 0))
+		if order_count >= order.goal:
+			order_cleared = true
+			world.order_cleared(order)
+
+
+func order_bonus() -> int:
+	return 300 + Game.rank() * 150
 
 
 func quota_text() -> String:
 	return "단속 %d/%d   출동 %d/%d" % [caught, quota, missions_ok, mission_quota]
+
+
+func order_text() -> String:
+	if order.is_empty():
+		return ""
+	return "지시 · %s  %s" % [order.title, "완료!" if order_cleared else "%d/%d" % [order_count, order.goal]]
 
 
 func quota_done() -> bool:
@@ -80,6 +131,8 @@ func grade() -> String:
 	var score: float = minf(float(caught) / quota, 1.3) * 60.0 + missions_ok * 12.0 - missions_fail * 6.0 - complaints * 4.0
 	if raid_today >= 0:
 		score += 30.0
+	if order_cleared:
+		score += 10.0
 	if score >= 95.0:
 		return "S"
 	if score >= 75.0:
@@ -101,7 +154,7 @@ func end_shift() -> void:
 		Game.best_grade = g
 	var r := {
 		"day": Game.day, "grade": g, "pay": pay,
-		"stats": "단속 %d / %d\n출동 성공 %d · 실패 %d\n민원 %d건\n오늘 번 돈 ₩%d" % [caught, quota, missions_ok, missions_fail, complaints, earned],
+		"stats": "단속 %d / %d\n출동 성공 %d · 실패 %d\n%s\n민원 %d건\n오늘 번 돈 ₩%d" % [caught, quota, missions_ok, missions_fail, order_text(), complaints, earned],
 		"districts": _district_text(),
 		"weather": "비" if _rain_tomorrow else "맑음",
 	}
@@ -159,6 +212,8 @@ func _newspaper(g: String) -> Dictionary:
 		head = "%s %d건 적발… 단속 고삐 죈다" % [Game.TASKS[top].short, top_n]
 		sub = "물대포 파출소 %s의 집중 단속에 상인들 반응은 엇갈렸다." % rank_name
 	var briefs: Array = []
+	if order_cleared:
+		briefs.append("[파출소] 소장 특별 지시 '%s' 완수… 소장 \"역시 내가 사람 볼 줄 알지\"" % order.title)
 	for i in mini(world.cfg.zone + 1, Game.GANGS.size()):
 		if Game.raided[i]:
 			continue

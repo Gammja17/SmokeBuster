@@ -12,6 +12,7 @@ const RED := Color(1, 0.42, 0.36)
 @onready var hitmarker: Label = $Crosshair/Hitmarker
 @onready var clock_label: Label = $TopLeft/Term/V/Head/Clock
 @onready var quota_label: Label = $TopLeft/Term/V/Quota
+@onready var order_label: Label = $TopLeft/Term/V/Order
 @onready var rank_label: Label = $TopLeft/Term/V/RankRow/Rank
 @onready var next_label: Label = $TopLeft/Term/V/RankRow/Next
 @onready var xp_bar: ProgressBar = $TopLeft/Term/V/XpBar
@@ -189,6 +190,13 @@ func set_clock(text: String) -> void:
 func set_quota(text: String, done: bool) -> void:
 	quota_label.text = text
 	quota_label.add_theme_color_override("font_color", YEL if done else Color(0.91, 0.918, 0.929))
+
+
+func set_order(text: String, done: bool) -> void:
+	## 오늘의 지시 (소장님). 다 채우면 초록
+	order_label.visible = text != ""
+	order_label.text = text
+	order_label.add_theme_color_override("font_color", Color(0.5, 1, 0.6) if done else YEL)
 
 
 func set_district(text: String) -> void:

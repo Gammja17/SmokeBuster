@@ -15,6 +15,22 @@ const INTRO := [
 	{"who": "소장님", "text": "나머진 동료들한테 물어보게. 머리 위에 노란 표시 있는 친구가 할 말 있는 거야.", "anim": "explain"},
 	{"who": "소장님", "text": "자, 나가 보게!", "anim": "salute"},
 ]
+const MORNING := ["좋은 아침이네! 어제 수고 많았어.", "왔나? 커피는 상황실에 있네.", "오늘도 무사히 퇴근하세나.", "어제 신문 봤나? 허허, 우리 얘기더군."]
+
+
+## 아침 조회: 소장님이 오늘의 특별 지시를 내린다 (첫날은 INTRO 의 마지막 인사 앞에 끼운다)
+static func briefing(order: Dictionary, first_day: bool) -> Array:
+	var lines: Array = []
+	if first_day:
+		lines = INTRO.slice(0, INTRO.size() - 1)
+	else:
+		lines.append({"who": "소장님", "text": MORNING.pick_random(), "anim": "wave"})
+	lines.append({"who": "소장님", "text": "오늘의 특별 지시는 '%s'." % order.title, "anim": "explain"})
+	lines.append({"who": "소장님", "text": order.line})
+	lines.append({"who": "소장님", "text": "%d건 채우면 따로 챙겨 주지. 해당 단속은 수당도 1.5배야!" % order.goal, "anim": "cross_arms"})
+	lines.append(INTRO[-1])
+	return lines
+
 
 const TOPICS := {
 	"rookie": [

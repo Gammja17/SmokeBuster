@@ -68,6 +68,21 @@ func press(key: Key) -> void:
 	Input.parse_input_event(r)
 
 
+func _skip_dialogue() -> void:
+	## 대화창을 끝까지 넘긴다 (선택지는 첫 번째)
+	var w = current_scene
+	for k in 40:
+		if not w.dialogue.active:
+			break
+		if w.dialogue._choosing:
+			w.dialogue._pick(["", []])
+		else:
+			w.dialogue._line.visible_ratio = 1.0
+			w.dialogue._next()
+		await frames(2)
+	await create_timer(0.5).timeout
+
+
 func _place_front(player, n, dist: float) -> void:
 	var fwd: Vector3 = -player.global_basis.z
 	fwd.y = 0
@@ -102,8 +117,10 @@ func _run() -> void:
 	var dup: Array = world.get_tree().get_nodes_in_group("coworker").filter(func(c): return c.role in ["s_clerk", "s_doctor"] and c.global_position.y > -50.0)
 	check(dup.is_empty(), "편의점 알바/병원 원장님은 밖에 안 서 있다")
 	world._start()
-	await frames(5)
-	check(world.playing and world.player.input_enabled, "클릭하면 바로 순찰 시작")
+	await create_timer(0.9).timeout
+	check(world.dialogue.active and world.shift.order.get("id") == "smoke", "아침 조회: 소장님이 오늘의 지시 (첫날은 흡연 단속)")
+	await _skip_dialogue()
+	check(world.playing and world.player.input_enabled, "조회 끝나면 바로 순찰 시작")
 	world.exit_interior()
 	await frames(3)
 	check(world.inside == "" and world.player.global_position.y > -10.0, "파출소 문으로 나가면 바깥")
@@ -128,9 +145,10 @@ func _run() -> void:
 	player.rotation.y = 0
 	await frames(3)
 
-	# ---- 흡연자: 물 → 돈, 실적
+	# ---- 흡연자: 물 → 돈, 실적 (오늘의 지시: 흡연 단속 진행)
 	var money0: int = game.money
 	var xp0: int = game.xp
+	var order0: int = world.shift.order_count
 	var s = world._new_npc("normal")
 	_place_front(player, s, 3.0)
 	world.npcs.add_child(s)
@@ -144,6 +162,7 @@ func _run() -> void:
 		if s.done:
 			break
 	check(s.done and game.money > money0 and game.xp > xp0, "흡연자 단속 → 돈 %d, 실적 %d" % [game.money - money0, game.xp - xp0])
+	check(world.shift.order_count == order0 + 1 and game.money - money0 >= 75, "지시 대상 단속: 진행 +1, 수당 1.5배 (%d원)" % (game.money - money0))
 	await frames(200)
 	check(not is_instance_valid(s) or s.state == 4, "넘어졌다가 일어나 떠난다")
 
@@ -174,6 +193,12 @@ func _run() -> void:
 	await frames(5)
 	check(game.rank() == 1 and world.rank == 1, "실적이 차면 승진 (%s)" % game.rank_name())
 	check(world.city.zone.size.x > zone_before.size.x, "승진하면 관할 구역 확장")
+	# 지시 완수 보너스
+	world.shift.order_count = world.shift.order.goal - 1
+	var mb: int = game.money
+	var bonus: int = world.shift.order_bonus()
+	world._complete("smoke", "흡연자 단속", player.global_position, 50)
+	check(world.shift.order_cleared and game.money - mb >= 50 + bonus, "지시 완수 → 보너스 (%d원)" % (game.money - mb))
 	check("jaywalk" in world.cfg.spawns and "shop" in world.cfg.spawns, "새 사건 종류가 열린다")
 	var shops := 0
 	for c in world.get_children():
