@@ -12,6 +12,8 @@ const RAID_POOLS := [
 	["m_hiker", "m_office", "m_gamer", "m_worker", "f_ajumma"],
 	["m_drunk", "m_track", "f_trench", "m_office"],
 	["m_thug", "m_track", "m_thief", "m_drunk"],
+	["m_delivery", "m_track", "m_college", "m_jogger"],
+	["m_thug", "m_office", "f_trench", "s_shady", "m_track"],
 ]
 
 var world: Node
@@ -54,6 +56,8 @@ func _clue_text(i: int) -> String:
 		["\"골초왕이 지하에서 판을 벌인대요\"", "담배 상자에 찍힌 같은 도장", "꽁초 봉투에 적힌 주소 일부", "흡연카페 할인 쿠폰", "지하 계단 앞에서 본 연기"],
 		["\"사장님한테 상납했어요\"", "보라색 네온 영수증", "노래방 회원 카드", "새벽 3시 영업 전단", "같은 번호로 걸려 온 전화"],
 		["검은 후드에 새긴 마크", "도박 칩 하나", "\"행동대장이 시켰어요\"", "지하 주차장 열쇠", "판돈 장부 한 장"],
+		["번호판 없는 오토바이", "\"대장이 주차장에서 기다려요\"", "배달통 속 담배 보루", "엔진 오일 묻은 장갑", "주차장 출입 카드"],
+		["금박 명함 \"꽁초 대부\"", "옥상 엘리베이터 카드", "카르텔 장부 사본", "\"모든 담배파 위에 대부가 있다\"", "VIP 라운지 초대장"],
 	]
 	return bits[i][(Game.clues[i] - 1) % 5]
 

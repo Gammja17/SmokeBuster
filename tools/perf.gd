@@ -76,6 +76,14 @@ func _run() -> void:
 	print("npc %d" % w.get_tree().get_nodes_in_group("npc").size())
 	await stutter(w, p)
 	await measure("baseline")
+	print("pos ", p.global_position, " lamps ", w.city.lamp_lights.size(), " omni total ", w.find_children("*", "OmniLight3D", true, false).size())
+	if w.day.raining:
+		w.day.raining = false
+		w.day.rain = 0.0
+		await measure("- rain")
+		for l in w.city.lamp_lights:
+			l.visible = false
+		await measure("- lamp lights")
 	var env: Environment = w.get_node("Env").environment
 	for n in w.get_tree().get_nodes_in_group("npc"):
 		n._anim.active = false

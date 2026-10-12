@@ -10,7 +10,7 @@ var rooms := {}     # key -> Dictionary
 
 
 func build_all() -> void:
-	var keys := ["station", "store", "hospital", "smoke_den", "karaoke", "casino"]
+	var keys := ["station", "store", "hospital", "smoke_den", "karaoke", "casino", "garage", "penthouse"]
 	for i in keys.size():
 		var origin := BASE + Vector3(i * 60.0, 0, 0)
 		var root := Node3D.new()
@@ -122,7 +122,7 @@ func _build_station(r: Node3D) -> Dictionary:
 		_box(r, Vector3(0.1, 0.3, 0.1), Vector3(x, 1.25, 1.3), Mats.flat(Color(0.1, 0.1, 0.1), 0.5), false)
 	# 수배 전단: 조직 두목들
 	for i in Game.GANGS.size():
-		var gx := -1.4 + i * 1.4
+		var gx := -2.4 + i * 1.2
 		_box(r, Vector3(1.0, 1.3, 0.04), Vector3(gx, 1.7, -5.33), Mats.flat(Color(0.95, 0.92, 0.82), 0.9), false)
 		var wl := _label(r, "수배\n%s\n%s" % [Game.GANGS[i].boss, "검거" if Game.raided[i] else "?"], Vector3(gx, 1.75, -5.28), 30, Color(0.6, 0.1, 0.1) if not Game.raided[i] else Color(0.2, 0.5, 0.2))
 		wl.outline_size = 0
@@ -302,3 +302,65 @@ func _build_casino(r: Node3D) -> Dictionary:
 		spots[i] = r.position + spots[i]
 	return {"name": "지하 도박장", "spawn": r.position + Vector3(0, 0.2, d / 2 - 1.8), "yaw": 0.0,
 		"points": [_exit_point(r, d)], "spots": spots, "boss": r.position + Vector3(0, 0.1, -5.6)}
+
+
+func _build_garage(r: Node3D) -> Dictionary:
+	## 지하 주차장: 낮은 천장, 기둥, 형광등, 오토바이 줄
+	var w := 22.0
+	var d := 16.0
+	_room(r, w, d, Mats.pbr("concrete", 4.0, Color(0.55, 0.55, 0.57)), Mats.pbr("concrete", 4.0, Color(0.6, 0.6, 0.62)), Color(0.15, 0.17, 0.2))
+	var stripe := Mats.flat(Color(0.95, 0.8, 0.15), 0.6)
+	for x in [-7.0, 0.0, 7.0]:
+		for z in [-4.0, 3.0]:
+			_box(r, Vector3(0.7, H, 0.7), Vector3(x, H / 2, z), Mats.flat(Color(0.7, 0.7, 0.7), 0.8))
+			_box(r, Vector3(0.72, 0.3, 0.72), Vector3(x, 0.6, z), stripe, false)
+	var spots: Array = []
+	for i in 6:
+		var x := -9.0 + i * 3.6
+		_box(r, Vector3(0.5, 0.9, 1.8), Vector3(x, 0.45, -6.5), Mats.flat([Color(0.8, 0.15, 0.1), Color(0.1, 0.1, 0.1), Color(0.2, 0.4, 0.9)][i % 3], 0.4, 0.4))
+		_box(r, Vector3(0.12, 0.02, 4.5), Vector3(x + 1.8, 0.01, -5.5), Mats.flat(Color(0.95, 0.95, 0.9), 0.8), false)
+		spots.append(r.position + Vector3(x + 0.9, 0.1, -4.6))
+	for k in 4:
+		spots.append(r.position + Vector3(-6.0 + k * 4.0, 0.1, 0.0))
+	var tube := Mats.flat(Color(0.9, 0.95, 1), 0.3)
+	tube.emission_enabled = true
+	tube.emission = Color(0.85, 0.95, 1)
+	tube.emission_energy_multiplier = 2.0
+	for x in [-6.0, 0.0, 6.0]:
+		_box(r, Vector3(2.0, 0.06, 0.15), Vector3(x, H - 0.1, 0), tube, false)
+		_light(r, Vector3(x, H - 0.4, 0), Color(0.85, 0.95, 1), 1.6, 9.0)
+	_label(r, "B2  주차 금지 구역", Vector3(0, 2.6, -7.8), 80, Color(1, 0.85, 0.2))
+	return {"name": "지하 주차장", "spawn": r.position + Vector3(0, 0.2, d / 2 - 1.8), "yaw": 0.0,
+		"points": [_exit_point(r, d)], "spots": spots, "boss": r.position + Vector3(0, 0.1, -3.0)}
+
+
+func _build_penthouse(r: Node3D) -> Dictionary:
+	## 옥상 VIP 라운지: 금색 조명, 소파, 창밖 도시 불빛 (최종 두목)
+	var w := 22.0
+	var d := 16.0
+	_room(r, w, d, Mats.flat(Color(0.12, 0.1, 0.08), 0.15, 0.3), Mats.flat(Color(0.18, 0.14, 0.1), 0.5), Color(0.22, 0.17, 0.1))
+	var gold := Mats.flat(Color(1, 0.78, 0.35), 0.25, 0.9)
+	var city_glow := Mats.flat(Color(0.05, 0.07, 0.15), 0.1)
+	city_glow.emission_enabled = true
+	city_glow.emission = Color(0.25, 0.35, 0.7)
+	city_glow.emission_energy_multiplier = 0.9
+	_box(r, Vector3(w - 1.0, 2.2, 0.05), Vector3(0, 1.8, -d / 2 + 0.2), city_glow, false)
+	for i in 12:
+		var dot := Mats.flat(Color(1, 0.8, 0.4), 0.3)
+		dot.emission_enabled = true
+		dot.emission = [Color(1, 0.8, 0.4), Color(0.5, 0.8, 1), Color(1, 0.4, 0.6)][i % 3]
+		dot.emission_energy_multiplier = 3.0
+		_box(r, Vector3(0.08, 0.08, 0.02), Vector3(-9.0 + i * 1.6, 1.2 + (i * 37 % 10) * 0.12, -d / 2 + 0.24), dot, false)
+	var spots: Array = []
+	for i in 4:
+		var c := Vector3(-6.5 + (i % 2) * 13.0, 0, -2.5 + (i / 2) * 5.0)
+		_box(r, Vector3(3.2, 0.45, 1.0), c + Vector3(0, 0.23, -1.0), Mats.flat(Color(0.55, 0.1, 0.1), 0.6))
+		_box(r, Vector3(1.6, 0.5, 0.9), c + Vector3(0, 0.25, 0.3), gold, false)
+		spots.append(r.position + c + Vector3(-1.0, 0.1, -0.2))
+		spots.append(r.position + c + Vector3(1.0, 0.1, 1.2))
+	_box(r, Vector3(4.0, 0.6, 1.6), Vector3(0, 0.3, -5.5), gold)
+	for x in [-6.0, 0.0, 6.0]:
+		_light(r, Vector3(x, H - 0.4, 0), Color(1, 0.8, 0.5), 2.0, 9.0)
+	_label(r, "VIP", Vector3(0, 2.9, -7.7), 120, Color(1, 0.8, 0.35))
+	return {"name": "옥상 VIP 라운지", "spawn": r.position + Vector3(0, 0.2, d / 2 - 1.8), "yaw": 0.0,
+		"points": [_exit_point(r, d)], "spots": spots, "boss": r.position + Vector3(0, 0.1, -4.3)}

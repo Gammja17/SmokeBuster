@@ -61,9 +61,10 @@ var upgrades := {"tank": 0, "pressure": 0, "speed": 0, "mental": 0, "cctv": 0, "
 var has_truck := false
 var total_caught := 0
 var day := 1                       # 근무 일차
-var clean := [25.0, 15.0, 10.0]    # 구역별 정화도 0~100
-var clues := [0, 0, 0]             # 구역별 조직 단서 (CLUES_NEEDED 개면 아지트가 드러남)
-var raided := [false, false, false]   # 구역별 두목 검거 여부
+var clean := [25.0, 15.0, 10.0, 8.0, 5.0]    # 구역별 정화도 0~100
+var clues := [0, 0, 0, 0, 0]                  # 구역별 조직 단서 (CLUES_NEEDED 개면 아지트가 드러남)
+var raided := [false, false, false, false, false]   # 구역별 두목 검거 여부
+var ending_seen := false
 var best_grade := ""
 
 ## 구역마다 숨어 있는 조직. 단서를 모으면 아지트(건물 안)를 급습할 수 있다.
@@ -72,6 +73,8 @@ const GANGS := [
 	{"name": "골목 담배파", "boss": "골초왕", "model": "m_boss", "hideout": "smoke_den", "place": "지하 흡연카페"},
 	{"name": "네온 패밀리", "boss": "네온 사장", "model": "s_shady", "hideout": "karaoke", "place": "불법 노래방"},
 	{"name": "검은 후드단", "boss": "후드단 행동대장", "model": "m_thug", "hideout": "casino", "place": "지하 도박장"},
+	{"name": "폭주 배달단", "boss": "폭주대장", "model": "m_delivery", "hideout": "garage", "place": "지하 주차장"},
+	{"name": "꽁초 카르텔", "boss": "꽁초 대부", "model": "m_office", "hideout": "penthouse", "place": "옥상 VIP 라운지"},
 ]
 
 
@@ -155,11 +158,13 @@ const TASKS := {
 const ZONES := [
 	{"name": "1구역 · 첫 번째 블록", "rect": Rect2(-63, -63, 72, 72)},
 	{"name": "2구역 · 공원까지", "rect": Rect2(-63, -63, 126, 72)},
-	{"name": "3구역 · 동네 전체", "rect": Rect2(-63, -63, 126, 126)},
+	{"name": "3구역 · 옛 동네 전체", "rect": Rect2(-63, -63, 126, 126)},
+	{"name": "4구역 · 서북 시장통", "rect": Rect2(-117, -117, 180, 180)},
+	{"name": "5구역 · 신도심 전체", "rect": Rect2(-117, -117, 234, 234)},
 ]
 const RANKS := ["순경", "경장", "경사", "경위", "경감", "경정", "총경"]
 const RANK_XP := [0, 400, 1100, 2400, 4500, 7500, 12000]   # 이 실적부터 그 계급
-const HOW_TEXT := {"water": "물", "photo": "촬영", "pickup": "E 줍기", "break": "간판에 물", "chase": "추격"}
+const HOW_TEXT := {"water": "물", "photo": "촬영", "pickup": "E 줍기", "break": "합선 후 간판 뜯기", "chase": "추격"}
 const SPAWN_NAMES := {
 	"smoke": "흡연자", "trash": "쓰레기", "litter": "무단투기범", "jaywalk": "무단횡단", "teen_smoke": "담배 피는 학생",
 	"shop": "불법업소", "teen_drink": "술 마시는 학생", "bully": "학교폭력", "drunk": "음주운전",
@@ -187,7 +192,7 @@ func rank_span() -> Array:
 
 
 func zone_for_rank(r: int) -> int:
-	return 0 if r == 0 else (1 if r == 1 else 2)
+	return [0, 1, 2, 3, 4, 4, 4][clampi(r, 0, 6)]
 
 
 ## 계급별로 동네에 나오는 사건과 밀도
@@ -206,8 +211,8 @@ func patrol_config(r: int) -> Dictionary:
 		"weights": weights,
 		"zone": zone,
 		"incidents": min(6 + r * 2, 14),        # 동시에 진행 중인 사건 수 목표
-		"pedestrians": [9, 14, 20][zone],
-		"shops": [0, 1, 2][zone],
+		"pedestrians": [9, 14, 20, 26, 32][zone],
+		"shops": [0, 1, 2, 3, 4][zone],
 		"events": r >= 1,
 		"boss": r >= 3,
 	}
@@ -249,9 +254,10 @@ func new_game() -> void:
 	has_truck = false
 	total_caught = 0
 	day = 1
-	clean = [25.0, 15.0, 10.0]
-	clues = [0, 0, 0]
-	raided = [false, false, false]
+	clean = [25.0, 15.0, 10.0, 8.0, 5.0]
+	clues = [0, 0, 0, 0, 0]
+	raided = [false, false, false, false, false]
+	ending_seen = false
 	best_grade = ""
 	save_game()
 
@@ -267,7 +273,7 @@ func save_game() -> void:
 	f.store_string(JSON.stringify({
 		"money": money, "xp": xp, "owned": owned, "upgrades": upgrades,
 		"has_truck": has_truck, "total_caught": total_caught,
-		"day": day, "clean": clean, "clues": clues, "raided": raided, "best_grade": best_grade,
+		"day": day, "clean": clean, "clues": clues, "raided": raided, "best_grade": best_grade, "ending_seen": ending_seen,
 	}))
 
 
@@ -289,8 +295,9 @@ func load_game() -> void:
 	var c: Array = data.get("clean", clean)
 	var q: Array = data.get("clues", clues)
 	var r: Array = data.get("raided", raided)
-	for i in 3:
+	for i in clean.size():
 		clean[i] = float(c[i]) if i < c.size() else clean[i]
 		clues[i] = int(q[i]) if i < q.size() else 0
 		raided[i] = bool(r[i]) if i < r.size() else false
 	best_grade = str(data.get("best_grade", ""))
+	ending_seen = bool(data.get("ending_seen", false))

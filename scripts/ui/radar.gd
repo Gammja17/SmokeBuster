@@ -44,10 +44,10 @@ func _draw() -> void:
 	var z: Rect2 = city.zone
 	draw_rect(Rect2(z.position * k, z.size * k), COL_BG)
 	for b in city.block_centers:
-		var col := COL_PARK if b == city.park_center else COL_BLOCK
+		var col := COL_PARK if b in city.parks else COL_BLOCK
 		var h := CityBuilder.BLOCK_HALF
 		draw_rect(Rect2((b - Vector2(h, h)) * k, Vector2(h, h) * 2 * k), col)
-	for r in [-CityBuilder.PITCH, 0.0, CityBuilder.PITCH]:
+	for r in CityBuilder.ROAD_LINES:
 		var w := CityBuilder.ROAD_W * k
 		draw_rect(Rect2(Vector2(r - CityBuilder.ROAD_W / 2, -e) * k, Vector2(w, e * 2 * k)), COL_ROAD)
 		draw_rect(Rect2(Vector2(-e, r - CityBuilder.ROAD_W / 2) * k, Vector2(e * 2 * k, w)), COL_ROAD)

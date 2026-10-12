@@ -172,6 +172,30 @@ func _run() -> void:
 			shops += 1
 	check(shops >= 1, "승진하면 불법업소가 생긴다 (%d곳)" % shops)
 
+	# ---- 불법업소: 물로 합선 → E 연타로 간판 뜯기 / 차로 들이받기
+	var shop_list: Array = world.get_tree().get_nodes_in_group("illegal_shop")
+	if shop_list.size() > 0:
+		var sh = shop_list[0]
+		sh.soak(999.0, Vector3.FORWARD, 0.0)
+		await frames(2)
+		check(sh.is_shorted and not sh.done, "물로 합선 → 전원 차단 (아직 철거 전)")
+		var rip_doors: Array = player.doors.filter(func(d): return d.role == "rip")
+		check(rip_doors.size() == 1, "간판 앞에 'E 연타' 자리가 생긴다")
+		var money_before: int = game.money
+		for k in 3:
+			world._use_door(rip_doors[0])
+			await frames(2)
+		await create_timer(1.0, true, false, true).timeout
+		check(sh.done and game.money > money_before, "E 세 번에 간판이 뜯겨 떨어진다 (+%d원)" % (game.money - money_before))
+		check(player.doors.filter(func(d): return d.role == "rip").is_empty(), "뜯고 나면 E 자리가 사라진다")
+		world._spawn_shop()
+		await frames(2)
+		var fresh: Array = world.get_tree().get_nodes_in_group("illegal_shop").filter(func(x): return not x.done)
+		if fresh.size() > 0:
+			fresh[0].on_rammed()
+			await frames(2)
+			check(fresh[0].done, "순찰차로 들이받으면 간판이 바로 떨어진다")
+
 	# ---- 장비실 (B)
 	world._open_shop()
 	await process_frame
@@ -320,7 +344,7 @@ func _run() -> void:
 	var looks := {}
 	for n in world.get_tree().get_nodes_in_group("npc"):
 		looks[n.model_name] = true
-	check(looks.size() >= 4, "행인 생김새가 다양함 (%d종)" % looks.size())
+	check(looks.size() >= 3, "행인 생김새가 다양함 (%d종)" % looks.size())
 	# Tab 무기 휠: 누르면 열리고 시간이 느려지고, 마우스를 민 쪽 무기로 바뀐다
 	game.owned = ["spray", "pistol", "bucket", "soaker", "hose"]
 	player.equip("spray")

@@ -22,7 +22,7 @@ const HINTS := [
 const EVENTS := [
 	["group", "흡연 모임 출몰!", "골목에 여럿이 모여 담배를 피워요"],
 	["drunk", "음주운전 의심 차량 제보!", "바깥 도로를 비틀비틀 달리는 차를 찍으세요"],
-	["shop", "불법업소 기습 개업!", "네온 간판에 물을 뿌려 합선시키세요"],
+	["shop", "불법업소 기습 개업!", "간판에 물을 뿌려 합선시킨 뒤 E 연타로 뜯어내세요"],
 	["bully", "학교폭력 신고 접수!", "현장을 찾아 사진으로 남기세요"],
 	["rush", "퇴근길 흡연 러시!", "30초 동안 흡연자가 쏟아져요 (보상 2배)"],
 	["thief", "소매치기 주의보!", "도둑 둘이 동네에 숨어들었어요"],
@@ -674,15 +674,23 @@ func _spawn_shop() -> void:
 	owner_npc.position = Vector3(1.7, 0.06, 1.3)
 	owner_npc.rotation.y = PI
 	shop_node.add_child(owner_npc)
+	shop_node.shorted.connect(func(_s):
+		if is_instance_valid(owner_npc):
+			owner_npc.say(["안 돼!! 전기!!", "야 이거 비싼 간판이야!", "손대지 마요!!"].pick_random(), "angry")
+		hud.add_feed("전원 차단! 간판 앞에서 E 연타 (차로 들이받아도 됨)", Color(1, 0.8, 0.4))
+		refresh_doors())
+	shop_node.ripped.connect(func(_s, rammed):
+		refresh_doors()
+		_slowmo(0.6)
+		player.shake(0.9 if rammed else 0.6)
+		hud.banner("간판 철거!", "순찰차로 박살!" if rammed else "뿌드드득... 쾅!!", 2.0))
 	shop_node.resolved.connect(func(s, task):
 		if is_instance_valid(owner_npc):
 			owner_npc.say(["내 가게!!", "이게 무슨 짓이에요!", "아이고 망했다..."].pick_random(), "angry")
 			_later(4.0, func():
 				if is_instance_valid(owner_npc):
 					owner_npc.queue_free())
-		_complete(task, Game.TASKS[task].name, s.incident_pos())
-		hud.banner("불법업소 철거!", "", 1.6)
-		player.shake(0.4))
+		_complete(task, Game.TASKS[task].name, s.incident_pos()))
 
 
 func _spawn_boss() -> void:
@@ -799,6 +807,14 @@ func _cheer(pos: Vector3) -> void:
 					_later(0.9, func():
 						if is_instance_valid(who) and who.state == Npc.State.WALK:
 							who._play("walk")))
+
+
+func _slowmo(real_seconds: float) -> void:
+	## 잠깐 느려졌다가 돌아온다 (간판이 떨어지는 순간)
+	Engine.time_scale = 0.3
+	await get_tree().create_timer(real_seconds, true, false, true).timeout
+	if not (hud.wheel.visible):
+		Engine.time_scale = 1.0
 
 
 func _hitstop(duration: float) -> void:
@@ -1149,6 +1165,11 @@ func _use_door(door: Dictionary) -> void:
 			exit_interior()
 		"hideout":
 			crime.start_raid(door.gang)
+		"rip":
+			if is_instance_valid(door.shop):
+				door.shop.tug(player.global_position)
+				player.shake(0.25)
+				hud.hit(false)
 		"locker":
 			_open_shop()
 		"rest":
@@ -1201,6 +1222,9 @@ func refresh_doors() -> void:
 		all.append_array(crime.hideouts.values())
 	for key in interiors.rooms:
 		all.append_array(interiors.rooms[key].points)
+	for shop_node in get_tree().get_nodes_in_group("illegal_shop"):
+		if shop_node.can_rip():
+			all.append({"role": "rip", "shop": shop_node, "pos": shop_node.rip_point(), "normal": shop_node.global_basis.z, "label": "E 연타  간판 뜯기!"})
 	player.doors = all
 
 
@@ -1433,8 +1457,8 @@ func _start_mission() -> void:
 		"shop":
 			var before := get_children().filter(func(c): return c is IllegalShop).size()
 			_spawn_shop()
-			var shops := get_children().filter(func(c): return c is IllegalShop and not c.done)
-			if shops.size() <= before:
+			var shops := get_children().filter(func(c): return c is IllegalShop)
+			if shops.size() <= before or shops[-1].done:
 				return
 			targets.append(shops[-1])
 			pos = shops[-1].global_position

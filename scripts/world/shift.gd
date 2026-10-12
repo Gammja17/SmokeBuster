@@ -159,7 +159,7 @@ func _newspaper(g: String) -> Dictionary:
 		head = "%s %d건 적발… 단속 고삐 죈다" % [Game.TASKS[top].short, top_n]
 		sub = "물대포 파출소 %s의 집중 단속에 상인들 반응은 엇갈렸다." % rank_name
 	var briefs: Array = []
-	for i in mini(world.cfg.zone + 1, 3):
+	for i in mini(world.cfg.zone + 1, Game.GANGS.size()):
 		if Game.raided[i]:
 			continue
 		var c: int = Game.clues[i]

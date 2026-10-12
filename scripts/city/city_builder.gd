@@ -1,6 +1,7 @@
 class_name CityBuilder
 extends RefCounted
-## 2x2 블록 동네를 만든다. 도로 3x3 격자, 블록마다 건물/골목 안뜰, 한 블록은 공원.
+## 4x4 블록 동네를 만든다 (가운데 2x2 가 처음 동네, 바깥 12블록이 승진하면 열리는 곳).
+## 도로 5x5 격자, 블록마다 건물/골목 안뜰, 두 블록은 공원.
 ## 만든 뒤 보행자 길 그래프, 흡연 장소, 소화전 위치를 돌려준다.
 
 const PITCH := 54.0          # 도로 중심 간격
@@ -8,7 +9,8 @@ const ROAD_W := 10.0
 const BLOCK_HALF := 22.0     # 블록(인도 포함) 반 크기
 const WALK := 20.0           # 보행자 길(인도 중앙) 반 크기
 const INNER := 18.0          # 건물이 서는 안쪽 반 크기
-const EDGE := 63.0           # 바깥 인도 끝
+const EDGE := 117.0          # 바깥 인도 끝 (2 * PITCH + 9)
+const ROAD_LINES := [-108.0, -54.0, 0.0, 54.0, 108.0]   # 도로 중심선 (x 와 z 같음)
 
 const GRAFFITI := ["흡연금지", "CCTV 작동중", "쓰레기 버리지 마시오", "XX 참교육", "민지 사랑해", "여기서 담배 피면 벌금"]
 ## 순찰차/소방차 자리 (x, z): 여기엔 주차된 차를 두지 않는다
@@ -22,6 +24,7 @@ var spots: Array = []        # {pos: Vector3, kind: String, busy: bool}
 var hydrants: Array[Vector3] = []
 var block_centers: Array[Vector2] = []
 var park_center := Vector2.ZERO
+var parks: Array[Vector2] = []
 var ring_lanes: Array = []   # 자동차가 도는 사각 경로 [half, clockwise]
 var shop_slots: Array = []   # 불법업소를 붙일 수 있는 건물 정면 {pos, normal, used}
 var zone := Rect2(-EDGE, -EDGE, EDGE * 2, EDGE * 2)   # 관할 구역 (x, z)
@@ -44,13 +47,19 @@ func build(parent: Node3D, seed_value := 1234) -> void:
 
 	_ground()
 	_roads()
+	# 가운데 2x2 를 먼저 (예전과 같은 순서/난수라 파출소 동네는 그대로), 그다음 바깥 12블록
 	for bx in [-1, 1]:
 		for bz in [-1, 1]:
 			block_centers.append(Vector2(bx, bz) * PITCH / 2)
+	for bx in [-3, -1, 1, 3]:
+		for bz in [-3, -1, 1, 3]:
+			if abs(bx) == 3 or abs(bz) == 3:
+				block_centers.append(Vector2(bx, bz) * PITCH / 2)
 	park_center = block_centers[2]
+	parks = [park_center, Vector2(3, -1) * PITCH / 2]
 	for c in block_centers:
 		_block_slab(c)
-		if c == park_center:
+		if c in parks:
 			_park(c)
 		else:
 			var bi := block_centers.find(c)
@@ -59,7 +68,7 @@ func build(parent: Node3D, seed_value := 1234) -> void:
 	_outer_ring()
 	_parked_cars()
 	_nav_graph()
-	ring_lanes = [[PITCH - 2.5, true], [PITCH + 2.5, false]]
+	ring_lanes = [[PITCH - 2.5, true], [PITCH + 2.5, false], [PITCH * 2 - 2.5, true], [PITCH * 2 + 2.5, false]]
 	_merge_static()
 
 
@@ -153,11 +162,11 @@ func _mat_key(mat: Material) -> String:
 # ---------------------------------------------------------------- 기본 바닥/도로
 
 func _ground() -> void:
-	_box_m(root, Vector3(260, 1, 260), Vector3(0, -0.5, 0), Mats.asphalt(), true)
+	_box_m(root, Vector3(EDGE * 2 + 40, 1, EDGE * 2 + 40), Vector3(0, -0.5, 0), Mats.asphalt(), true)
 	# 보이지 않는 경계 벽
 	for s in [-1, 1]:
-		_wall(Vector3(1, 20, 140), Vector3(s * (EDGE + 1), 10, 0))
-		_wall(Vector3(140, 20, 1), Vector3(0, 10, s * (EDGE + 1)))
+		_wall(Vector3(1, 20, EDGE * 2 + 14), Vector3(s * (EDGE + 1), 10, 0))
+		_wall(Vector3(EDGE * 2 + 14, 20, 1), Vector3(0, 10, s * (EDGE + 1)))
 
 
 func _roads() -> void:
@@ -315,7 +324,7 @@ func _shop_slot(block: Node3D, pos: Vector3, rot: float, slot: float) -> void:
 
 
 func is_on_road(p: Vector3) -> bool:
-	for c in [-PITCH, 0.0, PITCH]:
+	for c in ROAD_LINES:
 		if abs(p.x - c) < ROAD_W / 2 - 0.3 or abs(p.z - c) < ROAD_W / 2 - 0.3:
 			return true
 	return false
@@ -506,9 +515,9 @@ func _road_markings() -> void:
 	## 도로 위 노란 중앙선, 흰 가장자리선, 교차로 앞 횡단보도
 	var yellow := Color(0.95, 0.75, 0.1)
 	var white := Color(0.92, 0.92, 0.9)
-	var lines := [-PITCH, 0.0, PITCH]
+	var lines := ROAD_LINES
 	for c in lines:
-		for k in range(2):
+		for k in range(lines.size() - 1):
 			var a: float = lines[k] + ROAD_W / 2
 			var b: float = lines[k + 1] - ROAD_W / 2
 			var mid := (a + b) / 2
@@ -716,15 +725,15 @@ func _outer_ring() -> void:
 			root.add_child(holder)
 			_building(holder, Vector3.ZERO, 180.0, slot)
 	for s in [-1, 1]:
-		for i in 6:
-			var z := -50.0 + i * 20.0
+		for i in 10:
+			var z := -100.0 + i * 22.0
 			_ph(root, "street_lamp_01", Vector3(s * (EDGE - 0.6), 0.06, z), -90.0 * s + 180.0, 1.7)
 
 
 func _parked_cars() -> void:
-	for c in [0.0]:
-		for along in range(-50, 51, 7):
-			if abs(along) < 10 or abs(abs(along) - PITCH) < 10:
+	for c in [-PITCH, 0.0, PITCH]:
+		for along in range(-104, 105, 7):
+			if ROAD_LINES.any(func(l): return abs(along - l) < 10):
 				continue
 			for side in [-1, 1]:
 				if rng.randf() < 0.45:
@@ -747,10 +756,10 @@ func _reserved(p: Vector2) -> bool:
 ## 불법주차 자리 후보: 가운데 도로 횡단보도 위 [위치, 방향(도)]
 func parking_candidates() -> Array:
 	var list := []
-	for inter in [-PITCH, 0.0, PITCH]:
+	for inter in ROAD_LINES:
 		for s in [-1, 1]:
 			var along: float = inter + s * 10.5
-			if abs(along) > PITCH:
+			if abs(along) > PITCH * 2:
 				continue
 			for lane in [-2.0, 2.0]:
 				list.append([Vector3(lane, 0.02, along), 0.0 if lane > 0 else 180.0])
