@@ -68,6 +68,7 @@ func _ready() -> void:
 			names[n] = true
 	for n in names:
 		load("res://assets/people/%s.glb" % n)
+		Human.lib(n)
 	rank = Game.rank()
 	cfg = Game.patrol_config(rank)
 	city.build(self, 4242)
