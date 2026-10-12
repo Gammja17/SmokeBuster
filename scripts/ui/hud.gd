@@ -25,6 +25,9 @@ extends CanvasLayer
 @onready var truck_box: HBoxContainer = $TopRight/Truck
 @onready var truck_bar: ProgressBar = $TopRight/Truck/TruckBar
 @onready var wheel: Control = $WeaponWheel
+@onready var clock_label: Label = $BottomRight/Clock
+@onready var quota_label: Label = $TopLeft/Quota
+@onready var district_label: Label = $BottomRight/District
 @onready var prompt: Label = $Prompt
 @onready var hint: Label = $Hint
 @onready var viewfinder: Control = $Viewfinder
@@ -146,6 +149,27 @@ func _won(m: int) -> String:
 			out += ","
 		out += s[i]
 	return "₩" + out
+
+
+func set_clock(text: String) -> void:
+	clock_label.text = text
+
+
+func set_quota(text: String, done: bool) -> void:
+	quota_label.text = ("✔ " if done else "") + text
+	quota_label.modulate = Color(0.6, 1, 0.6) if done else Color.WHITE
+
+
+func set_district(text: String) -> void:
+	district_label.text = text
+
+
+func flash_fade() -> void:
+	## 문 드나들 때 잠깐 까맣게
+	flash.color = Color(0, 0, 0, 1)
+	var tw := create_tween().set_ignore_time_scale(true)
+	tw.tween_property(flash, "color:a", 0.0, 0.45)
+	tw.tween_callback(func(): flash.color = Color(1, 1, 1, 0))
 
 
 func set_combo(mult: float) -> void:

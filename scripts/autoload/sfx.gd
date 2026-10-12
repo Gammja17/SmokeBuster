@@ -39,6 +39,7 @@ const LOOPS := {
 	"hose": "res://assets/sfx/hose_loop.wav",
 	"siren": "res://assets/sfx/siren_loop.wav",
 	"city": "res://assets/sfx/city_loop.wav",
+	"rain": "res://assets/sfx/rain_loop.wav",
 	"bgm": "res://assets/music/bgm.wav",
 	"club": "res://assets/music/club.wav",
 	"karaoke": "res://assets/music/karaoke.wav",

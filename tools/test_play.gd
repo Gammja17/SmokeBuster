@@ -26,6 +26,18 @@ func _face(player, target: Vector3) -> void:
 	player.camera.look_at(target, Vector3.UP)
 
 
+func _use_point(role: String) -> void:
+	## 지금 건물 안의 그 자리로 가서 E
+	var world = current_scene
+	for p in world.player.doors:
+		if p.role == role and p.pos.y < -50.0 and (world.inside == "" or p.pos.distance_to(world.interiors.rooms[world.inside].spawn) < 30.0):
+			world.player.global_position = p.pos + Vector3(0, 0.3, 0)
+			break
+	await frames(3)
+	world.player._try_pickup()
+	await frames(3)
+
+
 func settle() -> void:
 	## 흘려보낸 입력은 다음 물리 틱에 처리되므로 물리 프레임도 기다린다 (한 화면 프레임에 몰릴 수 있어 화면 프레임도)
 	await frames(3)
@@ -335,15 +347,26 @@ func _run() -> void:
 	check(not player._nearest_door().is_empty(), "편의점 문 앞에서 E 안내")
 	player._try_pickup()
 	await frames(2)
-	check(game.money == 470 and player.mental == 2, "편의점: 30원, 멘탈 +1")
+	check(world.inside == "store" and player.global_position.y < -50.0, "편의점 문 → 가게 안으로")
+	await _use_point("counter")
+	check(game.money == 470 and player.mental == 2, "편의점 계산대: 30원, 멘탈 +1")
+	await _use_point("exit")
+	check(world.inside == "" and player.global_position.distance_to(store.pos) < 4.0, "밖으로 나오면 가게 문 앞")
 	var station: Dictionary = world.city.doors.filter(func(d): return d.role == "station")[0]
 	player.global_position = station.pos + Vector3(0, 0.3, 0)
 	await frames(3)
 	player._try_pickup()
 	await frames(2)
-	check(player.mental == game.max_mental() and world.shop_layer.visible, "파출소: 회복하고 장비실 열림")
+	check(world.inside == "station", "파출소 안으로")
+	await _use_point("rest")
+	check(player.mental == game.max_mental(), "파출소 소파: 멘탈 회복")
+	await _use_point("locker")
+	check(world.shop_layer.visible, "파출소 사물함: 장비실 열림")
 	world._close_shop()
 	await frames(2)
+	await _use_point("desk")
+	check(not world.report.visible, "할당량 전엔 퇴근 못 함")
+	await _use_point("exit")
 
 	# ---- 무전 출동: 종류마다 현장이 생기는지
 	world.rank = 3
@@ -392,6 +415,44 @@ func _run() -> void:
 	check(world._deco.size() >= 2, "업그레이드가 파출소에 보인다")
 	game.upgrades.cctv = 0
 	game.upgrades.garage = 0
+
+	# ---- 밤: 해가 지면 가로등이 켜지고 간판이 밝아진다
+	world.day.hour = 22.0
+	world.day.apply()
+	check(world.city.lamp_lights.size() > 0 and world.city.lamp_lights[0].light_energy > 1.0 and world.get_node("Sun").light_energy < 0.5, "밤 22시: 가로등 켜짐, 해 짐")
+	world.day.hour = 13.0
+	world.day.apply()
+	check(world.city.lamp_lights[0].light_energy < 0.1, "낮 13시: 가로등 꺼짐")
+
+	# ---- 조직: 단서가 다 모이면 아지트가 드러나고, 급습해서 두목까지 잡으면 구역 정화
+	game.clues[0] = game.CLUES_NEEDED - 1
+	game.raided[0] = false
+	var clean0: float = game.clean[0]
+	world.crime.on_catch("thief", world.SPAWN)
+	check(game.clues[0] == game.CLUES_NEEDED and world.crime.hideouts.has(0), "단서 %d개 → 아지트 발견" % game.CLUES_NEEDED)
+	var hide: Dictionary = world.crime.hideouts.get(0, {})
+	if not hide.is_empty():
+		player.global_position = hide.pos + Vector3(0, 0.3, 0)
+		await frames(3)
+		player._try_pickup()
+		await frames(5)
+		check(world.inside == "smoke_den" and world.crime.raid.targets.size() >= 4, "아지트 안으로 급습 (일당 %d)" % world.crime.raid.get("targets", []).size())
+		var boss_ok: bool = world.crime.raid.targets.any(func(n): return n.kind == "boss" and n.model_name == "m_boss")
+		check(boss_ok, "두목은 골초왕 모델")
+		for n in world.crime.raid.targets:
+			n.caught("tackle", Vector3.FORWARD)
+		await frames(5)
+		check(game.raided[0] and game.clean[0] > clean0 + 25.0 and world.crime.raid.is_empty(), "급습 성공: 두목 검거, 정화도 +30")
+		await _use_point("exit")
+
+	# ---- 퇴근: 성적표와 신문, 다음 날
+	var day0: int = game.day
+	world.shift.end_shift()
+	await frames(5)
+	check(world.report.visible and game.day == day0 + 1, "퇴근 성적표 (DAY %d)" % day0)
+	check(world.report.get_node("Row/Paper/V/Headline").text.contains("골초왕"), "신문 1면: 두목 검거 (%s)" % world.report.get_node("Row/Paper/V/Headline").text)
+	world.report.visible = false
+	world.get_tree().paused = false
 
 	# ---- 진행 저장 → 다시 열면 계급 유지
 	game.save_game()

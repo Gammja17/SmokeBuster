@@ -88,6 +88,43 @@ static func shop_glass() -> StandardMaterial3D:
 	return m
 
 
+static func glass_lit(cool := false) -> StandardMaterial3D:
+	## 밤에 불 켜지는 창 (낮에는 보통 유리와 거의 같다). 따뜻한 집 불빛과 푸른 형광등 두 가지
+	var key := "glass_lit_cool" if cool else "glass_lit"
+	if _cache.has(key):
+		return _cache[key]
+	var m := glass().duplicate() as StandardMaterial3D
+	m.emission_enabled = true
+	m.emission = Color(0.75, 0.88, 1.0) if cool else Color(1.0, 0.72, 0.42)
+	m.emission_energy_multiplier = 0.0
+	_cache[key] = m
+	return m
+
+
+static func set_night(n: float) -> void:
+	## n: 0 = 한낮, 1 = 한밤. 간판/쇼윈도/불 켜진 창의 밝기를 올린다
+	for key in _cache:
+		var m: StandardMaterial3D = _cache[key]
+		if key.begins_with("sign_"):
+			m.emission_energy_multiplier = lerp(0.4, 2.6, n)
+		elif key == "shop_glass":
+			m.emission_energy_multiplier = lerp(0.35, 1.6, n)
+		elif key == "glass_lit":
+			m.emission_energy_multiplier = lerp(0.0, 0.75, n)
+		elif key == "glass_lit_cool":
+			m.emission_energy_multiplier = lerp(0.0, 0.5, n)
+
+
+static func set_wet(w: float) -> void:
+	## 비: 바닥이 젖어 어둡고 반질반질해진다 (SSR 이 네온을 비춤)
+	for key in ["asphalt", "pavement"]:
+		for k in _cache:
+			if k.begins_with(key + "_"):
+				var m: StandardMaterial3D = _cache[k]
+				m.roughness = lerp(1.0, 0.25, w)
+				m.albedo_color = Color.WHITE.lerp(Color(0.62, 0.62, 0.66), w) * (Color(0.85, 0.85, 0.88) if key == "asphalt" else Color.WHITE)
+
+
 static func sign_board(color: Color) -> StandardMaterial3D:
 	var key := "sign_" + color.to_html()
 	if _cache.has(key):

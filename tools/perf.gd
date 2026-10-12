@@ -61,6 +61,11 @@ func _run() -> void:
 		await process_frame
 	var w = current_scene
 	w._start()
+	if args.size() > 1 and args[1] == "night":
+		w.day.running = false
+		w.day.hour = 22.5
+		w.day.raining = true
+		w.day.rain = 1.0
 	Input.mouse_mode = Input.MOUSE_MODE_VISIBLE
 	var p = w.player
 	# 큰길 가운데에서 길 따라 멀리 보는, 가장 많이 그려지는 장면

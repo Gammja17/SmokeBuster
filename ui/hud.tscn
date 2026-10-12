@@ -345,6 +345,13 @@ theme_override_colors/font_color = Color(0.85, 0.85, 0.85, 1)
 theme_override_font_sizes/font_size = 17
 text = "편의점 근처 · 120m · 남은 시간 1:20"
 
+[node name="Quota" type="Label" parent="TopLeft"]
+layout_mode = 2
+theme_override_constants/outline_size = 6
+theme_override_font_sizes/font_size = 17
+theme_override_styles/normal = SubResource("panel_dark")
+text = "오늘 할당  단속 0/10 · 출동 0/2"
+
 [node name="Feed" type="VBoxContainer" parent="."]
 anchors_preset = 2
 anchor_top = 1.0
@@ -409,8 +416,8 @@ anchor_left = 1.0
 anchor_top = 1.0
 anchor_right = 1.0
 anchor_bottom = 1.0
-offset_left = -520.0
-offset_top = -96.0
+offset_left = -620.0
+offset_top = -150.0
 offset_right = -28.0
 offset_bottom = -20.0
 grow_horizontal = 0
@@ -418,6 +425,15 @@ grow_vertical = 0
 mouse_filter = 2
 theme_override_constants/separation = -4
 alignment = 2
+
+[node name="Clock" type="Label" parent="BottomRight"]
+layout_mode = 2
+theme_override_colors/font_color = Color(1, 0.9, 0.6, 1)
+theme_override_constants/outline_size = 8
+theme_override_fonts/font = ExtResource("4_title")
+theme_override_font_sizes/font_size = 22
+text = "DAY 1  10:00"
+horizontal_alignment = 2
 
 [node name="Zone" type="Label" parent="BottomRight"]
 layout_mode = 2
@@ -433,6 +449,14 @@ theme_override_constants/outline_size = 8
 theme_override_fonts/font = SubResource("italic")
 theme_override_font_sizes/font_size = 24
 text = "파출소 근처"
+horizontal_alignment = 2
+
+[node name="District" type="Label" parent="BottomRight"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.7, 1, 0.75, 1)
+theme_override_constants/outline_size = 6
+theme_override_font_sizes/font_size = 17
+text = ""
 horizontal_alignment = 2
 
 [node name="WeaponWheel" type="Control" parent="."]

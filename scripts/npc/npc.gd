@@ -92,6 +92,9 @@ var done := false
 var _model: Human
 var _anim: AnimationPlayer
 var model_name := ""
+var force_model := ""     # 정해진 인물로 (조직 두목 등)
+var title := ""           # 머리 위 이름 (두목)
+var interior := false     # 건물 안에 있는 사람 (길 그래프를 쓰지 않는다)
 var _walk_anim := "walk"
 var _cur_anim := ""
 var _busy_t := 0.0
@@ -175,7 +178,7 @@ func _ready() -> void:
 	if is_minor():
 		walk_speed = 1.9
 
-	model_name = (POOLS.get(kind, POOLS.ped) as Array).pick_random()
+	model_name = force_model if force_model != "" else (POOLS.get(kind, POOLS.ped) as Array).pick_random()
 	var height := randf_range(1.66, 1.84)
 	if model_name in FEMALE:
 		height = randf_range(1.58, 1.70)
@@ -235,10 +238,10 @@ func _ready() -> void:
 		_build_spray_can()
 	if task() != "":
 		add_to_group("incident")
-	if LABELS.has(kind):
+	if LABELS.has(kind) or title != "":
 		_label = _make_label(Game.TASKS[task()].color if task() != "" else Color.WHITE, 34)
 		_label.position.y = _head_y() + 0.25
-		_label.text = LABELS[kind]
+		_label.text = title if title != "" else LABELS[kind]
 		if kind == "boss":
 			_label.font_size = 64
 			_label.modulate = Color(1, 0.8, 0.1)

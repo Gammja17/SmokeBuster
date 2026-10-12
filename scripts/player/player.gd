@@ -410,10 +410,21 @@ func _nearest_coworker() -> Node3D:
 	return null
 
 
+func _door_first() -> bool:
+	## 동료/가게 주인보다 문(계산대 등)이 더 가까우면 문을 쓴다
+	var door := _nearest_door()
+	var cw := _nearest_coworker()
+	if door.is_empty():
+		return false
+	if cw == null:
+		return true
+	return Vector2(door.pos.x - global_position.x, door.pos.z - global_position.z).length() < cw.global_position.distance_to(global_position)
+
+
 func _try_pickup() -> void:
 	var t := _nearest_trash()
 	var cw := _nearest_coworker()
-	if t == null and cw:
+	if t == null and cw and not _door_first():
 		cw.talk()
 		return
 	if t == null:
@@ -433,12 +444,14 @@ func _update_prompt() -> void:
 		text = ""
 	elif _nearest_trash():
 		text = "E  가방 주워 돌려주기" if _nearest_trash().is_in_group("bag") else "E  쓰레기 줍기"
-	elif _nearest_coworker():
+	elif _nearest_coworker() and not _door_first():
 		text = "E  %s와 대화" % _nearest_coworker().display_name()
 	elif not _nearest_door().is_empty():
-		text = "E  " + {"station": "파출소 (휴식, 장비실)", "store": "편의점 (물 + 멘탈1, 30원)", "hospital": "병원 (멘탈 회복, 100원)", "school": "학교"}[_nearest_door().role]
+		var door := _nearest_door()
+		text = door.get("label", "E  " + {"station": "파출소 들어가기", "store": "편의점 들어가기", "hospital": "병원 들어가기", "school": "학교"}.get(door.role, ""))
 	elif _near_vehicle():
-		text = "F  " + ("소방차" if _near_vehicle().kind == "firetruck" else ("순찰차" if _near_vehicle().kind == "police" else "차 뺏기")) + " 타기"
+		var vk = _near_vehicle().get("kind")   # 길 위 차(TrafficCar)엔 kind 가 없다
+		text = "F  " + ("소방차 타기" if vk == "firetruck" else ("순찰차 타기" if vk == "police" else "차 뺏기"))
 	elif _near_hydrant:
 		text = "E 꾹  물 채우기"
 	if text != _prompt:

@@ -12,7 +12,7 @@ const COL_BLOCK := Color(0.27, 0.29, 0.28)
 const COL_ROAD := Color(0.55, 0.57, 0.58)
 const COL_PARK := Color(0.26, 0.42, 0.26)
 const COL_OUT := Color(0.05, 0.05, 0.06, 0.92)
-const ROLE_COL := {"station": Color(0.35, 0.6, 1), "store": Color(0.4, 0.85, 0.4), "hospital": Color(1, 0.35, 0.35), "school": Color(1, 0.8, 0.3)}
+const ROLE_COL := {"station": Color(0.35, 0.6, 1), "store": Color(0.4, 0.85, 0.4), "hospital": Color(1, 0.35, 0.35), "school": Color(1, 0.8, 0.3), "hideout": Color(1, 0.1, 0.1)}
 
 
 func _ready() -> void:
@@ -26,6 +26,12 @@ func _process(_delta: float) -> void:
 func _draw() -> void:
 	draw_rect(Rect2(Vector2.ZERO, size), COL_OUT)
 	if player == null or world == null:
+		return
+	if world.inside != "":
+		var f := get_theme_default_font()
+		var t: String = world.interiors.rooms[world.inside].name
+		var tw := f.get_string_size(t, HORIZONTAL_ALIGNMENT_LEFT, -1, 24).x
+		draw_string(f, size / 2 + Vector2(-tw / 2, 8), t, HORIZONTAL_ALIGNMENT_LEFT, -1, 24, Color(1, 1, 1, 0.7))
 		return
 	var c := size / 2 + Vector2(0, size.y * 0.12)   # GTA처럼 플레이어를 조금 아래에
 	var yaw := player.global_rotation.y
@@ -49,8 +55,9 @@ func _draw() -> void:
 	draw_rect(Rect2(z.position * k, z.size * k), Color(1, 0.75, 0.2, 0.7), false, 2.0)
 	draw_set_transform_matrix(Transform2D.IDENTITY)
 
-	for d in city.doors:
-		_icon(xf, k, d.pos, ROLE_COL.get(d.role, Color.WHITE), 6.0, true)
+	for d in player.doors:
+		if d.pos.y > -50.0 and ROLE_COL.has(d.role):
+			_icon(xf, k, d.pos, ROLE_COL[d.role], 8.0 if d.role == "hideout" else 6.0, true, d.role == "hideout")
 	for t in get_tree().get_nodes_in_group("trash"):
 		_dot(xf, k, t.global_position, Color(0.6, 0.9, 0.4, 0.85), 2.5)
 	for n in get_tree().get_nodes_in_group("npc"):

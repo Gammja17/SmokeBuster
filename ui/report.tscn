@@ -1,0 +1,198 @@
+[gd_scene format=3]
+
+[ext_resource type="Script" path="res://scripts/ui/report.gd" id="1_report"]
+[ext_resource type="FontFile" path="res://assets/fonts/Pretendard-ExtraBold.otf" id="2_title"]
+[ext_resource type="FontFile" path="res://assets/fonts/Pretendard-SemiBold.otf" id="3_semi"]
+
+[sub_resource type="StyleBoxFlat" id="card"]
+content_margin_left = 34.0
+content_margin_top = 26.0
+content_margin_right = 34.0
+content_margin_bottom = 26.0
+bg_color = Color(0.03, 0.04, 0.06, 0.92)
+border_width_top = 3
+border_color = Color(0.35, 0.6, 1, 1)
+
+[sub_resource type="StyleBoxFlat" id="paper"]
+content_margin_left = 30.0
+content_margin_top = 22.0
+content_margin_right = 30.0
+content_margin_bottom = 22.0
+bg_color = Color(0.93, 0.91, 0.85, 1)
+shadow_color = Color(0, 0, 0, 0.5)
+shadow_size = 14
+
+[sub_resource type="StyleBoxFlat" id="rule"]
+bg_color = Color(0.1, 0.1, 0.1, 1)
+content_margin_top = 1.0
+content_margin_bottom = 1.0
+
+[node name="Report" type="CanvasLayer"]
+process_mode = 3
+layer = 20
+visible = false
+script = ExtResource("1_report")
+
+[node name="Dim" type="ColorRect" parent="."]
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+color = Color(0, 0, 0, 0.72)
+
+[node name="Row" type="HBoxContainer" parent="."]
+anchors_preset = 8
+anchor_left = 0.5
+anchor_top = 0.5
+anchor_right = 0.5
+anchor_bottom = 0.5
+offset_left = -760.0
+offset_top = -290.0
+offset_right = 760.0
+offset_bottom = 290.0
+grow_horizontal = 2
+grow_vertical = 2
+theme_override_constants/separation = 36
+alignment = 1
+
+[node name="Card" type="PanelContainer" parent="Row"]
+custom_minimum_size = Vector2(620, 0)
+layout_mode = 2
+theme_override_styles/panel = SubResource("card")
+
+[node name="V" type="VBoxContainer" parent="Row/Card"]
+layout_mode = 2
+theme_override_constants/separation = 10
+
+[node name="Head" type="Label" parent="Row/Card/V"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.55, 0.75, 1, 1)
+theme_override_fonts/font = ExtResource("3_semi")
+theme_override_font_sizes/font_size = 22
+text = "DAY 1 · 근무 성적표"
+
+[node name="GradeRow" type="HBoxContainer" parent="Row/Card/V"]
+layout_mode = 2
+theme_override_constants/separation = 24
+
+[node name="Grade" type="Label" parent="Row/Card/V/GradeRow"]
+custom_minimum_size = Vector2(150, 0)
+layout_mode = 2
+theme_override_colors/font_color = Color(1, 0.85, 0.3, 1)
+theme_override_constants/outline_size = 10
+theme_override_fonts/font = ExtResource("2_title")
+theme_override_font_sizes/font_size = 150
+text = "A"
+horizontal_alignment = 1
+
+[node name="Comment" type="Label" parent="Row/Card/V/GradeRow"]
+custom_minimum_size = Vector2(380, 0)
+layout_mode = 2
+size_flags_vertical = 4
+theme_override_fonts/font = ExtResource("2_title")
+theme_override_font_sizes/font_size = 30
+text = "수고했어요!"
+autowrap_mode = 3
+
+[node name="Stats" type="Label" parent="Row/Card/V"]
+layout_mode = 2
+theme_override_fonts/font = ExtResource("3_semi")
+theme_override_font_sizes/font_size = 22
+text = "단속 12 / 10
+출동 성공 2 · 실패 0
+민원 1건"
+
+[node name="Districts" type="Label" parent="Row/Card/V"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.65, 1, 0.7, 1)
+theme_override_font_sizes/font_size = 19
+text = "1구역 정화도 25% → 41%"
+
+[node name="Pay" type="Label" parent="Row/Card/V"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.45, 0.82, 0.4, 1)
+theme_override_fonts/font = ExtResource("2_title")
+theme_override_font_sizes/font_size = 34
+text = "월급 ₩500"
+
+[node name="Next" type="Button" parent="Row/Card/V"]
+custom_minimum_size = Vector2(0, 58)
+layout_mode = 2
+theme_override_font_sizes/font_size = 26
+text = "다음 근무 시작 (DAY 2)"
+
+[node name="Paper" type="PanelContainer" parent="Row"]
+custom_minimum_size = Vector2(620, 0)
+layout_mode = 2
+theme_override_styles/panel = SubResource("paper")
+
+[node name="V" type="VBoxContainer" parent="Row/Paper"]
+layout_mode = 2
+theme_override_constants/separation = 8
+
+[node name="Mast" type="Label" parent="Row/Paper/V"]
+layout_mode = 2
+theme_override_constants/outline_size = 0
+theme_override_colors/font_color = Color(0.08, 0.08, 0.08, 1)
+theme_override_fonts/font = ExtResource("2_title")
+theme_override_font_sizes/font_size = 54
+text = "동네일보"
+horizontal_alignment = 1
+
+[node name="Date" type="Label" parent="Row/Paper/V"]
+layout_mode = 2
+theme_override_constants/outline_size = 0
+theme_override_colors/font_color = Color(0.25, 0.25, 0.25, 1)
+theme_override_font_sizes/font_size = 16
+text = "제 1호 · 맑음"
+horizontal_alignment = 1
+
+[node name="Rule" type="Panel" parent="Row/Paper/V"]
+custom_minimum_size = Vector2(0, 3)
+layout_mode = 2
+theme_override_styles/panel = SubResource("rule")
+
+[node name="Headline" type="Label" parent="Row/Paper/V"]
+layout_mode = 2
+theme_override_constants/outline_size = 0
+theme_override_colors/font_color = Color(0.05, 0.05, 0.05, 1)
+theme_override_fonts/font = ExtResource("2_title")
+theme_override_font_sizes/font_size = 40
+text = "헤드라인"
+autowrap_mode = 3
+
+[node name="Sub" type="Label" parent="Row/Paper/V"]
+layout_mode = 2
+theme_override_constants/outline_size = 0
+theme_override_colors/font_color = Color(0.2, 0.2, 0.2, 1)
+theme_override_fonts/font = ExtResource("3_semi")
+theme_override_font_sizes/font_size = 21
+text = "부제"
+autowrap_mode = 3
+
+[node name="Photo" type="TextureRect" parent="Row/Paper/V"]
+custom_minimum_size = Vector2(0, 250)
+layout_mode = 2
+expand_mode = 1
+stretch_mode = 6
+
+[node name="Caption" type="Label" parent="Row/Paper/V"]
+layout_mode = 2
+theme_override_constants/outline_size = 0
+theme_override_colors/font_color = Color(0.35, 0.35, 0.35, 1)
+theme_override_font_sizes/font_size = 14
+text = "▲ 어젯밤 현장 (사진: 동네일보)"
+
+[node name="Rule2" type="Panel" parent="Row/Paper/V"]
+custom_minimum_size = Vector2(0, 1)
+layout_mode = 2
+theme_override_styles/panel = SubResource("rule")
+
+[node name="Briefs" type="Label" parent="Row/Paper/V"]
+layout_mode = 2
+theme_override_constants/outline_size = 0
+theme_override_colors/font_color = Color(0.15, 0.15, 0.15, 1)
+theme_override_font_sizes/font_size = 18
+text = "단신"
+autowrap_mode = 3

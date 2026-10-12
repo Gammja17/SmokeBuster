@@ -276,6 +276,7 @@ func _alley(block: Node3D) -> void:
 	lamp.omni_range = 10.0
 	lamp.position = Vector3(0, 4.5, 0)
 	block.add_child(lamp)
+	lamp_lights.append(lamp)   # 골목 전구 불빛도 밤에 밝아진다
 
 	# 바닥 소품: 쓰레기통, 박스, 쓰레기봉투, 물웅덩이
 	_prop_in(block, "roads/dumpster", Vector3(13.5, 0, -1.25), 90.0, 6.0, true)
@@ -406,6 +407,8 @@ func _building(parent: Node3D, pos: Vector3, rot: float, slot: float, shop := ""
 	l.position = Vector3(0, 3.55, fz + 0.28)
 	l.visibility_range_end = 70.0
 	b.add_child(l)
+	if shop == "":
+		shop_signs.append({"label": l, "name": shop_name, "pos": b.to_global(Vector3(0, 0, fz))})
 	# 차양
 	if rng.randf() < 0.5:
 		var aw := MeshInstance3D.new()
@@ -434,19 +437,23 @@ func _building(parent: Node3D, pos: Vector3, rot: float, slot: float, shop := ""
 
 	# 위층 창문 (앞면과 양옆)
 	var glass: Material = Mats.glass()
+	var lit: Material = Mats.glass_lit()
+	var lit_cool: Material = Mats.glass_lit(true)
 	var sill: Material = Mats.flat(Color(0.85, 0.85, 0.83), 0.6)
 	for f in range(1, floors):
 		var y := 4.2 + (f - 1) * 3.2 + 1.65
 		var cols := int((w - 1.0) / 2.6)
 		for c in cols:
 			var x := -((cols - 1) * 2.6) / 2 + c * 2.6
-			_box_m(b, Vector3(1.6, 1.7, 0.1), Vector3(x, y, fz + 0.02), glass, false)
+			var rw := rng.randf()
+			_box_m(b, Vector3(1.6, 1.7, 0.1), Vector3(x, y, fz + 0.02), lit if rw < 0.22 else (lit_cool if rw < 0.32 else glass), false)
 			_box_m(b, Vector3(1.8, 0.12, 0.28), Vector3(x, y - 0.9, fz + 0.1), sill, false)
 		for s in [-1, 1]:
 			var rows := int((d - 1.0) / 2.6)
 			for c in rows:
 				var z := -((rows - 1) * 2.6) / 2 + c * 2.6
-				_box_m(b, Vector3(0.1, 1.7, 1.6), Vector3(s * (w / 2 + 0.02), y, z), glass, false)
+				var rs := rng.randf()
+				_box_m(b, Vector3(0.1, 1.7, 1.6), Vector3(s * (w / 2 + 0.02), y, z), lit if rs < 0.22 else (lit_cool if rs < 0.32 else glass), false)
 	# 옥상
 	var ac: Material = Mats.flat(Color(0.8, 0.82, 0.84), 0.5, 0.3)
 	for i in rng.randi_range(1, 3):
@@ -1076,6 +1083,8 @@ const ROLES := {
 }
 const ROLE_NAMES := {"store": "편의점", "hospital": "병원", "school": "물대포중학교"}
 
+var shop_signs: Array = []    # 가게 간판 {label, name, pos} (동네가 더러우면 "임대문의"로 바뀐다)
+var lamp_lights: Array[OmniLight3D] = []   # 밤에 켜지는 가로등 불빛
 var doors: Array = []          # 들어갈 수 있는 건물 {role, pos, normal, name}
 var station_front := Vector3.ZERO
 var station_node: Node3D
@@ -1185,6 +1194,18 @@ func _ph(parent: Node3D, name: String, pos: Vector3, rot: float, scl: float) -> 
 		mi.visibility_range_end = far
 		if name == "fire_hydrant":
 			mi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	if name == "street_lamp_01":
+		# 밤에 켜지는 등 (DayCycle 이 밝기를 조절한다)
+		var light := OmniLight3D.new()
+		light.light_color = Color(1, 0.78, 0.5)
+		light.light_energy = 0.0
+		light.omni_range = 9.0
+		light.position = Vector3(0, 3.45, 0)
+		light.distance_fade_enabled = true
+		light.distance_fade_begin = 60.0
+		light.distance_fade_length = 20.0
+		n.add_child(light)
+		lamp_lights.append(light)
 	return n
 
 

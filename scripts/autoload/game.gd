@@ -60,6 +60,31 @@ var owned: Array = ["spray"]
 var upgrades := {"tank": 0, "pressure": 0, "speed": 0, "mental": 0, "cctv": 0, "ops": 0, "garage": 0}
 var has_truck := false
 var total_caught := 0
+var day := 1                       # 근무 일차
+var clean := [25.0, 15.0, 10.0]    # 구역별 정화도 0~100
+var clues := [0, 0, 0]             # 구역별 조직 단서 (CLUES_NEEDED 개면 아지트가 드러남)
+var raided := [false, false, false]   # 구역별 두목 검거 여부
+var best_grade := ""
+
+## 구역마다 숨어 있는 조직. 단서를 모으면 아지트(건물 안)를 급습할 수 있다.
+const CLUES_NEEDED := 5
+const GANGS := [
+	{"name": "골목 담배파", "boss": "골초왕", "model": "m_boss", "hideout": "smoke_den", "place": "지하 흡연카페"},
+	{"name": "네온 패밀리", "boss": "네온 사장", "model": "s_shady", "hideout": "karaoke", "place": "불법 노래방"},
+	{"name": "검은 후드단", "boss": "후드단 행동대장", "model": "m_thug", "hideout": "casino", "place": "지하 도박장"},
+]
+
+
+func district_of(p: Vector3) -> int:
+	## 구역 번호 (ZONES 는 안쪽부터 겹쳐 넓어지므로 처음 들어맞는 것)
+	for i in ZONES.size():
+		if ZONES[i].rect.has_point(Vector2(p.x, p.z)):
+			return i
+	return ZONES.size() - 1
+
+
+func add_clean(i: int, amount: float) -> void:
+	clean[i] = clampf(clean[i] + amount, 0.0, 100.0)
 
 
 func _ready() -> void:
@@ -223,6 +248,11 @@ func new_game() -> void:
 	upgrades = {"tank": 0, "pressure": 0, "speed": 0, "mental": 0, "cctv": 0, "ops": 0, "garage": 0}
 	has_truck = false
 	total_caught = 0
+	day = 1
+	clean = [25.0, 15.0, 10.0]
+	clues = [0, 0, 0]
+	raided = [false, false, false]
+	best_grade = ""
 	save_game()
 
 
@@ -237,6 +267,7 @@ func save_game() -> void:
 	f.store_string(JSON.stringify({
 		"money": money, "xp": xp, "owned": owned, "upgrades": upgrades,
 		"has_truck": has_truck, "total_caught": total_caught,
+		"day": day, "clean": clean, "clues": clues, "raided": raided, "best_grade": best_grade,
 	}))
 
 
@@ -254,3 +285,12 @@ func load_game() -> void:
 		upgrades[k] = int(up.get(k, 0))
 	has_truck = bool(data.get("has_truck", false))
 	total_caught = int(data.get("total_caught", 0))
+	day = int(data.get("day", 1))
+	var c: Array = data.get("clean", clean)
+	var q: Array = data.get("clues", clues)
+	var r: Array = data.get("raided", raided)
+	for i in 3:
+		clean[i] = float(c[i]) if i < c.size() else clean[i]
+		clues[i] = int(q[i]) if i < q.size() else 0
+		raided[i] = bool(r[i]) if i < r.size() else false
+	best_grade = str(data.get("best_grade", ""))

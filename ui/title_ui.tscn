@@ -280,10 +280,10 @@ anchor_left = 0.5
 anchor_top = 0.5
 anchor_right = 0.5
 anchor_bottom = 0.5
-offset_left = -480.0
-offset_top = -230.0
-offset_right = 480.0
-offset_bottom = 230.0
+offset_left = -520.0
+offset_top = -250.0
+offset_right = 520.0
+offset_bottom = 250.0
 grow_horizontal = 2
 grow_vertical = 2
 theme_override_styles/panel = SubResource("howto_bg")
@@ -308,7 +308,8 @@ text = "WASD 이동 · Shift 달리기 · 마우스 조준 · 좌클릭 물 뿌�
 E 줍기 / 대화 / 소화전 물 채우기 · F 차 타기 · V 3인칭
 B 장비실 · Esc 일시정지
 
-정해진 일은 없어요. 동네를 돌며 마음대로 단속하세요!"
+근무는 10시부터 새벽 2시까지. 할당량을 채우고 파출소 근무 일지에서 퇴근!
+단속하면 구역이 깨끗해지고 조직 단서가 나와요. 단서 5개면 아지트 급습!"
 horizontal_alignment = 1
 
 [node name="Back" type="Label" parent="HowToPanel/V"]
