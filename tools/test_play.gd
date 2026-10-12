@@ -96,9 +96,17 @@ func _run() -> void:
 	check(world != null and world.name == "World", "월드 씬 로드")
 	check(game.rank() == 0 and world.city.zone.size.x < 100, "순경은 1구역만")
 	check(world.npcs.get_child_count() >= 8, "행인과 흡연자 등장 (%d명)" % world.npcs.get_child_count())
+	check(world.inside == "station" and world.player.global_position.y < -50.0, "출근은 파출소 안에서")
+	var staff_in: Array = world.get_tree().get_nodes_in_group("coworker").filter(func(c): return c.role in ["chief", "ops", "rookie"] and c.global_position.y < -50.0)
+	check(staff_in.size() == 3, "소장님/상황실/신입은 파출소 안 (%d명)" % staff_in.size())
+	var dup: Array = world.get_tree().get_nodes_in_group("coworker").filter(func(c): return c.role in ["s_clerk", "s_doctor"] and c.global_position.y > -50.0)
+	check(dup.is_empty(), "편의점 알바/병원 원장님은 밖에 안 서 있다")
 	world._start()
 	await frames(5)
 	check(world.playing and world.player.input_enabled, "클릭하면 바로 순찰 시작")
+	world.exit_interior()
+	await frames(3)
+	check(world.inside == "" and world.player.global_position.y > -10.0, "파출소 문으로 나가면 바깥")
 
 	# 사건이 플레이어 근처에 계속 채워지는지
 	world.cfg.incidents = 6
@@ -234,6 +242,9 @@ func _run() -> void:
 	player.take_hit(1, player.global_position + Vector3.FORWARD)
 	await create_timer(2.6).timeout
 	check(player.mental == game.max_mental() and player.input_enabled, "기절해도 파출소에서 다시 시작")
+	check(world.inside == "station" and player.global_position.distance_to(world.interiors.rooms.station.sofa) < 1.5, "기절하면 파출소 소파에서 깨어남")
+	world.exit_interior()
+	await frames(3)
 
 	# ---- 쓰레기
 	var x1: int = game.xp

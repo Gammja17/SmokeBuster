@@ -157,6 +157,8 @@ func _ready() -> void:
 	_city_sound = Sfx.loop_player("city", self, -6.0)
 	_city_sound.play()
 	Sfx.music(true)
+	# 출근은 파출소 안에서 (흡연자 둘은 바로 앞 길에 미리 세워 두었다)
+	_go_station(interiors.rooms.station.spawn, interiors.rooms.station.yaw)
 	player.input_enabled = false
 	hud.banner("DAY %d" % Game.day, "클릭해서 출근", 0.0)
 
@@ -867,12 +869,10 @@ func _faint() -> void:
 	hud.money_delta(-lost)
 	hud.damage_flash(0.8)
 	await get_tree().create_timer(2.2).timeout
-	if vehicle:
-		_toggle_vehicle()
-	if inside != "":
-		inside = ""
-		day.indoor = false
-	player.global_position = SPAWN
+	# 파출소 소파에서 깨어난다
+	_go_station(interiors.rooms.station.sofa, PI / 2)
+	hud.flash_fade()
+	hud.radio("정신 들어요? 동네 분들이 업어다 줬어요. 좀 쉬었다 나가요.", "상황실 요원")
 	player.mental = Game.max_mental()
 	hud.set_mental(player.mental, Game.max_mental())
 	hud.set_money(Game.money)
@@ -1257,26 +1257,21 @@ func _spawn_interior_staff() -> void:
 
 
 func start_ending() -> void:
-	## 다섯 조직을 다 잡으면: 파출소 앞에 동료들이 모여 한마디씩 → 호외 → 크레딧
+	## 다섯 조직을 다 잡으면: 파출소 안에 동료들이 모여 한마디씩 → 호외 → 크레딧
 	if Game.ending_seen:
 		return
 	Game.ending_seen = true
 	Game.save_game()
 	await get_tree().create_timer(3.0).timeout
-	if inside != "":
-		exit_interior()
-	if vehicle:
-		_toggle_vehicle()
 	hud.flash_fade()
-	player.global_position = SPAWN + Vector3(0, 0, 2.5)
-	player.rotation.y = 0.0
+	var room: Dictionary = interiors.rooms.station
+	_go_station(room.spawn + Vector3(0, 0, -1.5), 0.0)
 	var cw := {}
 	for c in get_tree().get_nodes_in_group("coworker"):
 		cw[c.role] = c
-	var spots := {"chief": Vector3(-17.0, 0.06, -6.6), "ops": Vector3(-19.2, 0.06, -6.2), "rookie": Vector3(-14.8, 0.06, -6.2), "mechanic": Vector3(-12.8, 0.06, -5.6)}
-	for r in spots:
+	for r in ["chief", "ops", "rookie", "mechanic"]:
 		if cw.has(r):
-			cw[r].global_position = spots[r]
+			cw[r].global_position = room.staff[r][0]
 	await get_tree().create_timer(0.5).timeout
 	var convo := [
 		{"who": "소장님", "at": cw.get("chief"), "text": "해냈군... 다섯 조직 전부. 처음 왔을 땐 분무기 하나 들고 쭈뼛거리더니.", "anim": "cross_arms"},
@@ -1305,19 +1300,39 @@ func _next_day() -> void:
 
 
 func _spawn_coworkers() -> void:
-	## 파출소 앞 동료들 (소장님은 정문, 상황실 요원은 옆, 정비 담당은 차고, 신입은 순찰차 옆)
-	for c in [["chief", Vector3(-20.6, 0.06, -7.7), 0.0], ["ops", Vector3(-23.0, 0.06, -7.5), 0.3],
-			["mechanic", Vector3(-11.0, 0.06, -7.7), -0.4], ["rookie", Vector3(-14.8, 0.06, -5.4), 0.3]]:
+	## 경찰은 파출소 안 자기 자리 (소장님 책상, 상황실 요원 민원 창구, 신입은 장비실 옆).
+	## 정비 담당만 밖 차고에서 순찰차를 돌본다.
+	var staff: Dictionary = interiors.rooms.station.staff
+	for role in ["chief", "ops", "rookie"]:
 		var cw := Coworker.new()
-		cw.role = c[0]
-		cw.position = c[1]
-		cw.rotation.y = PI + c[2]
+		cw.role = role
+		cw.position = staff[role][0]
+		cw.rotation.y = staff[role][1]
 		add_child(cw)
+	var mech := Coworker.new()
+	mech.role = "mechanic"
+	mech.position = Vector3(-11.0, 0.06, -7.7)
+	mech.rotation.y = PI - 0.4
+	add_child(mech)
+
+
+func _go_station(pos: Vector3, yaw: float) -> void:
+	## 파출소 안으로 바로 옮긴다 (출근, 기절, 엔딩). 문으로 나가면 파출소 정문 앞.
+	if vehicle:
+		_toggle_vehicle()
+	inside = "station"
+	_return_door = city.doors.filter(func(d): return d.role == "station")[0]
+	day.indoor = true
+	if _city_sound:
+		_city_sound.volume_db = -20.0
+	player.global_position = pos
+	player.rotation.y = yaw
+	player.velocity = Vector3.ZERO
 
 
 func _spawn_townsfolk() -> void:
-	## 편의점/병원/학교 앞 사람, 그리고 가게 앞 분식집 사장님 둘
-	var who := {"store": "s_clerk", "hospital": "s_doctor", "school": "s_teacher"}
+	## 학교 정문 앞 선생님, 가게 앞 분식집 사장님 둘 (편의점 알바와 병원 원장님은 건물 안에 있다)
+	var who := {"school": "s_teacher"}
 	for d in city.doors:
 		if d.role in who:
 			_place_town(who[d.role], d.pos + d.normal * 1.3, d.normal, 2.2)

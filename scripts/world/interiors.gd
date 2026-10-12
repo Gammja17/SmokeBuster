@@ -149,6 +149,12 @@ func _build_station(r: Node3D) -> Dictionary:
 		_box(r, Vector3(0.06, H, 0.06), Vector3(-7.7 + i * 0.48, H / 2, 1.7), metal)
 	_label(r, "유치장", Vector3(-6.0, 2.9, 1.65), 48, Color(1, 0.6, 0.5))
 	_label(r, "물대포 파출소", Vector3(0, 2.95, -5.3), 80, Color(1, 1, 1))
+	# 소장 책상 (수배 전단 앞)
+	_box(r, Vector3(2.0, 0.76, 0.9), Vector3(0, 0.38, -3.7), wood)
+	_box(r, Vector3(0.5, 0.05, 0.35), Vector3(0.5, 0.79, -3.6), Mats.flat(Color(0.9, 0.9, 0.88), 0.6), false)
+	_box(r, Vector3(0.6, 0.1, 0.12), Vector3(-0.4, 0.81, -3.3), navy, false)
+	_label(r, "소장", Vector3(-0.4, 0.82, -3.23), 26, Color(1, 0.9, 0.5))
+	_box(r, Vector3(0.6, 1.1, 0.6), Vector3(0, 0.55, -5.0), Mats.flat(Color(0.15, 0.15, 0.18), 0.7), false)
 	for x in [-5.0, 0.0, 5.0]:
 		_light(r, Vector3(x, H - 0.3, 0), Color(0.95, 0.97, 1.0), 1.8, 9.0)
 	return {
@@ -158,6 +164,14 @@ func _build_station(r: Node3D) -> Dictionary:
 			_point(r, "rest", Vector3(5.5, 0, 1.6), "E  소파에서 쉬기 (멘탈, 물 회복)"),
 			_point(r, "desk", Vector3(-5.5, 0, -4.4), "E  근무 일지 (퇴근 보고)")],
 		"spots": [], "boss": Vector3.ZERO,
+		# 동료 자리: [위치, 방향] (PI 면 문 쪽을 본다). 정비 담당은 평소엔 밖 차고에 있고 엔딩 때만 들어온다
+		"staff": {
+			"chief": [r.position + Vector3(0, 0.06, -4.55), PI],
+			"ops": [r.position + Vector3(-2.5, 0.06, 0.55), PI],
+			"rookie": [r.position + Vector3(2.8, 0.06, -1.6), PI - 0.5],
+			"mechanic": [r.position + Vector3(3.6, 0.06, 0.4), PI + 0.6],
+		},
+		"sofa": r.position + Vector3(5.5, 0.3, 1.6),
 	}
 
 
