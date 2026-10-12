@@ -445,7 +445,11 @@ func _update_prompt() -> void:
 	elif _nearest_trash():
 		text = "E  가방 주워 돌려주기" if _nearest_trash().is_in_group("bag") else "E  쓰레기 줍기"
 	elif _nearest_coworker() and not _door_first():
-		text = "E  %s와 대화" % _nearest_coworker().display_name()
+		var who: String = _nearest_coworker().display_name()
+		# 받침 있으면 "과" (신입 순경과), 없으면 "와" (편의점 알바와)
+		var last := who.unicode_at(who.length() - 1)
+		var batchim := last >= 0xAC00 and last <= 0xD7A3 and (last - 0xAC00) % 28 != 0
+		text = "E  %s%s 대화" % [who, "과" if batchim else "와"]
 	elif not _nearest_door().is_empty():
 		var door := _nearest_door()
 		text = door.get("label", "E  " + {"station": "파출소 들어가기", "store": "편의점 들어가기", "hospital": "병원 들어가기", "school": "학교"}.get(door.role, ""))

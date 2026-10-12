@@ -244,6 +244,10 @@ func radio(line: String, who := "상황실") -> void:
 		_next_radio()
 
 
+func radio_busy() -> bool:
+	return radio_box.visible or not _radio_queue.is_empty()
+
+
 func _next_radio() -> void:
 	if _radio_queue.is_empty():
 		radio_box.visible = false

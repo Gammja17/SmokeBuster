@@ -124,6 +124,19 @@ func _run() -> void:
 	world.exit_interior()
 	await frames(3)
 	check(world.inside == "" and world.player.global_position.y > -10.0, "파출소 문으로 나가면 바깥")
+	# 신입 순경이 따라나온다
+	var bud = world.buddy
+	await frames(5)
+	check(bud.active and bud.visible and bud.global_position.distance_to(world.player.global_position) < 6.0, "신입 순경 동행 순찰 시작")
+	var station_rookie: Array = world.get_tree().get_nodes_in_group("coworker_rookie")
+	check(not station_rookie.is_empty() and not station_rookie[0].visible, "따라나오면 파출소 안 신입 자리는 빈다")
+	var bp0: Vector3 = world.player.global_position
+	world.player.global_position = bp0 + Vector3(0, 0, -12)
+	for i in 240:
+		await physics_frame
+	check(bud.global_position.distance_to(world.player.global_position) < 7.0, "신입이 선배를 따라온다 (%.1fm)" % bud.global_position.distance_to(world.player.global_position))
+	world.player.global_position = bp0
+	await frames(10)
 
 	# 사건이 플레이어 근처에 계속 채워지는지
 	world.cfg.incidents = 6
@@ -163,6 +176,22 @@ func _run() -> void:
 			break
 	check(s.done and game.money > money0 and game.xp > xp0, "흡연자 단속 → 돈 %d, 실적 %d" % [game.money - money0, game.xp - xp0])
 	check(world.shift.order_count == order0 + 1 and game.money - money0 >= 75, "지시 대상 단속: 진행 +1, 수당 1.5배 (%d원)" % (game.money - money0))
+	# 신입: 근처 사건을 무전으로 알려 준다 / 물 맞으면 비명 (민원은 아님)
+	var bud2 = world.buddy
+	bud2._teleport_behind()
+	var far_s = world._new_npc("normal")
+	far_s.position = player.global_position + Vector3(14, 0.05, 0)
+	world.npcs.add_child(far_s)
+	await frames(30)
+	world.hud._radio_queue.clear()
+	world.hud.radio_box.visible = false
+	bud2._spot()
+	check(world.hud.radio_who.text.contains("신입") and world.hud.radio_line.text.contains("m)"), "신입이 사건 위치를 알려 줌 (%s)" % world.hud.radio_line.text)
+	far_s.queue_free()
+	var comp0: int = world.complaints
+	bud2._wet_cd = 0.0
+	bud2.soak(0.5, Vector3.FORWARD, 1.0)
+	check(bud2.soaked_today == 1 and world.complaints == comp0, "신입한테 물: 비명만, 민원 없음")
 	await frames(200)
 	check(not is_instance_valid(s) or s.state == 4, "넘어졌다가 일어나 떠난다")
 

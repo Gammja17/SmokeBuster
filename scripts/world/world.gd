@@ -51,6 +51,7 @@ var report: CanvasLayer
 var dialogue: CanvasLayer
 var ending: CanvasLayer
 var inside := ""                 # 지금 들어가 있는 건물 (빈 문자열이면 바깥)
+var buddy: Buddy                 # 같이 순찰 도는 신입
 var _return_door := {}
 var _hud_t := 0.0
 
@@ -748,6 +749,8 @@ func _complete(task: String, label: String, pos := Vector3.ZERO, reward := -1, s
 	_add_xp(reward)
 	if shift:
 		shift.record_catch(task, reward)
+	if big and buddy:
+		buddy.on_catch(task, pos if pos != Vector3.ZERO else player.global_position)
 
 
 func order_cleared(order: Dictionary) -> void:
@@ -812,7 +815,7 @@ func _cheer(pos: Vector3) -> void:
 					who._play("emote-yes", 0.1)
 					_later(0.9, func():
 						if is_instance_valid(who) and who.state == Npc.State.WALK:
-							who._play("walk")))
+							who._play("walk" if who._pause_t <= 0.0 else "idle")))
 
 
 func _slowmo(real_seconds: float) -> void:
@@ -1255,6 +1258,7 @@ func enter_interior(key: String, door: Dictionary) -> void:
 func exit_interior() -> void:
 	if inside == "":
 		return
+	var was := inside
 	inside = ""
 	day.indoor = false
 	var n: Vector3 = _return_door.get("normal", Vector3.BACK)
@@ -1264,6 +1268,8 @@ func exit_interior() -> void:
 	_city_sound.volume_db = -6.0
 	hud.flash_fade()
 	Sfx.play("click", -4.0, 0.7)
+	if was == "station" and buddy and playing:
+		buddy.join()
 
 
 func _spawn_interior_staff() -> void:
@@ -1285,6 +1291,8 @@ func start_ending() -> void:
 	hud.flash_fade()
 	var room: Dictionary = interiors.rooms.station
 	_go_station(room.spawn + Vector3(0, 0, -1.5), 0.0)
+	if buddy:
+		buddy.dismiss()
 	var cw := {}
 	for c in get_tree().get_nodes_in_group("coworker"):
 		cw[c.role] = c
@@ -1328,6 +1336,13 @@ func _spawn_coworkers() -> void:
 		cw.position = staff[role][0]
 		cw.rotation.y = staff[role][1]
 		add_child(cw)
+	for c in get_children():
+		if c is Coworker and c.role == "rookie":
+			c.add_to_group("coworker_rookie")
+	buddy = Buddy.new()
+	buddy.world = self
+	buddy.player = player
+	add_child(buddy)
 	var mech := Coworker.new()
 	mech.role = "mechanic"
 	mech.position = Vector3(-11.0, 0.06, -7.7)

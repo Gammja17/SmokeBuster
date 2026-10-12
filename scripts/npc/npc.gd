@@ -140,6 +140,8 @@ var _prev_state := State.WALK
 var _leave_after_down := false
 var _drip: CPUParticles3D
 var _water: Node
+var _pause_t := 0.0         # 길 가다 잠깐 멈춤 (두리번, 폰, 수다)
+var _chat_with: Npc
 
 
 func setup(p_kind: String, p_city: CityBuilder, p_player: Node3D) -> void:
@@ -325,6 +327,8 @@ func light_up(new_kind: String) -> void:
 
 
 func start_walking(from_node: int) -> void:
+	_pause_t = 0.0
+	_chat_with = null
 	_from_node = from_node
 	_to_node = -1
 	_pick_next_node()
@@ -590,14 +594,44 @@ func _walk_step(delta: float) -> Vector3:
 			_later(0.6, func():
 				if is_instance_valid(self) and state == State.WALK:
 					_play("walk"))
+	if _pause_t > 0.0:
+		_pause_t -= delta
+		if is_instance_valid(_chat_with):
+			var d := _chat_with.global_position - global_position
+			rotation.y = lerp_angle(rotation.y, atan2(-d.x, -d.z), 6.0 * delta)
+		if _pause_t <= 0.0:
+			_chat_with = null
+			_play("walk")
+		return Vector3.ZERO
 	if _to_node < 0:
 		return Vector3.ZERO
 	var to := _target - global_position
 	to.y = 0
 	if to.length() < 0.6:
 		_pick_next_node()
+		if kind == "ped" and not done:
+			_maybe_pause()
 		return Vector3.ZERO
 	return to.normalized() * walk_speed
+
+
+func _maybe_pause() -> void:
+	## 동네 사람들은 그냥 걷기만 하지 않는다: 두리번, 폰 보기, 커피 한 모금, 아는 사람 만나면 수다
+	if randf() > 0.18:
+		return
+	for o in get_tree().get_nodes_in_group("npc"):
+		if o != self and o is Npc and o.kind == "ped" and o.state == State.WALK and o._pause_t <= 0.0 				and o.global_position.distance_to(global_position) < 3.5:
+			var t := randf_range(4.0, 8.0)
+			start_pause(t, ["talk", "laugh"].pick_random(), o)
+			o.start_pause(t, "talk", self)
+			return
+	start_pause(randf_range(2.5, 6.0), ["look_around", "idle2", "drink", "breathe", "hands_back"].pick_random(), null)
+
+
+func start_pause(t: float, anim: String, with: Npc) -> void:
+	_pause_t = t
+	_chat_with = with
+	_play(anim, 0.3)
 
 
 func _pick_next_node() -> void:
