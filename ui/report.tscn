@@ -1,8 +1,8 @@
 [gd_scene format=3]
 
 [ext_resource type="Script" path="res://scripts/ui/report.gd" id="1_report"]
-[ext_resource type="FontFile" path="res://assets/fonts/Pretendard-ExtraBold.otf" id="2_title"]
-[ext_resource type="FontFile" path="res://assets/fonts/Pretendard-SemiBold.otf" id="3_semi"]
+[ext_resource type="FontFile" path="res://assets/fonts/Pretendard-Bold.otf" id="2_title"]
+[ext_resource type="FontFile" path="res://assets/fonts/Pretendard-Medium.otf" id="3_semi"]
 
 [sub_resource type="StyleBoxFlat" id="card"]
 content_margin_left = 34.0
@@ -80,7 +80,6 @@ theme_override_constants/separation = 24
 custom_minimum_size = Vector2(150, 0)
 layout_mode = 2
 theme_override_colors/font_color = Color(1, 0.85, 0.3, 1)
-theme_override_constants/outline_size = 10
 theme_override_fonts/font = ExtResource("2_title")
 theme_override_font_sizes/font_size = 150
 text = "A"
@@ -133,7 +132,6 @@ theme_override_constants/separation = 8
 
 [node name="Mast" type="Label" parent="Row/Paper/V"]
 layout_mode = 2
-theme_override_constants/outline_size = 0
 theme_override_colors/font_color = Color(0.08, 0.08, 0.08, 1)
 theme_override_fonts/font = ExtResource("2_title")
 theme_override_font_sizes/font_size = 54
@@ -142,7 +140,6 @@ horizontal_alignment = 1
 
 [node name="Date" type="Label" parent="Row/Paper/V"]
 layout_mode = 2
-theme_override_constants/outline_size = 0
 theme_override_colors/font_color = Color(0.25, 0.25, 0.25, 1)
 theme_override_font_sizes/font_size = 16
 text = "제 1호 · 맑음"
@@ -155,7 +152,6 @@ theme_override_styles/panel = SubResource("rule")
 
 [node name="Headline" type="Label" parent="Row/Paper/V"]
 layout_mode = 2
-theme_override_constants/outline_size = 0
 theme_override_colors/font_color = Color(0.05, 0.05, 0.05, 1)
 theme_override_fonts/font = ExtResource("2_title")
 theme_override_font_sizes/font_size = 40
@@ -164,7 +160,6 @@ autowrap_mode = 3
 
 [node name="Sub" type="Label" parent="Row/Paper/V"]
 layout_mode = 2
-theme_override_constants/outline_size = 0
 theme_override_colors/font_color = Color(0.2, 0.2, 0.2, 1)
 theme_override_fonts/font = ExtResource("3_semi")
 theme_override_font_sizes/font_size = 21
@@ -179,7 +174,6 @@ stretch_mode = 6
 
 [node name="Caption" type="Label" parent="Row/Paper/V"]
 layout_mode = 2
-theme_override_constants/outline_size = 0
 theme_override_colors/font_color = Color(0.35, 0.35, 0.35, 1)
 theme_override_font_sizes/font_size = 14
 text = "▲ 어젯밤 현장 (사진: 동네일보)"
@@ -191,7 +185,6 @@ theme_override_styles/panel = SubResource("rule")
 
 [node name="Briefs" type="Label" parent="Row/Paper/V"]
 layout_mode = 2
-theme_override_constants/outline_size = 0
 theme_override_colors/font_color = Color(0.15, 0.15, 0.15, 1)
 theme_override_font_sizes/font_size = 18
 text = "단신"

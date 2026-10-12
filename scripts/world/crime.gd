@@ -44,8 +44,9 @@ func on_catch(task: String, pos: Vector3, npc: Node = null) -> void:
 	if randf() < chance:
 		Game.clues[i] += 1
 		var gang: Dictionary = Game.GANGS[i]
-		world.hud.announce("단서 획득!  %s %d/%d" % [gang.name, Game.clues[i], Game.CLUES_NEEDED], Color(1, 0.45, 0.35))
-		world.hud.add_feed("단서: %s" % _clue_text(i), Color(1, 0.6, 0.5))
+		world.hud.add_feed("단서 %d/%d · %s" % [Game.clues[i], Game.CLUES_NEEDED, _clue_text(i)], Color(1, 0.6, 0.5))
+		if not Game.flag("talk_clue"):
+			world.hud.radio("방금 그거, %s 쪽 단서 같아요. 다섯 개쯤 모이면 아지트가 나올 거예요." % gang.name)
 		Sfx.play("radio", -4.0)
 		if Game.clues[i] >= Game.CLUES_NEEDED:
 			_reveal(i, true)
@@ -117,7 +118,8 @@ func _reveal(i: int, announce: bool) -> void:
 	tw.tween_property(light, "light_energy", 3.0, 0.6)
 	world.refresh_doors()
 	if announce:
-		world.hud.banner("아지트 발견!", "%s의 %s 위치가 드러났어요\n미니맵의 빨간 문으로 가서 E" % [gang.name, gang.place], 3.5)
+		world.hud.banner("아지트 발견", gang.place, 2.5)
+		world.hud.radio("%s 아지트 찾았어요! 지도에 빨간 문 찍어둘게요." % gang.name)
 		Sfx.play("fanfare", -2.0)
 
 
@@ -161,7 +163,7 @@ func start_raid(i: int) -> void:
 	boss.position = room.boss
 	world.npcs.add_child(boss)
 	raid.targets.append(boss)
-	world.hud.banner("급습!", "%s 일당 %d명과 두목 %s\n전부 물로 제압하세요" % [gang.name, count, gang.boss], 2.5)
+	world.hud.banner("급습", gang.name, 1.6)
 	Sfx.play("bong")
 
 
@@ -173,7 +175,7 @@ func _process(delta: float) -> void:
 		for n in raid.targets:
 			if is_instance_valid(n) and not n.done:
 				left += 1
-		world.hud.set_hint("남은 일당 %d명" % left if left > 0 else "")
+		world.hud.set_raid("남은 일당 %d명" % left if left > 0 else "")
 		if left == 0:
 			_raid_done()
 	_thank_t -= delta
@@ -191,7 +193,7 @@ func _raid_done() -> void:
 	var reward := 1500 * (i + 1)
 	world._complete("shop", "%s 일망타진!" % gang.name, world.player.global_position, reward)
 	world.shift.raid_today = i
-	world.hud.banner("급습 성공!", "%s 두목 %s 검거!\n%s 정화도 +30" % [gang.name, gang.boss, Game.ZONES[i].name.get_slice(" ", 0)], 3.5)
+	world.hud.banner("급습 성공", "%s 검거" % gang.boss, 2.5)
 	Sfx.play("fanfare", 0.0)
 	var door: Dictionary = hideouts[i]
 	door.label = "E  밖으로 (아지트 정리 완료)"
@@ -201,6 +203,8 @@ func _raid_done() -> void:
 	world.refresh_doors()
 	Game.save_game()
 	refresh_visuals()
+	if not Game.raided.has(false):
+		world.start_ending()
 
 
 func _thank() -> void:

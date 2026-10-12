@@ -1,0 +1,109 @@
+[gd_scene format=3]
+
+[ext_resource type="Script" path="res://scripts/ui/dialogue.gd" id="1_dlg"]
+[ext_resource type="FontFile" path="res://assets/fonts/Pretendard-Bold.otf" id="2_bold"]
+[ext_resource type="FontFile" path="res://assets/fonts/D2Coding.ttf" id="3_mono"]
+
+[sub_resource type="StyleBoxFlat" id="box"]
+content_margin_left = 28.0
+content_margin_top = 18.0
+content_margin_right = 28.0
+content_margin_bottom = 20.0
+bg_color = Color(0.03, 0.035, 0.045, 0.86)
+border_width_top = 2
+border_color = Color(1, 0.831, 0, 1)
+
+[sub_resource type="StyleBoxFlat" id="choice"]
+content_margin_left = 14.0
+content_margin_top = 6.0
+content_margin_right = 14.0
+content_margin_bottom = 6.0
+bg_color = Color(1, 1, 1, 0.06)
+border_width_left = 3
+border_color = Color(0.4, 0.42, 0.45, 1)
+
+[sub_resource type="StyleBoxFlat" id="choice_hover"]
+content_margin_left = 14.0
+content_margin_top = 6.0
+content_margin_right = 14.0
+content_margin_bottom = 6.0
+bg_color = Color(1, 0.831, 0, 0.14)
+border_width_left = 3
+border_color = Color(1, 0.831, 0, 1)
+
+[node name="Dialogue" type="CanvasLayer"]
+layer = 12
+visible = false
+script = ExtResource("1_dlg")
+
+[node name="Top" type="ColorRect" parent="."]
+anchors_preset = 10
+anchor_right = 1.0
+offset_bottom = 0.0
+grow_horizontal = 2
+mouse_filter = 2
+color = Color(0, 0, 0, 1)
+
+[node name="Bottom" type="ColorRect" parent="."]
+anchors_preset = 12
+anchor_top = 1.0
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 0
+mouse_filter = 2
+color = Color(0, 0, 0, 1)
+
+[node name="Box" type="PanelContainer" parent="."]
+anchors_preset = 7
+anchor_left = 0.5
+anchor_top = 1.0
+anchor_right = 0.5
+anchor_bottom = 1.0
+offset_left = -470.0
+offset_top = -250.0
+offset_right = 470.0
+offset_bottom = -96.0
+grow_horizontal = 2
+grow_vertical = 0
+theme_override_styles/panel = SubResource("box")
+
+[node name="V" type="VBoxContainer" parent="Box"]
+layout_mode = 2
+theme_override_constants/separation = 8
+
+[node name="Name" type="Label" parent="Box/V"]
+layout_mode = 2
+theme_override_colors/font_color = Color(1, 0.831, 0, 1)
+theme_override_fonts/font = ExtResource("2_bold")
+theme_override_font_sizes/font_size = 19
+text = "소장님"
+
+[node name="Line" type="Label" parent="Box/V"]
+custom_minimum_size = Vector2(880, 0)
+layout_mode = 2
+theme_override_font_sizes/font_size = 24
+text = "대사"
+autowrap_mode = 3
+visible_characters_behavior = 1
+
+[node name="Choices" type="VBoxContainer" parent="Box/V"]
+layout_mode = 2
+theme_override_constants/separation = 4
+
+[node name="Cont" type="Label" parent="Box/V"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.62, 0.65, 0.69, 1)
+theme_override_fonts/font = ExtResource("3_mono")
+theme_override_font_sizes/font_size = 13
+text = "E / 클릭  ▶"
+horizontal_alignment = 2
+
+[node name="ChoiceStyle" type="Button" parent="."]
+visible = false
+theme_override_styles/normal = SubResource("choice")
+theme_override_styles/hover = SubResource("choice_hover")
+theme_override_styles/focus = SubResource("choice_hover")
+theme_override_styles/pressed = SubResource("choice_hover")
+theme_override_font_sizes/font_size = 20
+alignment = 0

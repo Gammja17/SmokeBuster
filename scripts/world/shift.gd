@@ -53,7 +53,7 @@ func record_catch(task: String, reward: int) -> void:
 
 
 func quota_text() -> String:
-	return "오늘 할당  단속 %d/%d · 출동 %d/%d" % [caught, quota, missions_ok, mission_quota]
+	return "단속 %d/%d   출동 %d/%d" % [caught, quota, missions_ok, mission_quota]
 
 
 func quota_done() -> bool:
@@ -63,11 +63,11 @@ func quota_done() -> bool:
 func _on_hour(h: int) -> void:
 	match h:
 		18:
-			world.hud.banner("해가 집니다", "밤에는 술집, 싸움, 노상방뇨가 늘어나요", 2.5)
+			world.hud.radio("해 졌어요. 밤엔 술집, 싸움, 노상방뇨 신고가 늘어요.")
 		22:
-			world.hud.add_feed("심야 근무 시작. 유흥가를 살펴보세요", Color(0.75, 0.6, 1))
+			world.hud.radio("22시 넘었어요. 할당 못 채웠어도 파출소 들어와서 퇴근해도 돼요.")
 		25:
-			world.hud.banner("퇴근 1시간 전!", "할당량: " + quota_text().trim_prefix("오늘 할당  "), 2.5)
+			world.hud.radio("퇴근 한 시간 전이에요.")
 		26:
 			end_shift()
 

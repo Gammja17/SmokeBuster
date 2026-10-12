@@ -14,7 +14,7 @@ const ROAD_LINES := [-108.0, -54.0, 0.0, 54.0, 108.0]   # 도로 중심선 (x �
 
 const GRAFFITI := ["흡연금지", "CCTV 작동중", "쓰레기 버리지 마시오", "XX 참교육", "민지 사랑해", "여기서 담배 피면 벌금"]
 ## 순찰차/소방차 자리 (x, z): 여기엔 주차된 차를 두지 않는다
-const RESERVED := [Vector2(-13.0, -3.6), Vector2(-23.0, -3.6)]
+const RESERVED := [Vector2(-13.0, -3.6), Vector2(-23.0, -3.6), Vector2(-32.0, -3.6)]
 const PARKED := ["sedan", "suv", "taxi", "van", "hatchback-sports", "sedan-sports", "suv-luxury", "delivery", "truck"]
 
 var root: Node3D

@@ -7,18 +7,6 @@ const NEAR := 12.0               # 사건이 생기는 거리 (플레이어 기�
 const FAR := 42.0
 const STREAK_NAMES := ["", "", "더블!", "트리플!", "물벼락!", "싹쓸이!!", "동네 평화!!!"]
 const CHEERS := ["속이 다 시원하네!", "잘한다!", "역시 단속반!", "오오~", "멋져요!", "그렇지!"]
-const HINTS := [
-	"담배 연기가 피어오르는 사람을 찾아 좌클릭으로 물을 뿌려 끄세요.",
-	"길에 떨어진 쓰레기는 가까이 가서 E로 주워요.",
-	"레이더의 깜빡이는 점과 화면 가장자리 ! 는 수상한 사람이에요. 가서 뭘 하는지 직접 보세요.",
-	"아무 잘못 없는 행인에게 뿌리면 민원(-20원)! 가방 멘 학생의 비행은 우클릭 카메라로 찍어 신고.",
-	"뛰는 사람 앞 바닥에 물을 깔아두면 미끄러져요.",
-	"길가 순찰차에 다가가 F로 타요. 운전 중 H는 사이렌, F로 내려요.",
-	"V로 3인칭 시점! 전력질주하다 문제아에게 부딪히면 태클로 잡아요.",
-	"무전 출동이 오면 파란 빛기둥이 현장이에요. 순찰차로 달려가세요!",
-	"파출소 문 앞에서 E: 휴식(멘탈, 물 회복)과 장비실. 편의점 30원, 병원 100원.",
-	"Tab 꾹: 무기 휠 · B: 장비실 · 물이 떨어지면 빨간 소화전 옆에서 E를 꾹",
-]
 const EVENTS := [
 	["group", "흡연 모임 출몰!", "골목에 여럿이 모여 담배를 피워요"],
 	["drunk", "음주운전 의심 차량 제보!", "바깥 도로를 비틀비틀 달리는 차를 찍으세요"],
@@ -52,8 +40,6 @@ var _timers := {}
 var _group_seq := 0
 var _event_t := 50.0
 var _rush_t := 0.0
-var _hint_i := 0
-var _hint_t := 0.0
 var _save_t := 20.0
 var _city_sound: AudioStreamPlayer
 var _capture_grace := 0.0
@@ -62,6 +48,8 @@ var shift: Shift
 var crime: Crime
 var interiors: Interiors
 var report: CanvasLayer
+var dialogue: CanvasLayer
+var ending: CanvasLayer
 var inside := ""                 # 지금 들어가 있는 건물 (빈 문자열이면 바깥)
 var _return_door := {}
 var _hud_t := 0.0
@@ -94,6 +82,11 @@ func _ready() -> void:
 	report = load("res://ui/report.tscn").instantiate()
 	add_child(report)
 	report.next_day.connect(_next_day)
+	dialogue = load("res://ui/dialogue.tscn").instantiate()
+	add_child(dialogue)
+	dialogue.player = player
+	ending = load("res://ui/ending.tscn").instantiate()
+	add_child(ending)
 
 	player.water = water
 	player.hydrants = city.hydrants
@@ -165,7 +158,7 @@ func _ready() -> void:
 	_city_sound.play()
 	Sfx.music(true)
 	player.input_enabled = false
-	hud.banner("DAY %d · %s 출근" % [Game.day, Game.rank_name()], "%s\n%s\n클릭해서 근무 시작" % [Game.ZONES[cfg.zone].name, shift.quota_text()], 0.0)
+	hud.banner("DAY %d" % Game.day, "클릭해서 출근", 0.0)
 
 
 func _update_rank_hud() -> void:
@@ -178,9 +171,17 @@ func _start() -> void:
 	player.input_enabled = true
 	player.capture_mouse()
 	_capture_grace = 1.0
-	hud.banner("근무 시작!", "비가 와요. 길이 미끄러워요" if day.raining else "", 1.2)
+	if day.raining:
+		hud.radio("오늘 비 와요. 길 미끄러우니까 조심하고.")
 	shift.begin()
+	hud.banner_box.visible = false
 	Sfx.play("bong")
+	# 첫날엔 소장님이 다가와 일을 가르쳐 준다 (튜토리얼 화면 대신 대화로)
+	if not Game.flag("intro"):
+		var chief := get_tree().get_nodes_in_group("coworker").filter(func(c): return c.role == "chief")
+		if not chief.is_empty():
+			await get_tree().create_timer(0.6).timeout
+			dialogue.start(Talks.INTRO, chief[0])
 
 
 func _unhandled_input(event: InputEvent) -> void:
@@ -267,7 +268,6 @@ func _process(delta: float) -> void:
 	_update_spawns(delta)
 	_update_events(delta)
 	_update_boss_smoke()
-	_update_hints(delta)
 	_update_mission(delta)
 
 
@@ -281,17 +281,6 @@ func _update_day_hud() -> void:
 	var tag := "두목 검거" if Game.raided[i] else "단서 %d/%d" % [Game.clues[i], Game.CLUES_NEEDED]
 	hud.set_district("정화도 %d%% · %s %s" % [int(Game.clean[i]), Game.GANGS[i].name, tag])
 
-
-func _update_hints(delta: float) -> void:
-	_hint_t -= delta
-	if _hint_t > 0.0:
-		return
-	_hint_t = 9.0
-	if _hint_i < HINTS.size():
-		hud.set_hint(HINTS[_hint_i])
-		_hint_i += 1
-	else:
-		hud.set_hint("")
 
 
 func _update_boss_smoke() -> void:
@@ -405,7 +394,7 @@ func _update_events(delta: float) -> void:
 	if options.is_empty():
 		return
 	var e: Array = options.pick_random()
-	hud.banner(e[1], e[2], 2.5)
+	hud.radio(e[1] + " " + e[2])
 	Sfx.play("horn", -6.0, 0.8)
 	match e[0]:
 		"group": _spawn_group()
@@ -470,9 +459,8 @@ func _new_npc(kind: String) -> Npc:
 	n.hurt_player.connect(func(npc, amount): player.take_hit(amount, npc.global_position))
 	n.dropped_bag.connect(_spawn_bag)
 	n.shout.connect(func(who, text):
-		hud.add_feed(text, Color(1, 0.4, 0.35))
 		if text == "도둑이야!!" and who.global_position.distance_to(player.global_position) < 45.0:
-			hud.banner("도둑이야!!", "가방 들고 뛰어가는 사람을 쫓아가 잡으세요", 1.8))
+			hud.radio("소매치기 신고! 가방 든 사람 쫓아가서 부딪혀요." if not Game.flag("talk_thief") else "소매치기 신고!"))
 	return n
 
 
@@ -677,13 +665,14 @@ func _spawn_shop() -> void:
 	shop_node.shorted.connect(func(_s):
 		if is_instance_valid(owner_npc):
 			owner_npc.say(["안 돼!! 전기!!", "야 이거 비싼 간판이야!", "손대지 마요!!"].pick_random(), "angry")
-		hud.add_feed("전원 차단! 간판 앞에서 E 연타 (차로 들이받아도 됨)", Color(1, 0.8, 0.4))
+		if not Game.flag("talk_rip"):
+			hud.radio("전원 나갔어요! 간판 앞에서 E 연타로 뜯어요. 차로 들이받아도 되고요.", "정비 담당")
 		refresh_doors())
 	shop_node.ripped.connect(func(_s, rammed):
 		refresh_doors()
 		_slowmo(0.6)
 		player.shake(0.9 if rammed else 0.6)
-		hud.banner("간판 철거!", "순찰차로 박살!" if rammed else "뿌드드득... 쾅!!", 2.0))
+		hud.banner("간판 철거", "", 1.4))
 	shop_node.resolved.connect(func(s, task):
 		if is_instance_valid(owner_npc):
 			owner_npc.say(["내 가게!!", "이게 무슨 짓이에요!", "아이고 망했다..."].pick_random(), "angry")
@@ -718,7 +707,6 @@ func _on_npc_resolved(npc: Npc, task: String) -> void:
 	_complete(task, name, npc.global_position, reward, npc)
 	_cheer(npc.global_position)
 	if npc.kind == "boss":
-		hud.banner("골초왕 퇴치!", "", 2.0)
 		player.shake(0.6)
 
 
@@ -740,14 +728,11 @@ func _complete(task: String, label: String, pos := Vector3.ZERO, reward := -1, s
 	hud.set_money(Game.money)
 	hud.set_combo(combo)
 	hud.hit(true)
-	hud.add_feed("+%d원  %s" % [reward, label], Game.TASKS[task].color.lightened(0.3))
+	hud.money_delta(reward)
 	Sfx.play("coin", -3.0 if big else -6.0, 1.0 + (combo - 1.0) * 0.15)
-	if pos != Vector3.ZERO:
-		Popups.text(self, pos + Vector3.UP * 2.4, "+%d원" % reward, Color(1, 0.88, 0.3), 80 if big else 54, 1.6, 1.1)
 	if big:
 		_streak += 1
 		if _streak >= 2:
-			hud.announce(STREAK_NAMES[min(_streak, STREAK_NAMES.size() - 1)])
 			Sfx.play("fanfare", -8.0, 1.0 + _streak * 0.08)
 		_hitstop(0.07 if _streak < 3 else 0.12)
 		player.shake(0.25)
@@ -784,7 +769,7 @@ func _promote(new_rank: int) -> void:
 		_spawn_shop()
 	if cfg.zone != old_cfg.zone:
 		_spawn_props(10)
-	hud.banner("승진! %s" % Game.rank_name(), "\n".join(lines), 3.0)
+	hud.banner("승진 · %s" % Game.rank_name(), " · ".join(lines), 3.0)
 	Sfx.play("fanfare", 0.0)
 	player.mental = Game.max_mental()
 	hud.set_mental(player.mental, Game.max_mental())
@@ -858,7 +843,9 @@ func _on_annoyed(_npc: Npc, minor: bool) -> void:
 	Game.money = max(Game.money - 20, 0)
 	hud.set_money(Game.money)
 	hud.set_complaints(complaints, 0)
-	hud.add_feed("민원 접수 -20원" + ("  (미성년자에게 물!)" if minor else ""), Color(1, 0.5, 0.4))
+	hud.money_delta(-20)
+	if minor and not Game.flag("talk_minor_water"):
+		hud.radio("학생한테 물 뿌리면 안 돼요! 우클릭으로 사진 찍어서 학교에 넘겨요.", "소장님")
 	Sfx.play("error", -4.0)
 
 
@@ -876,7 +863,8 @@ func _faint() -> void:
 	player.input_enabled = false
 	var lost := int(Game.money * 0.1)
 	Game.money -= lost
-	hud.banner("멘탈 붕괴...", "파출소에서 정신 차리는 중 (-%d원)" % lost, 2.0)
+	hud.banner("기절", "", 1.8)
+	hud.money_delta(-lost)
 	hud.damage_flash(0.8)
 	await get_tree().create_timer(2.2).timeout
 	if vehicle:
@@ -902,6 +890,8 @@ func _spawn_vehicles() -> void:
 		_add_vehicle("police", Vector3(-13.0, 0.3, -3.6), -PI / 2)
 	if Game.has_truck and not have.has("firetruck"):
 		_add_vehicle("firetruck", Vector3(-23.0, 0.3, -3.6), -PI / 2)
+	if Game.has_excavator and not have.has("excavator"):
+		_add_vehicle("excavator", Vector3(-32.0, 0.3, -3.6), -PI / 2)
 
 
 func _add_vehicle(kind: String, pos: Vector3, yaw: float, model := "") -> Vehicle:
@@ -978,7 +968,6 @@ func _on_vehicle_hit(n: Node, spd: float, v: Vehicle) -> void:
 	dir = dir.normalized()
 	if n.can_be_caught():
 		n.caught("car", dir)
-		hud.announce("차로 검거!", Color(0.5, 0.9, 1))
 	else:
 		n.run_over(dir, spd)
 		if not n.done:
@@ -1176,18 +1165,18 @@ func _use_door(door: Dictionary) -> void:
 			player.mental = Game.max_mental()
 			hud.set_mental(player.mental, Game.max_mental())
 			player.refill_all()
-			hud.add_feed("소파에서 쉬었어요 (멘탈, 물 회복)", Color(0.6, 0.9, 1))
+			hud.add_feed("휴식 · 멘탈, 물 회복", Color(0.6, 0.9, 1))
 			Sfx.play("refill", -4.0)
 		"desk":
 			if shift.can_clock_out():
 				exit_interior()
 				shift.end_shift()
 			else:
-				hud.add_feed("아직 퇴근 못 해요: %s (22시부터는 언제든)" % shift.quota_text().trim_prefix("오늘 할당  "), Color(1, 0.8, 0.5))
+				hud.add_feed("퇴근 불가 · 할당량 또는 22시 이후", Color(1, 0.8, 0.5))
 				Sfx.play("error", -6.0)
 		"counter":
 			if Game.money < 30:
-				hud.add_feed("돈이 모자라요 (30원)", Color(1, 0.5, 0.4))
+				hud.add_feed("돈 부족", Color(1, 0.5, 0.4))
 				Sfx.play("error", -4.0)
 				return
 			Game.money -= 30
@@ -1195,24 +1184,24 @@ func _use_door(door: Dictionary) -> void:
 			player.mental = min(player.mental + 1, Game.max_mental())
 			hud.set_mental(player.mental, Game.max_mental())
 			hud.set_money(Game.money)
-			hud.add_feed("편의점: 생수와 에너지 음료 (-30원)", Color(0.6, 1, 0.6))
+			hud.money_delta(-30)
 			Sfx.play("buy")
 		"reception":
 			if player.mental >= Game.max_mental():
-				hud.add_feed("멘탈이 멀쩡해요", Color(0.8, 0.8, 0.8))
+				hud.add_feed("멘탈 정상", Color(0.8, 0.8, 0.8))
 				return
 			if Game.money < 100:
-				hud.add_feed("돈이 모자라요 (100원)", Color(1, 0.5, 0.4))
+				hud.add_feed("돈 부족", Color(1, 0.5, 0.4))
 				Sfx.play("error", -4.0)
 				return
 			Game.money -= 100
 			player.mental = Game.max_mental()
 			hud.set_mental(player.mental, Game.max_mental())
 			hud.set_money(Game.money)
-			hud.add_feed("병원: 멘탈 완전 회복 (-100원)", Color(0.6, 1, 0.6))
+			hud.money_delta(-100)
 			Sfx.play("buy")
 		"school":
-			hud.add_feed("교문이 닫혀 있어요. 근처 학생들 비행을 잘 지켜보세요", Color(0.8, 0.85, 1))
+			pass
 
 
 func refresh_doors() -> void:
@@ -1265,6 +1254,49 @@ func _spawn_interior_staff() -> void:
 		t.position = pair[1]
 		t.rotation.y = 0.0
 		add_child(t)
+
+
+func start_ending() -> void:
+	## 다섯 조직을 다 잡으면: 파출소 앞에 동료들이 모여 한마디씩 → 호외 → 크레딧
+	if Game.ending_seen:
+		return
+	Game.ending_seen = true
+	Game.save_game()
+	await get_tree().create_timer(3.0).timeout
+	if inside != "":
+		exit_interior()
+	if vehicle:
+		_toggle_vehicle()
+	hud.flash_fade()
+	player.global_position = SPAWN + Vector3(0, 0, 2.5)
+	player.rotation.y = 0.0
+	var cw := {}
+	for c in get_tree().get_nodes_in_group("coworker"):
+		cw[c.role] = c
+	var spots := {"chief": Vector3(-17.0, 0.06, -6.6), "ops": Vector3(-19.2, 0.06, -6.2), "rookie": Vector3(-14.8, 0.06, -6.2), "mechanic": Vector3(-12.8, 0.06, -5.6)}
+	for r in spots:
+		if cw.has(r):
+			cw[r].global_position = spots[r]
+	await get_tree().create_timer(0.5).timeout
+	var convo := [
+		{"who": "소장님", "at": cw.get("chief"), "text": "해냈군... 다섯 조직 전부. 처음 왔을 땐 분무기 하나 들고 쭈뼛거리더니.", "anim": "cross_arms"},
+		{"who": "상황실 요원", "at": cw.get("ops"), "text": "요즘 들어오는 신고가 다 감사 전화예요. 저 이런 거 처음 받아 봐요.", "anim": "talk"},
+		{"who": "신입 순경", "at": cw.get("rookie"), "text": "선배님 최고예요! 저도 꼭 선배님처럼 될게요!", "anim": "cheer"},
+		{"who": "정비 담당", "at": cw.get("mechanic"), "text": "차는 좀 덜 부숴 줬으면 했지만... 뭐, 잘했어.", "anim": "laugh"},
+		{"who": "소장님", "at": cw.get("chief"), "text": "구청에서 연락이 왔네. 자네를 우리 서장으로 올리고 싶다는군.", "anim": "explain"},
+		{"choices": [
+			["감사합니다. 열심히 하겠습니다!", [{"who": "소장님", "at": cw.get("chief"), "text": "허허, 서장님. 그래도 순찰은 계속 나가야 하네!", "anim": "salute"}]],
+			["저는 아직 순찰이 좋습니다.", [{"who": "소장님", "at": cw.get("chief"), "text": "그럴 줄 알았네. 그럼 우리 동네, 앞으로도 잘 부탁하네.", "anim": "salute"}]],
+		]},
+	]
+	convo = convo.filter(func(it): return not it.has("at") or it.at != null)
+	dialogue.start(convo, cw.get("chief"))
+	await dialogue.finished
+	var avg := 0.0
+	for c in Game.clean:
+		avg += c
+	ending.play({"rank": Game.rank_name(), "days": Game.day, "caught": Game.total_caught,
+		"best": Game.best_grade if Game.best_grade != "" else "-", "clean": int(avg / Game.clean.size()), "money": Game.money})
 
 
 func _next_day() -> void:
@@ -1487,8 +1519,7 @@ func _start_mission() -> void:
 		"reward": reward, "beacon": _make_beacon(pos),
 	}
 	Sfx.play("radio", 2.0)
-	hud.banner("무전: " + info.title, "%s · 제한 %d초 · 보상 %d원" % [mission.place, int(info.time), reward], 2.6)
-	hud.add_feed("출동 요청: " + info.title, Color(0.5, 0.8, 1))
+	hud.radio("%s · %s" % [info.title, mission.place] if Game.flag("talk_mission") else "%s · %s. 파란 빛기둥 보이죠? 거기로 가요." % [info.title, mission.place])
 
 
 func _finish_mission(success: bool, left: float) -> void:
@@ -1506,11 +1537,12 @@ func _finish_mission(success: bool, left: float) -> void:
 		Game.money += total
 		hud.set_money(Game.money)
 		_add_xp(total)
-		hud.banner("출동 완료!", "+%d원 (시간 보너스 +%d)" % [total, bonus], 2.2)
+		hud.banner("출동 완료", "", 1.6)
+		hud.money_delta(total)
 		Sfx.play("fanfare", 0.0)
 		player.shake(0.3)
 	else:
-		hud.banner("출동 실패...", "현장은 다른 순찰차가 정리했어요", 1.8)
+		hud.banner("출동 실패", "", 1.4)
 		Sfx.play("error", -2.0)
 	mission = {}
 	_mission_t = randf_range(20.0, 35.0)

@@ -85,6 +85,7 @@ func _clear(w) -> void:
 func _run() -> void:
 	var game = root.get_node("Game")
 	game.new_game()
+	game.flags["intro"] = true   # 첫날 소장님 대화는 건너뛴다
 	game.owned = ["spray", "pistol", "bucket", "soaker", "hose"]
 	game.has_truck = true
 
@@ -195,6 +196,23 @@ func _run() -> void:
 			fresh[0].on_rammed()
 			await frames(2)
 			check(fresh[0].done, "순찰차로 들이받으면 간판이 바로 떨어진다")
+		# 포크레인: 팔로 내려찍어 간판 뜯기
+		game.has_excavator = true
+		world._spawn_vehicles()
+		var exc: Array = world.get_tree().get_nodes_in_group("vehicle").filter(func(v): return v.kind == "excavator")
+		check(exc.size() == 1, "포크레인이 파출소 옆에 생긴다")
+		world._spawn_shop()
+		await frames(2)
+		var target_shop: Array = world.get_tree().get_nodes_in_group("illegal_shop").filter(func(x): return not x.done)
+		if exc.size() == 1 and target_shop.size() > 0:
+			var ts = target_shop[0]
+			var n: Vector3 = ts.global_basis.z
+			# 팔 끝이 간판에 닿는 자리에 세우고 바로 찍는다 (골목이 좁아도 되게)
+			exc[0].rotation.y = atan2(n.x, n.z)
+			exc[0].global_position = ts.incident_pos() + n * 5.5 - Vector3.UP * 2.5
+			exc[0]._arm_hit()
+			await frames(2)
+			check(ts.done, "포크레인 팔로 간판을 찍어 떨어뜨린다")
 
 	# ---- 장비실 (B)
 	world._open_shop()
@@ -360,7 +378,18 @@ func _run() -> void:
 	await frames(3)
 	player._try_pickup()
 	await frames(2)
-	check(cws[0]._label.text != cws[0].display_name(), "E 로 동료와 대화")
+	check(world.dialogue.active, "E 로 동료와 대화 (대화창)")
+	for k in 12:
+		if not world.dialogue.active:
+			break
+		if world.dialogue._choosing:
+			world.dialogue._pick(["", []])
+		else:
+			world.dialogue._line.visible_ratio = 1.0
+			world.dialogue._next()
+		await frames(2)
+	await create_timer(0.5).timeout
+	check(not world.dialogue.active and player.input_enabled, "대화 끝나면 다시 움직임")
 	var roles: Array = world.city.doors.map(func(d): return d.role)
 	check("station" in roles and "store" in roles and "hospital" in roles, "파출소/편의점/병원 문 (%s)" % str(roles))
 	var store: Dictionary = world.city.doors.filter(func(d): return d.role == "store")[0]
@@ -465,16 +494,49 @@ func _run() -> void:
 		check(boss_ok, "두목은 골초왕 모델")
 		for n in world.crime.raid.targets:
 			n.caught("tackle", Vector3.FORWARD)
-		await frames(5)
-		check(game.raided[0] and game.clean[0] > clean0 + 25.0 and world.crime.raid.is_empty(), "급습 성공: 두목 검거, 정화도 +30")
+		for k in 60:
+			if world.crime.raid.is_empty():
+				break
+			await frames(1)
+		check(game.raided[0] and game.clean[0] >= minf(clean0 + 25.0, 100.0) and world.crime.raid.is_empty(), "급습 성공: 두목 검거, 정화도 +30")
 		await _use_point("exit")
+
+	# ---- 엔딩: 다섯 조직을 다 잡으면 동료 대화 → 호외 → 크레딧
+	for gi in game.GANGS.size():
+		game.raided[gi] = gi != 4
+	game.ending_seen = false
+	game.clues[4] = game.CLUES_NEEDED
+	world.crime._reveal(4, false)
+	if world.crime.hideouts.has(4):
+		world.crime.start_raid(4)
+		await frames(3)
+		for n in world.crime.raid.targets:
+			n.caught("tackle", Vector3.FORWARD)
+		await frames(5)
+		await create_timer(4.2).timeout
+		check(world.dialogue.active and game.ending_seen, "마지막 두목 검거 → 엔딩 대화")
+		for k in 20:
+			if not world.dialogue.active:
+				break
+			if world.dialogue._choosing:
+				world.dialogue._pick(["", []])
+			else:
+				world.dialogue._line.visible_ratio = 1.0
+				world.dialogue._next()
+			await frames(2)
+		await create_timer(0.6).timeout
+		check(world.ending.visible, "호외와 크레딧")
+		world.ending.visible = false
+		world.get_tree().paused = false
+	else:
+		check(false, "5구역 아지트 자리 없음")
 
 	# ---- 퇴근: 성적표와 신문, 다음 날
 	var day0: int = game.day
 	world.shift.end_shift()
 	await frames(5)
 	check(world.report.visible and game.day == day0 + 1, "퇴근 성적표 (DAY %d)" % day0)
-	check(world.report.get_node("Row/Paper/V/Headline").text.contains("골초왕"), "신문 1면: 두목 검거 (%s)" % world.report.get_node("Row/Paper/V/Headline").text)
+	check(world.report.get_node("Row/Paper/V/Headline").text.contains("검거"), "신문 1면: 두목 검거 (%s)" % world.report.get_node("Row/Paper/V/Headline").text)
 	world.report.visible = false
 	world.get_tree().paused = false
 
@@ -490,5 +552,6 @@ func _run() -> void:
 	check(current_scene.name == "Title", "타이틀 씬")
 
 	game.new_game()
+	game.flags["intro"] = true   # 첫날 소장님 대화는 건너뛴다
 	print("RESULT fails=%d" % fails)
 	quit(fails)

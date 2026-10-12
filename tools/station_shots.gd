@@ -20,6 +20,7 @@ func _run() -> void:
 	root.size = Vector2i(1280, 720)
 	var game = root.get_node("Game")
 	game.new_game()
+	game.flags["intro"] = true   # 첫날 소장님 대화는 건너뛴다
 	change_scene_to_file("res://scenes/world.tscn")
 	await frames(20)
 	var w = current_scene

@@ -31,7 +31,7 @@ func _draw() -> void:
 			var pos := center + dir * t
 			var col := Color(0.35, 0.7, 1)
 			draw_colored_polygon(PackedVector2Array([pos + dir * 22, pos - dir * 8 + dir.orthogonal() * 16, pos - dir * 8 - dir.orthogonal() * 16]), col)
-			draw_string(get_theme_default_font(), pos - dir * 50 - Vector2(55, -6), "출동 %dm" % int(mp.distance_to(player.global_position)), HORIZONTAL_ALIGNMENT_CENTER, 110, 20, col)
+			draw_string(get_theme_default_font(), pos - dir * 50 - Vector2(55, -6), "%dm" % int(mp.distance_to(player.global_position)), HORIZONTAL_ALIGNMENT_CENTER, 110, 20, col)
 	for n in get_tree().get_nodes_in_group("incident"):
 		if not n.is_active_incident():
 			continue
@@ -57,4 +57,4 @@ func _draw() -> void:
 		var tip := pos + dir * 16
 		var side := dir.orthogonal() * 12
 		draw_colored_polygon(PackedVector2Array([tip, pos - dir * 6 + side, pos - dir * 6 - side]), col)
-		draw_string(get_theme_default_font(), pos - dir * 40 - Vector2(45, -6), "! %dm" % int(dist), HORIZONTAL_ALIGNMENT_CENTER, 90, 16, col)
+		draw_string(get_theme_default_font(), pos - dir * 40 - Vector2(45, -6), "%dm" % int(dist), HORIZONTAL_ALIGNMENT_CENTER, 90, 16, col)

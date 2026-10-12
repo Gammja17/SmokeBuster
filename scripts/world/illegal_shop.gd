@@ -218,7 +218,6 @@ func soak(amount: float, _dir: Vector3, _knock: float) -> void:
 		_spark_cd = 0.35
 		_sparks.restart()
 		Sfx.play_at("spark", incident_pos(), -4.0, randf_range(0.9, 1.2))
-	_power_label.visible = true
 	var pct := int(clamp(power / need, 0.0, 1.0) * 100)
 	_power_label.text = "합선까지 %d%%" % pct
 	_power_label.modulate = Color(1, 0.9, 0.4).lerp(Color(1, 0.3, 0.2), 1.0 - pct / 100.0)
@@ -267,7 +266,6 @@ func tug(from: Vector3) -> void:
 	_sparks.restart()
 	Sfx.play_at("spark", incident_pos(), 0.0, randf_range(0.8, 1.1))
 	Sfx.play_at("kick", incident_pos(), 2.0, 0.6 + _tugs * 0.1)
-	_power_label.text = "간판 뜯기 " + "■".repeat(_tugs) + "□".repeat(TUGS - _tugs)
 	var tw := create_tween()
 	var ang := 6.0 + _tugs * 7.0
 	tw.tween_property(_sign_root, "rotation_degrees:z", ang + 8.0, 0.06)

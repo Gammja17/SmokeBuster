@@ -61,6 +61,12 @@ func _refresh() -> void:
 		"보유중" if Game.has_truck else "%d원" % Game.TRUCK_PRICE, not Game.has_truck and Game.money >= Game.TRUCK_PRICE)
 	truck.buy.connect(_buy_truck)
 
+	var exc := ITEM.instantiate()
+	_weapons.add_child(exc)
+	exc.setup("포크레인 대여", "파출소 옆에 포크레인이 생긴다. 타서 좌클릭하면 팔로 불법업소 간판을 콱!",
+		"보유중" if Game.has_excavator else "%d원" % Game.EXCAVATOR_PRICE, not Game.has_excavator and Game.money >= Game.EXCAVATOR_PRICE)
+	exc.buy.connect(_buy_excavator)
+
 	for key in Game.UPGRADES:
 		var u: Dictionary = Game.UPGRADES[key]
 		var lvl: int = Game.upgrades[key]
@@ -89,6 +95,14 @@ func _buy_truck() -> void:
 		return
 	Game.money -= Game.TRUCK_PRICE
 	Game.has_truck = true
+	_bought()
+
+
+func _buy_excavator() -> void:
+	if Game.money < Game.EXCAVATOR_PRICE or Game.has_excavator:
+		return
+	Game.money -= Game.EXCAVATOR_PRICE
+	Game.has_excavator = true
 	_bought()
 
 

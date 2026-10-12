@@ -1,7 +1,7 @@
 class_name Vehicle
 extends CharacterBody3D
-## 직접 모는 차. kind: police(사이렌), firetruck(지붕 물대포), civilian(뺏은 차)
-## W/S 가속·후진, A/D 조향, Space 핸드브레이크, H 사이렌/경적, 좌클릭 물대포(소방차), F 내리기
+## 직접 모는 차. kind: police(사이렌), firetruck(지붕 물대포), civilian(뺏은 차), excavator(포크레인 팔)
+## W/S 가속·후진, A/D 조향, Space 핸드브레이크, H 사이렌/경적, 좌클릭 물대포(소방차)/팔 내려찍기(포크레인), F 내리기
 
 signal hit_npc(npc: Node, speed: float)
 
@@ -9,6 +9,7 @@ const STATS := {
 	"police": {"model": "police", "max": 22.0, "accel": 12.0, "steer": 2.3},
 	"firetruck": {"model": "firetruck", "max": 15.0, "accel": 7.0, "steer": 1.7},
 	"civilian": {"model": "sedan", "max": 19.0, "accel": 10.0, "steer": 2.1},
+	"excavator": {"model": "", "max": 7.0, "accel": 5.0, "steer": 1.5},
 }
 const MOUSE_SENS := 0.0025
 
@@ -34,6 +35,8 @@ var _spray_t := 0.0
 var _honk_cd := 0.0
 var _bump_cd := 0.0
 var _stream: AudioStreamPlayer
+var _boom: Node3D
+var _swinging := false
 
 
 func _ready() -> void:
@@ -44,14 +47,17 @@ func _ready() -> void:
 	var st: Dictionary = STATS[kind]
 	if model_name == "":
 		model_name = st.model
-	_model = load("res://assets/cars/%s.glb" % model_name).instantiate()
-	var scl := 2.2 if kind == "firetruck" else 1.6
-	_model.scale = Vector3.ONE * scl
-	_model.rotation.y = PI
+	if kind == "excavator":
+		_model = _build_excavator()
+	else:
+		_model = load("res://assets/cars/%s.glb" % model_name).instantiate()
+		var scl := 2.2 if kind == "firetruck" else 1.6
+		_model.scale = Vector3.ONE * scl
+		_model.rotation.y = PI
 	add_child(_model)
 	var col := CollisionShape3D.new()
 	var box := BoxShape3D.new()
-	box.size = Vector3(2.4, 2.0, 4.6) if kind != "firetruck" else Vector3(3.2, 3.2, 7.4)
+	box.size = {"firetruck": Vector3(3.2, 3.2, 7.4), "excavator": Vector3(2.8, 2.8, 4.4)}.get(kind, Vector3(2.4, 2.0, 4.6))
 	col.shape = box
 	col.position.y = box.size.y / 2 + 0.1
 	add_child(col)
@@ -63,7 +69,7 @@ func _ready() -> void:
 	camera = Camera3D.new()
 	camera.fov = 72
 	camera.far = 170
-	camera.position = Vector3(0, 1.0, 9.5 if kind == "firetruck" else 7.0)
+	camera.position = Vector3(0, 1.0, 9.5 if kind in ["firetruck", "excavator"] else 7.0)
 	_pivot.add_child(camera)
 
 	if kind == "police":
@@ -96,6 +102,82 @@ func _ready() -> void:
 		_stream = Sfx.loop_player("hose", self, -2.0)
 
 
+func _build_excavator() -> Node3D:
+	## 포크레인: 궤도, 노란 몸통, 운전석, 앞으로 뻗은 붐-암-버킷 (팔은 _boom 을 돌려 휘두른다)
+	var root := Node3D.new()
+	var yellow := Mats.flat(Color(0.98, 0.72, 0.08), 0.45, 0.2)
+	var dark := Mats.flat(Color(0.12, 0.12, 0.13), 0.8)
+	var steel := Mats.flat(Color(0.35, 0.35, 0.37), 0.4, 0.7)
+	for side in [-1, 1]:
+		_part(root, Vector3(0.8, 0.8, 4.2), Vector3(side * 1.05, 0.45, 0), dark)
+	_part(root, Vector3(2.6, 1.1, 3.0), Vector3(0, 1.4, 0.4), yellow)
+	_part(root, Vector3(2.4, 0.9, 0.7), Vector3(0, 1.3, 1.9), Mats.flat(Color(0.3, 0.3, 0.3), 0.6))
+	var cab := _part(root, Vector3(1.2, 1.4, 1.3), Vector3(-0.55, 2.6, -0.3), yellow)
+	_part(cab, Vector3(1.0, 0.9, 0.05), Vector3(0, 0.15, -0.66), Mats.glass())
+	_boom = Node3D.new()
+	_boom.position = Vector3(0.45, 2.1, -0.9)
+	_boom.rotation_degrees.x = 28.0
+	root.add_child(_boom)
+	_part(_boom, Vector3(0.45, 0.5, 3.6), Vector3(0, 0, -1.8), yellow)
+	var stick := Node3D.new()
+	stick.position = Vector3(0, 0, -3.6)
+	stick.rotation_degrees.x = -70.0
+	_boom.add_child(stick)
+	_part(stick, Vector3(0.35, 0.4, 2.6), Vector3(0, 0, -1.3), yellow)
+	var bucket := _part(stick, Vector3(1.1, 0.7, 0.7), Vector3(0, -0.2, -2.7), steel)
+	for i in 4:
+		_part(bucket, Vector3(0.12, 0.12, 0.3), Vector3(-0.4 + i * 0.27, -0.35, -0.3), steel)
+	var light := OmniLight3D.new()
+	light.light_color = Color(1, 0.6, 0.1)
+	light.light_energy = 1.2
+	light.omni_range = 4.0
+	light.position = Vector3(-0.55, 3.45, -0.3)
+	root.add_child(light)
+	_lights.append(light)
+	return root
+
+
+func _part(parent: Node3D, size: Vector3, pos: Vector3, mat: Material) -> MeshInstance3D:
+	var mi := MeshInstance3D.new()
+	var bm := BoxMesh.new()
+	bm.size = size
+	mi.mesh = bm
+	mi.material_override = mat
+	mi.position = pos
+	parent.add_child(mi)
+	return mi
+
+
+func _swing() -> void:
+	## 팔을 들었다가 콱 내려찍는다. 찍힌 자리 근처 불법업소 간판은 떨어지고 소품은 날아간다
+	if _swinging:
+		return
+	_swinging = true
+	var tw := create_tween()
+	tw.tween_property(_boom, "rotation_degrees:x", 48.0, 0.25).set_trans(Tween.TRANS_SINE)
+	tw.tween_property(_boom, "rotation_degrees:x", 2.0, 0.16).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN)
+	tw.tween_callback(_arm_hit)
+	tw.tween_interval(0.25)
+	tw.tween_property(_boom, "rotation_degrees:x", 28.0, 0.45).set_trans(Tween.TRANS_SINE)
+	tw.tween_callback(func(): _swinging = false)
+	Sfx.play_at("switch", global_position, 0.0, 0.5)
+
+
+func _arm_hit() -> void:
+	var fwd := -global_basis.z
+	var hit := global_position + fwd * 5.5 + Vector3.UP * 2.5
+	Sfx.play_at("thud", hit, 8.0, 0.6)
+	Sfx.play_at("kick", hit, 4.0, 0.5)
+	if driver and driver.has_method("shake"):
+		driver.shake(0.7)
+	for shop in get_tree().get_nodes_in_group("illegal_shop"):
+		if not shop.done and shop.incident_pos().distance_to(hit) < 5.5:
+			shop.on_rammed()
+	for body in get_parent().get_children():
+		if body is RigidBody3D and body.global_position.distance_to(hit) < 4.0:
+			body.apply_central_impulse((body.global_position - global_position).normalized() * 30.0 + Vector3.UP * 12.0)
+
+
 func can_enter(p: Node3D) -> bool:
 	return driver == null and global_position.distance_to(p.global_position) < 3.6 + (1.5 if kind == "firetruck" else 0.0)
 
@@ -125,6 +207,8 @@ func _unhandled_input(event: InputEvent) -> void:
 		_yaw -= event.relative.x * MOUSE_SENS
 		_pitch = clamp(_pitch - event.relative.y * MOUSE_SENS, -0.9, 0.35)
 		_look_idle = 0.0
+	elif event is InputEventMouseButton and event.pressed and event.button_index == MOUSE_BUTTON_LEFT and kind == "excavator":
+		_swing()
 	elif event is InputEventKey and event.pressed and not event.echo and event.keycode == KEY_H:
 		if kind == "police":
 			_siren_on = not _siren_on
@@ -238,6 +322,9 @@ func _update_lights(delta: float) -> void:
 	if _lights.is_empty():
 		return
 	var t := Time.get_ticks_msec() * 0.008
+	if kind == "excavator":
+		_lights[0].light_energy = (2.0 if sin(t * 0.8) > 0.0 else 0.2) if driver else 0.0
+		return
 	for i in _lights.size():
 		_lights[i].light_energy = (3.0 if sin(t + i * PI) > 0.0 else 0.0) if _siren_on else 0.0
 

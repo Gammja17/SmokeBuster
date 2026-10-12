@@ -26,10 +26,10 @@ const DATA := {
 
 var role := "chief"
 var human: Human
-var _label: Label3D
+var _marker: MeshInstance3D
 var _greeted := false
-var _say_t := 0.0
 var _player: Node3D
+var _bob := 0.0
 
 
 func _ready() -> void:
@@ -45,37 +45,53 @@ func _ready() -> void:
 	human = Human.make(role, 1.62 if role in ["rookie", "s_doctor", "s_vendor"] else 1.72)
 	add_child(human)
 	human.play(DATA[role].idle, 0.0)
-	_label = Label3D.new()
-	_label.font = load("res://assets/fonts/Pretendard-ExtraBold.otf")
-	_label.font_size = 40
-	_label.pixel_size = 0.006
-	_label.outline_size = 10
-	_label.billboard = BaseMaterial3D.BILLBOARD_ENABLED
-	_label.position.y = 2.05
-	_label.text = DATA[role].name
-	_label.modulate = _name_color()
-	add_child(_label)
+	# 할 말이 있으면 머리 위에 작은 노란 표시 (글씨 없이)
+	_marker = MeshInstance3D.new()
+	var pm := PrismMesh.new()
+	pm.size = Vector3(0.22, 0.22, 0.05)
+	var mat := StandardMaterial3D.new()
+	mat.albedo_color = Color(1, 0.831, 0)
+	mat.emission_enabled = true
+	mat.emission = Color(1, 0.831, 0)
+	mat.emission_energy_multiplier = 1.5
+	mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	mat.billboard_mode = BaseMaterial3D.BILLBOARD_FIXED_Y
+	pm.material = mat
+	_marker.mesh = pm
+	_marker.rotation_degrees.z = 180.0
+	_marker.position.y = 2.1
+	add_child(_marker)
+	_update_marker()
 
 
-func _name_color() -> Color:
-	## 파출소 식구는 파랑, 동네 사람은 연한 노랑
-	return Color(1, 0.92, 0.7) if DATA[role].get("town", false) else Color(0.6, 0.85, 1)
+func has_topic() -> bool:
+	return Talks.TOPICS.has(role) and not Game.flags.get("talk_" + role, false)
 
 
-func say(text: String, anim := "") -> void:
-	_label.text = text
-	_label.modulate = Color.WHITE
-	_say_t = 3.5
-	if anim != "":
-		human.play(anim, 0.2)
+func _update_marker() -> void:
+	_marker.visible = has_topic()
 
 
 func display_name() -> String:
 	return DATA[role].name
 
 
+func gesture(anim: String) -> void:
+	## 대화 중 몸짓 (말하고 나면 원래 자세로)
+	human.play(anim, 0.2)
+	_later(2.4, func(): human.play(DATA[role].idle, 0.3))
+
+
+func say(text: String, anim := "") -> void:
+	## 머리 위 글씨 대신 몸짓만 (대사는 대화창으로)
+	if anim != "":
+		human.play(anim, 0.2)
+
+
 func _process(delta: float) -> void:
-	_say_t -= delta
+	if _marker.visible:
+		_bob += delta * 3.0
+		_marker.position.y = 2.1 + sin(_bob) * 0.06
 	if _player == null:
 		_player = get_tree().get_first_node_in_group("player")
 		return
@@ -90,17 +106,21 @@ func _process(delta: float) -> void:
 			_later(2.0, func(): human.play(DATA[role].idle, 0.3))
 	elif to.length() > 9.0:
 		_greeted = false
-	if _say_t <= 0.0 and _label.text != DATA[role].name:
-		_label.text = DATA[role].name
-		_label.modulate = _name_color()
 
 
 func talk() -> void:
-	_label.text = DATA[role].lines.pick_random()
-	_label.modulate = Color.WHITE
-	_say_t = 3.5
-	human.play("talk", 0.2)
-	_later(3.0, func(): human.play(DATA[role].idle, 0.3))
+	## E: 처음엔 가르쳐 줄 이야기, 그다음부턴 한마디
+	var world := get_tree().current_scene
+	if world == null or not world.get("dialogue"):
+		return
+	var convo: Array
+	if has_topic():
+		Game.flags["talk_" + role] = true
+		convo = Talks.TOPICS[role]
+	else:
+		convo = [{"who": DATA[role].name, "text": DATA[role].lines.pick_random()}]
+	world.dialogue.start(convo, self)
+	_update_marker()
 
 
 func _later(t: float, fn: Callable) -> void:

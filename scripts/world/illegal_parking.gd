@@ -82,7 +82,7 @@ func on_photographed() -> void:
 		return
 	done = true
 	remove_from_group("incident")
-	_label.visible = true
+	_label.visible = false   # 머리 위 글씨 없이
 	_label.text = "견인합니다!"
 	_label.modulate = Color(0.6, 1, 0.6)
 	resolved.emit(self, "parking")

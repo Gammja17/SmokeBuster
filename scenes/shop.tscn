@@ -1,7 +1,7 @@
 [gd_scene load_steps=3 format=3]
 
 [ext_resource type="Script" path="res://scripts/ui/shop.gd" id="1_shop"]
-[ext_resource type="FontFile" path="res://assets/fonts/Pretendard-ExtraBold.otf" id="2_title"]
+[ext_resource type="FontFile" path="res://assets/fonts/Pretendard-Bold.otf" id="2_title"]
 
 [node name="Shop" type="Control"]
 process_mode = 3
@@ -20,7 +20,7 @@ anchor_right = 1.0
 anchor_bottom = 1.0
 grow_horizontal = 2
 grow_vertical = 2
-color = Color(0.03, 0.07, 0.15, 0.93)
+color = Color(0.02, 0.025, 0.03, 0.9)
 
 [node name="M" type="MarginContainer" parent="."]
 layout_mode = 1
@@ -44,14 +44,14 @@ layout_mode = 2
 [node name="Title" type="Label" parent="M/V/Header"]
 layout_mode = 2
 size_flags_horizontal = 3
-theme_override_colors/font_color = Color(0.55, 0.85, 1, 1)
+theme_override_colors/font_color = Color(0.91, 0.918, 0.929, 1)
 theme_override_fonts/font = ExtResource("2_title")
 theme_override_font_sizes/font_size = 52
 text = "단속반 장비실"
 
 [node name="Money" type="Label" parent="M/V/Header"]
 layout_mode = 2
-theme_override_colors/font_color = Color(1, 0.88, 0.35, 1)
+theme_override_colors/font_color = Color(1, 0.831, 0, 1)
 theme_override_fonts/font = ExtResource("2_title")
 theme_override_font_sizes/font_size = 42
 text = "0원"

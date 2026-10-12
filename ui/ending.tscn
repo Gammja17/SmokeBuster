@@ -1,0 +1,159 @@
+[gd_scene format=3]
+
+[ext_resource type="Script" path="res://scripts/ui/ending.gd" id="1_end"]
+[ext_resource type="FontFile" path="res://assets/fonts/Pretendard-Bold.otf" id="2_bold"]
+[ext_resource type="FontFile" path="res://assets/fonts/D2Coding.ttf" id="3_mono"]
+
+[sub_resource type="StyleBoxFlat" id="paper"]
+content_margin_left = 40.0
+content_margin_top = 30.0
+content_margin_right = 40.0
+content_margin_bottom = 30.0
+bg_color = Color(0.93, 0.91, 0.85, 1)
+shadow_color = Color(0, 0, 0, 0.6)
+shadow_size = 20
+
+[sub_resource type="StyleBoxFlat" id="rule"]
+bg_color = Color(0.1, 0.1, 0.1, 1)
+
+[sub_resource type="StyleBoxFlat" id="red"]
+content_margin_left = 12.0
+content_margin_top = 2.0
+content_margin_right = 12.0
+content_margin_bottom = 4.0
+bg_color = Color(0.75, 0.1, 0.1, 1)
+
+[node name="Ending" type="CanvasLayer"]
+process_mode = 3
+layer = 25
+visible = false
+script = ExtResource("1_end")
+
+[node name="Black" type="ColorRect" parent="."]
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+color = Color(0, 0, 0, 1)
+
+[node name="Paper" type="PanelContainer" parent="."]
+anchors_preset = 8
+anchor_left = 0.5
+anchor_top = 0.5
+anchor_right = 0.5
+anchor_bottom = 0.5
+offset_left = -420.0
+offset_top = -320.0
+offset_right = 420.0
+offset_bottom = 320.0
+grow_horizontal = 2
+grow_vertical = 2
+pivot_offset = Vector2(420, 320)
+theme_override_styles/panel = SubResource("paper")
+
+[node name="V" type="VBoxContainer" parent="Paper"]
+layout_mode = 2
+theme_override_constants/separation = 10
+
+[node name="Top" type="HBoxContainer" parent="Paper/V"]
+layout_mode = 2
+alignment = 1
+theme_override_constants/separation = 14
+
+[node name="Extra" type="Label" parent="Paper/V/Top"]
+layout_mode = 2
+theme_override_colors/font_color = Color(1, 1, 1, 1)
+theme_override_constants/shadow_offset_y = 0
+theme_override_fonts/font = ExtResource("2_bold")
+theme_override_font_sizes/font_size = 26
+theme_override_styles/normal = SubResource("red")
+text = "호외"
+
+[node name="Mast" type="Label" parent="Paper/V/Top"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.08, 0.08, 0.08, 1)
+theme_override_constants/shadow_offset_y = 0
+theme_override_fonts/font = ExtResource("2_bold")
+theme_override_font_sizes/font_size = 52
+text = "동네일보"
+
+[node name="Rule" type="Panel" parent="Paper/V"]
+custom_minimum_size = Vector2(0, 3)
+layout_mode = 2
+theme_override_styles/panel = SubResource("rule")
+
+[node name="Headline" type="Label" parent="Paper/V"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.05, 0.05, 0.05, 1)
+theme_override_constants/shadow_offset_y = 0
+theme_override_fonts/font = ExtResource("2_bold")
+theme_override_font_sizes/font_size = 44
+text = "다섯 조직 일망타진… 동네에 맑은 공기가 돌아왔다"
+autowrap_mode = 3
+
+[node name="Sub" type="Label" parent="Paper/V"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.2, 0.2, 0.2, 1)
+theme_override_constants/shadow_offset_y = 0
+theme_override_font_sizes/font_size = 21
+text = "부제"
+autowrap_mode = 3
+
+[node name="Rule2" type="Panel" parent="Paper/V"]
+custom_minimum_size = Vector2(0, 1)
+layout_mode = 2
+theme_override_styles/panel = SubResource("rule")
+
+[node name="Stats" type="Label" parent="Paper/V"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.12, 0.12, 0.12, 1)
+theme_override_constants/shadow_offset_y = 0
+theme_override_fonts/font = ExtResource("3_mono")
+theme_override_font_sizes/font_size = 18
+text = "근무 30일"
+
+[node name="Credits" type="Control" parent="."]
+clip_contents = true
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+
+[node name="Roll" type="Label" parent="Credits"]
+layout_mode = 1
+anchors_preset = 10
+anchor_right = 1.0
+offset_top = 900.0
+offset_bottom = 2400.0
+grow_horizontal = 2
+theme_override_font_sizes/font_size = 24
+text = "크레딧"
+horizontal_alignment = 1
+
+[node name="Buttons" type="HBoxContainer" parent="."]
+anchors_preset = 7
+anchor_left = 0.5
+anchor_top = 1.0
+anchor_right = 0.5
+anchor_bottom = 1.0
+offset_left = -260.0
+offset_top = -110.0
+offset_right = 260.0
+offset_bottom = -50.0
+grow_horizontal = 2
+grow_vertical = 0
+theme_override_constants/separation = 20
+alignment = 1
+
+[node name="Continue" type="Button" parent="Buttons"]
+custom_minimum_size = Vector2(240, 0)
+layout_mode = 2
+text = "계속 순찰"
+
+[node name="Title" type="Button" parent="Buttons"]
+custom_minimum_size = Vector2(240, 0)
+layout_mode = 2
+text = "타이틀로"

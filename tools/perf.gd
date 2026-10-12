@@ -53,6 +53,7 @@ func _run() -> void:
 	Engine.max_fps = 0
 	var game = root.get_node("Game")
 	game.new_game()
+	game.flags["intro"] = true   # 첫날 소장님 대화는 건너뛴다
 	game.xp = game.RANK_XP[3]
 	var args := OS.get_cmdline_user_args()
 	game.quality = int(args[0]) if args.size() > 0 else 2

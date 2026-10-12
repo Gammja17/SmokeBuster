@@ -53,18 +53,29 @@ const UPGRADES := {
 	"garage": {"name": "파출소 정비고", "desc": "차 최고 속도 +15%", "prices": [700]},
 }
 const TRUCK_PRICE := 3000
+const EXCAVATOR_PRICE := 1500
 
 var money := 0
 var xp := 0                  # 실적. 쌓이면 승진하고 관할 구역이 넓어진다
 var owned: Array = ["spray"]
 var upgrades := {"tank": 0, "pressure": 0, "speed": 0, "mental": 0, "cctv": 0, "ops": 0, "garage": 0}
 var has_truck := false
+var has_excavator := false
 var total_caught := 0
 var day := 1                       # 근무 일차
 var clean := [25.0, 15.0, 10.0, 8.0, 5.0]    # 구역별 정화도 0~100
 var clues := [0, 0, 0, 0, 0]                  # 구역별 조직 단서 (CLUES_NEEDED 개면 아지트가 드러남)
 var raided := [false, false, false, false, false]   # 구역별 두목 검거 여부
 var ending_seen := false
+var flags := {}                    # 한 번 들은 대화/안내 (다시 안 나오게)
+
+
+func flag(key: String) -> bool:
+	## 처음이면 false 를 돌려주고 표시해 둔다
+	if flags.get(key, false):
+		return true
+	flags[key] = true
+	return false
 var best_grade := ""
 
 ## 구역마다 숨어 있는 조직. 단서를 모으면 아지트(건물 안)를 급습할 수 있다.
@@ -252,6 +263,7 @@ func new_game() -> void:
 	owned = ["spray"]
 	upgrades = {"tank": 0, "pressure": 0, "speed": 0, "mental": 0, "cctv": 0, "ops": 0, "garage": 0}
 	has_truck = false
+	has_excavator = false
 	total_caught = 0
 	day = 1
 	clean = [25.0, 15.0, 10.0, 8.0, 5.0]
@@ -259,6 +271,7 @@ func new_game() -> void:
 	raided = [false, false, false, false, false]
 	ending_seen = false
 	best_grade = ""
+	flags = {}
 	save_game()
 
 
@@ -272,8 +285,8 @@ func save_game() -> void:
 		return
 	f.store_string(JSON.stringify({
 		"money": money, "xp": xp, "owned": owned, "upgrades": upgrades,
-		"has_truck": has_truck, "total_caught": total_caught,
-		"day": day, "clean": clean, "clues": clues, "raided": raided, "best_grade": best_grade, "ending_seen": ending_seen,
+		"has_truck": has_truck, "has_excavator": has_excavator, "total_caught": total_caught,
+		"day": day, "clean": clean, "clues": clues, "raided": raided, "best_grade": best_grade, "ending_seen": ending_seen, "flags": flags,
 	}))
 
 
@@ -290,6 +303,7 @@ func load_game() -> void:
 	for k in upgrades:
 		upgrades[k] = int(up.get(k, 0))
 	has_truck = bool(data.get("has_truck", false))
+	has_excavator = bool(data.get("has_excavator", false))
 	total_caught = int(data.get("total_caught", 0))
 	day = int(data.get("day", 1))
 	var c: Array = data.get("clean", clean)
@@ -301,3 +315,4 @@ func load_game() -> void:
 		raided[i] = bool(r[i]) if i < r.size() else false
 	best_grade = str(data.get("best_grade", ""))
 	ending_seen = bool(data.get("ending_seen", false))
+	flags = data.get("flags", {})

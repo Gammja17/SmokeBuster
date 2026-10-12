@@ -85,7 +85,7 @@ func _draw() -> void:
 			col = Color(0.55, 0.57, 0.6, 0.85)
 		_ring(c, R_IN, R_OUT, a0 + 0.012, a0 + span - 0.012, col)
 		if id == selected:
-			_ring(c, R_OUT - 10, R_OUT, a0 + 0.012, a0 + span - 0.012, Color(0.35, 0.65, 1, 1))
+			_ring(c, R_OUT - 6, R_OUT, a0 + 0.012, a0 + span - 0.012, Color(1, 0.831, 0, 1))
 		var mid := c + Vector2.from_angle(a0 + span / 2) * (R_IN + R_OUT) / 2
 		var w: Dictionary = Game.WEAPONS[id]
 		var name_col := Color.WHITE if owned else Color(1, 1, 1, 0.3)
@@ -98,8 +98,8 @@ func _draw() -> void:
 			_text(font, mid + Vector2(0, 24), "%d원" % w.price, 17, Color(1, 1, 1, 0.3))
 	if selected != "":
 		_text(font, c + Vector2(0, -14), Game.WEAPONS[selected].name, 30, Color.WHITE)
-		_text(font, c + Vector2(0, 18), "< 1 / 1 >", 16, Color(0.45, 0.7, 1))
-	_text(font, c + Vector2(0, R_OUT + 34), "마우스로 고르고 Tab 을 떼세요", 18, Color(1, 1, 1, 0.7))
+
+
 
 
 func _ring(c: Vector2, r0: float, r1: float, a0: float, a1: float, col: Color) -> void:
@@ -114,7 +114,6 @@ func _ring(c: Vector2, r0: float, r1: float, a0: float, a1: float, col: Color) -
 
 func _text(font: Font, at: Vector2, s: String, fs: int, col: Color) -> void:
 	var w := font.get_string_size(s, HORIZONTAL_ALIGNMENT_LEFT, -1, fs).x
-	draw_string_outline(font, at - Vector2(w / 2, -fs * 0.35), s, HORIZONTAL_ALIGNMENT_LEFT, -1, fs, 4, Color(0, 0, 0, 0.8))
 	draw_string(font, at - Vector2(w / 2, -fs * 0.35), s, HORIZONTAL_ALIGNMENT_LEFT, -1, fs, col)
 
 

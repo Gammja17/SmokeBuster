@@ -33,9 +33,28 @@ func _run() -> void:
 	w._start()
 	Input.mouse_mode = Input.MOUSE_MODE_VISIBLE
 	var p = w.player
-	await frames(60)
-	w.hud.add_feed("흡연자 단속! +50원", Color(0.5, 0.9, 1))
-	w.hud.add_feed("쓰레기 줍기 +10원", Color(0.6, 1, 0.5))
+	# 첫날 소장님 대화 (컷씬)
+	await create_timer(2.5).timeout
+	await shot("ui_dialogue")
+	for k in 3:
+		w.dialogue._line.visible_ratio = 1.0
+		w.dialogue._next()
+		await frames(30)
+	await shot("ui_dialogue_choice")
+	while w.dialogue.active:
+		if w.dialogue._choosing:
+			w.dialogue._pick(["", []])
+		else:
+			w.dialogue._line.visible_ratio = 1.0
+			w.dialogue._next()
+		await frames(3)
+	await create_timer(0.6).timeout
+	Input.mouse_mode = Input.MOUSE_MODE_VISIBLE
+	await frames(30)
+	w.hud.add_feed("단서 2/5 · 흡연카페 할인 쿠폰", Color(1, 0.6, 0.5))
+	w.hud.radio("흡연 민원 다수 · 편의점 근처. 파란 빛기둥 보이죠? 거기로 가요.")
+	w.hud.money_delta(50)
+	w.hud.set_prompt("E  쓰레기 줍기")
 	w.hud.set_complaints(2, 5)
 	w.hud.set_mission("흡연 민원 다수", "편의점 근처", 85.0, 120.0, 1, 3)
 	# 거리 쪽을 본다

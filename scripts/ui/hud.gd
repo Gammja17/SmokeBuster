@@ -1,51 +1,64 @@
 extends CanvasLayer
-## 화면 UI. 배치는 ui/hud.tscn, 여기서는 값만 갱신한다.
+## 화면 UI ("112 단말기"). 배치는 ui/hud.tscn, 여기서는 값만 갱신한다.
+## 글씨는 최대한 적게: 머리 위 글씨 없이, 꼭 필요한 숫자와 짧은 무전만.
+
+const YEL := Color(1, 0.831, 0)
+const RED := Color(1, 0.42, 0.36)
 
 @onready var damage: ColorRect = $Damage
 @onready var smoke_overlay: ColorRect = $SmokeOverlay
 @onready var indicators: Control = $Indicators
 @onready var crosshair: Control = $Crosshair
 @onready var hitmarker: Label = $Crosshair/Hitmarker
-@onready var zone_label: Label = $BottomRight/Zone
-@onready var place_label: Label = $BottomRight/Place
-@onready var rank_label: Label = $TopCenter/V/Rank
-@onready var next_label: Label = $TopCenter/V/Next
-@onready var xp_bar: ProgressBar = $TopCenter/V/Bar/XpBar
-@onready var cur_rank: Label = $TopCenter/V/Bar/Cur
-@onready var next_rank: Label = $TopCenter/V/Bar/NextRank
+@onready var clock_label: Label = $TopLeft/Term/V/Head/Clock
+@onready var quota_label: Label = $TopLeft/Term/V/Quota
+@onready var rank_label: Label = $TopLeft/Term/V/RankRow/Rank
+@onready var next_label: Label = $TopLeft/Term/V/RankRow/Next
+@onready var xp_bar: ProgressBar = $TopLeft/Term/V/XpBar
+@onready var mission_box: Control = $TopLeft/Term/V/Mission
+@onready var mission_head: Label = $TopLeft/Term/V/Mission/Head
+@onready var mission_title: Label = $TopLeft/Term/V/Mission/Title
+@onready var mission_info: Label = $TopLeft/Term/V/Mission/Info
+@onready var radio_box: Control = $TopLeft/Radio
+@onready var radio_who: Label = $TopLeft/Radio/V/Who
+@onready var radio_line: Label = $TopLeft/Radio/V/Line
 @onready var money_label: Label = $TopRight/Money
+@onready var delta_label: Label = $TopRight/Delta
 @onready var wanted_label: Label = $TopRight/Wanted
 @onready var combo_label: Label = $TopRight/Combo
+@onready var truck_box: HBoxContainer = $TopRight/Truck
+@onready var truck_bar: ProgressBar = $TopRight/Truck/TruckBar
 @onready var feed: VBoxContainer = $Feed
 @onready var radar: Control = $BottomLeft/Radar
 @onready var mental_bar: ProgressBar = $BottomLeft/Bars/MentalBar
-@onready var weapon_label: Label = $TopRight/Weapon
 @onready var ammo_bar: ProgressBar = $BottomLeft/Bars/WaterBar
-@onready var ammo_label: Label = $TopRight/Ammo
-@onready var truck_box: HBoxContainer = $TopRight/Truck
-@onready var truck_bar: ProgressBar = $TopRight/Truck/TruckBar
-@onready var wheel: Control = $WeaponWheel
-@onready var clock_label: Label = $BottomRight/Clock
-@onready var quota_label: Label = $TopLeft/Quota
+@onready var weapon_label: Label = $BottomRight/Weapon
+@onready var ammo_label: Label = $BottomRight/Ammo
+@onready var place_label: Label = $BottomRight/Place
+@onready var zone_label: Label = $BottomRight/Zone
 @onready var district_label: Label = $BottomRight/District
-@onready var prompt: Label = $Prompt
+@onready var prompt: Control = $Prompt
+@onready var prompt_key: Label = $Prompt/H/Key
+@onready var prompt_text: Label = $Prompt/H/Text
 @onready var hint: Label = $Hint
+@onready var announce_label: Label = $Announce
+@onready var banner_box: Control = $Banner
+@onready var banner_big: Label = $Banner/H/V/Big
+@onready var banner_small: Label = $Banner/H/V/Small
+@onready var wheel: Control = $WeaponWheel
 @onready var viewfinder: Control = $Viewfinder
 @onready var vf_targets: Label = $Viewfinder/Targets
 @onready var flash: ColorRect = $Flash
 @onready var polaroid: PanelContainer = $Polaroid
 @onready var polaroid_photo: TextureRect = $Polaroid/V/Photo
 @onready var polaroid_caption: Label = $Polaroid/V/Caption
-@onready var announce_label: Label = $Announce
-@onready var mission_box: PanelContainer = $TopLeft/Mission
-@onready var mission_title: Label = $TopLeft/Mission/V/Title
-@onready var mission_info: Label = $TopLeft/Mission/V/Info
-@onready var banner_big: Label = $Banner/Big
-@onready var banner_small: Label = $Banner/Small
 
 var _banner_tw: Tween
 var _announce_tw: Tween
 var _polaroid_tw: Tween
+var _delta_tw: Tween
+var _radio_tw: Tween
+var _radio_queue: Array = []
 var _player: Node3D
 var _money_shown := 0.0
 var _money_target := 0
@@ -63,18 +76,26 @@ func bind(world: Node, player: Node3D) -> void:
 
 
 func set_mission(title: String, place: String, left: float, dist: float, done: int, total: int) -> void:
-	## 왼쪽 위 출동 정보 (빈 제목이면 숨김)
+	## 단말기 아래칸 출동 정보 (빈 제목이면 숨김)
 	mission_box.visible = title != ""
 	if title == "":
 		return
+	mission_head.text = "출동"
 	mission_title.text = title
 	var s := int(max(left, 0.0))
-	mission_info.text = "%s · %dm · %d:%02d · %d/%d" % [place, int(dist), s / 60, s % 60, done, total]
-	mission_info.modulate = Color(1, 0.45, 0.4) if s <= 15 and s % 2 == 0 else Color.WHITE
+	mission_info.text = "%s  %dm  %d:%02d  %d/%d" % [place, int(dist), s / 60, s % 60, done, total]
+	mission_info.add_theme_color_override("font_color", RED if s <= 15 else Color(0.62, 0.65, 0.69))
+
+
+func set_raid(text: String) -> void:
+	## 급습 중엔 출동 칸을 쓴다
+	mission_box.visible = text != ""
+	mission_head.text = "급습"
+	mission_title.text = text
+	mission_info.text = ""
 
 
 func set_driving(on: bool, kind := "") -> void:
-	## 운전 중엔 무기 표시를 숨기고, 소방차일 때만 조준점
 	weapon_label.visible = not on
 	ammo_label.visible = not on
 	crosshair.visible = not on or kind == "firetruck"
@@ -111,11 +132,8 @@ func show_polaroid(tex: Texture2D, caption: String, good: bool) -> void:
 func set_rank(rank_name: String, zone_name: String, xp: int, lo: int, hi: int) -> void:
 	rank_label.text = rank_name
 	zone_label.text = zone_name
-	cur_rank.text = str(Game.rank() + 1)
-	next_rank.text = str(Game.rank() + 2)
 	if hi <= lo:
-		next_label.text = "최고 계급 · 실적 %d" % xp
-		next_rank.text = "★"
+		next_label.text = "%d" % xp
 		xp_bar.max_value = 1
 		xp_bar.value = 1
 		return
@@ -128,13 +146,26 @@ func set_money(m: int) -> void:
 	_money_target = m
 
 
+func money_delta(amount: int) -> void:
+	## 돈 밑에 +50 / -20 이 잠깐
+	if amount == 0:
+		return
+	delta_label.text = ("+%d" if amount > 0 else "%d") % amount
+	delta_label.add_theme_color_override("font_color", YEL if amount > 0 else RED)
+	delta_label.modulate.a = 1.0
+	if _delta_tw:
+		_delta_tw.kill()
+	_delta_tw = create_tween()
+	_delta_tw.tween_interval(1.0)
+	_delta_tw.tween_property(delta_label, "modulate:a", 0.0, 0.5)
+
+
 func _process(delta: float) -> void:
 	if viewfinder.visible and _player:
 		var n: int = _player.photo_targets().size()
-		vf_targets.text = ("신고 대상 %d 포착!" % n) if n > 0 else ""
+		vf_targets.text = ("포착 %d" % n) if n > 0 else ""
 	_money_shown = move_toward(_money_shown, _money_target, max(abs(_money_target - _money_shown) * 8.0, 40.0) * delta)
 	money_label.text = _won(int(_money_shown))
-	# 오른쪽 아래 현재 위치 (GTA 의 동네/거리 이름 자리)
 	_place_t -= delta
 	if _place_t <= 0.0 and _world and _player:
 		_place_t = 0.5
@@ -156,8 +187,8 @@ func set_clock(text: String) -> void:
 
 
 func set_quota(text: String, done: bool) -> void:
-	quota_label.text = ("✔ " if done else "") + text
-	quota_label.modulate = Color(0.6, 1, 0.6) if done else Color.WHITE
+	quota_label.text = text
+	quota_label.add_theme_color_override("font_color", YEL if done else Color(0.91, 0.918, 0.929))
 
 
 func set_district(text: String) -> void:
@@ -176,40 +207,51 @@ func set_combo(mult: float) -> void:
 	if mult <= 1.0:
 		combo_label.modulate.a = 0.0
 		return
-	combo_label.text = "콤보 x%.1f" % mult
+	combo_label.text = "x%.2f" % mult
 	combo_label.modulate.a = 1.0
-	combo_label.pivot_offset = combo_label.size / 2
-	combo_label.scale = Vector2.ONE * 1.4
-	create_tween().tween_property(combo_label, "scale", Vector2.ONE, 0.2)
 
 
 func add_feed(text: String, color := Color.WHITE) -> void:
-	## GTA 식 알림: 미니맵 위에 검은 상자로 쌓인다 (새 것이 아래)
-	var l := PanelContainer.new()
-	var sb := StyleBoxFlat.new()
-	sb.bg_color = Color(0, 0, 0, 0.62)
-	sb.content_margin_left = 10
-	sb.content_margin_right = 10
-	sb.content_margin_top = 4
-	sb.content_margin_bottom = 6
-	sb.border_width_left = 4
-	sb.border_color = color
-	l.add_theme_stylebox_override("panel", sb)
+	## 짧은 알림: 미니맵 위에 한 줄씩 (최대 3개, 3초)
+	var l := Label.new()
+	l.text = text
+	l.add_theme_font_size_override("font_size", 15)
+	l.add_theme_color_override("font_color", color.lerp(Color.WHITE, 0.4))
 	l.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	var t := Label.new()
-	t.text = text
-	t.add_theme_font_size_override("font_size", 19)
-	t.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	l.add_child(t)
 	feed.add_child(l)
-	while feed.get_child_count() > 5:
+	while feed.get_child_count() > 3:
 		var old := feed.get_child(0)
 		feed.remove_child(old)
 		old.queue_free()
 	var tw := l.create_tween()
 	tw.tween_interval(3.0)
-	tw.tween_property(l, "modulate:a", 0.0, 0.6)
+	tw.tween_property(l, "modulate:a", 0.0, 0.5)
 	tw.tween_callback(l.queue_free)
+
+
+func radio(line: String, who := "상황실") -> void:
+	## 무전 한 줄 (단말기 밑에 잠깐). 여러 개면 차례로
+	_radio_queue.append([who, line])
+	if not radio_box.visible:
+		_next_radio()
+
+
+func _next_radio() -> void:
+	if _radio_queue.is_empty():
+		radio_box.visible = false
+		return
+	var item: Array = _radio_queue.pop_front()
+	radio_who.text = "무전 · " + item[0]
+	radio_line.text = item[1]
+	radio_box.visible = true
+	radio_box.modulate.a = 1.0
+	Sfx.play("radio", -10.0)
+	if _radio_tw:
+		_radio_tw.kill()
+	_radio_tw = create_tween()
+	_radio_tw.tween_interval(clampf(item[1].length() * 0.09, 2.5, 6.0))
+	_radio_tw.tween_property(radio_box, "modulate:a", 0.0, 0.3)
+	_radio_tw.tween_callback(_next_radio)
 
 
 func set_mental(cur: int, maximum: int) -> void:
@@ -219,12 +261,7 @@ func set_mental(cur: int, maximum: int) -> void:
 
 
 func set_complaints(cur: int, maximum: int) -> void:
-	## 민원은 GTA 의 수배 별처럼
-	wanted_label.text = "" if cur <= 0 else "★".repeat(min(cur, 5)) + "☆".repeat(max(5 - cur, 0))
-	if cur > 0:
-		wanted_label.pivot_offset = Vector2(wanted_label.size.x, wanted_label.size.y / 2)
-		wanted_label.scale = Vector2.ONE * 1.3
-		create_tween().tween_property(wanted_label, "scale", Vector2.ONE, 0.25)
+	wanted_label.text = "" if cur <= 0 else "민원 " + "■".repeat(min(cur, 5)) + "□".repeat(max(5 - cur, 0))
 
 
 func set_weapon(id: String) -> void:
@@ -234,41 +271,54 @@ func set_weapon(id: String) -> void:
 func set_ammo(id: String, cur: float, maximum: float) -> void:
 	ammo_bar.max_value = maximum
 	ammo_bar.value = cur
-	if Game.WEAPONS[id].mode == "throw":
-		ammo_label.text = "%d  /  %d" % [int(cur), int(maximum)]
-	else:
-		ammo_label.text = "%d  /  %d" % [int(ceil(cur)), int(maximum)]
-	ammo_label.modulate = Color(1, 0.4, 0.4) if cur < maximum * 0.2 else Color.WHITE
+	ammo_label.text = "%d / %d" % [int(ceil(cur)), int(maximum)]
+	ammo_label.add_theme_color_override("font_color", RED if cur < maximum * 0.2 else Color(0.91, 0.918, 0.929))
 
 
 func set_truck(charge: float) -> void:
 	truck_box.visible = false
 	truck_bar.value = charge
-	truck_box.modulate = Color(1, 1, 1) if charge >= 1.0 else Color(1, 1, 1, 0.6)
 
 
 func set_prompt(text: String) -> void:
-	prompt.text = text
+	## "E  쓰레기 줍기" -> [E] 쓰레기 줍기
+	prompt.visible = text != ""
+	if text == "":
+		return
+	var parts := text.split("  ", false, 1)
+	if parts.size() == 2:
+		prompt_key.text = parts[0]
+		prompt_text.text = parts[1]
+		prompt_key.visible = true
+	else:
+		prompt_key.visible = false
+		prompt_text.text = text
+	prompt.reset_size()
+	prompt.position.x = (get_viewport().get_visible_rect().size.x - prompt.size.x) / 2
 
 
-func set_hint(text: String) -> void:
-	hint.text = text
+func set_hint(_text: String) -> void:
+	## 화면 아래 안내 줄은 쓰지 않는다 (가르치는 건 동료와의 대화로)
+	hint.visible = false
 
 
 func banner(big: String, small := "", duration := 2.5) -> void:
+	## 큰 순간에만: 화면을 가로지르는 띠가 미끄러져 들어온다
 	banner_big.text = big
 	banner_small.text = small
-	var b: Control = banner_big.get_parent()
-	b.modulate.a = 1.0
-	b.pivot_offset = b.size / 2
-	b.scale = Vector2.ONE * 0.6
+	banner_small.visible = small != ""
+	banner_box.visible = true
+	banner_box.modulate.a = 1.0
+	var h: Control = banner_box.get_node("H")
+	h.position.x = -60.0
 	if _banner_tw:
 		_banner_tw.kill()
-	_banner_tw = create_tween()
-	_banner_tw.tween_property(b, "scale", Vector2.ONE, 0.25).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+	_banner_tw = create_tween().set_ignore_time_scale(true)
+	_banner_tw.tween_property(h, "position:x", 0.0, 0.25).set_trans(Tween.TRANS_QUART).set_ease(Tween.EASE_OUT)
 	if duration > 0.0:
 		_banner_tw.tween_interval(duration)
-		_banner_tw.tween_property(b, "modulate:a", 0.0, 0.4)
+		_banner_tw.tween_property(banner_box, "modulate:a", 0.0, 0.35)
+		_banner_tw.tween_callback(func(): banner_box.visible = false)
 
 
 func hit(strong: bool) -> void:
@@ -279,18 +329,15 @@ func hit(strong: bool) -> void:
 	tw.parallel().tween_property(hitmarker, "modulate:a", 0.0, 0.35 if strong else 0.15)
 
 
-func announce(text: String, color := Color(1, 0.85, 0.25)) -> void:
-	## 콤보 외침 (더블! 트리플! 물벼락!)
+func announce(text: String, color := YEL) -> void:
+	## 조준점 밑 짧은 한 마디 (드물게)
 	announce_label.text = text
 	announce_label.add_theme_color_override("font_color", color)
 	announce_label.modulate.a = 1.0
-	announce_label.scale = Vector2.ONE * 2.2
-	announce_label.rotation = deg_to_rad(randf_range(-6, 6))
 	if _announce_tw:
 		_announce_tw.kill()
 	_announce_tw = create_tween().set_ignore_time_scale(true)
-	_announce_tw.tween_property(announce_label, "scale", Vector2.ONE, 0.18).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
-	_announce_tw.tween_interval(0.7)
+	_announce_tw.tween_interval(1.0)
 	_announce_tw.tween_property(announce_label, "modulate:a", 0.0, 0.3)
 
 

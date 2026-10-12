@@ -238,16 +238,7 @@ func _ready() -> void:
 		_build_spray_can()
 	if task() != "":
 		add_to_group("incident")
-	if LABELS.has(kind) or title != "":
-		_label = _make_label(Game.TASKS[task()].color if task() != "" else Color.WHITE, 34)
-		_label.position.y = _head_y() + 0.25
-		_label.text = title if title != "" else LABELS[kind]
-		if kind == "boss":
-			_label.font_size = 64
-			_label.modulate = Color(1, 0.8, 0.1)
-		if kind == "jaywalker":
-			_label.visible = false
-
+	# 머리 위 이름표는 달지 않는다 (두목은 덩치와 연기로 알아본다)
 	match kind:
 		"normal", "runner", "angry", "boss", "teen_smoker":
 			_set_state(State.SMOKING)
@@ -1102,6 +1093,8 @@ func _build_spray_can() -> void:
 
 
 func say(text: String, color := Color.WHITE) -> void:
+	## 머리 위 말풍선은 띄우지 않는다 (목소리와 몸짓만). 대화는 대화창에서.
+	return
 	_say.text = text
 	_say.modulate = color
 	_say.visible = true

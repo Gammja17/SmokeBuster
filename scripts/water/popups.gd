@@ -6,7 +6,8 @@ static var _font: Font
 
 
 static func text(where: Node, pos: Vector3, msg: String, color: Color, size := 72, rise := 1.2, life := 0.9) -> void:
-	if where == null or not where.is_inside_tree():
+	## 머리 위 글자는 더 이상 띄우지 않는다 (화면이 글씨로 덮이지 않게)
+	if true or where == null or not where.is_inside_tree():
 		return
 	if _font == null:
 		_font = load("res://assets/fonts/Pretendard-ExtraBold.otf")
