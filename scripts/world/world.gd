@@ -52,6 +52,7 @@ var dialogue: CanvasLayer
 var ending: CanvasLayer
 var inside := ""                 # 지금 들어가 있는 건물 (빈 문자열이면 바깥)
 var buddy: Buddy                 # 같이 순찰 도는 신입
+var favors := {}                 # 맡은 동네 부탁 role -> {count, giver}
 var _return_door := {}
 var _hud_t := 0.0
 
@@ -751,6 +752,69 @@ func _complete(task: String, label: String, pos := Vector3.ZERO, reward := -1, s
 		shift.record_catch(task, reward)
 	if big and buddy:
 		buddy.on_catch(task, pos if pos != Vector3.ZERO else player.global_position)
+	_progress_favors(task, pos if pos != Vector3.ZERO else player.global_position)
+
+
+# ---------------------------------------------------------------- 동네 사람 부탁
+
+func favor_status(role: String) -> String:
+	if not Talks.FAVORS.has(role):
+		return ""
+	if Game.flags.get("favor_%s_%d" % [role, Game.day], false):
+		return "done"
+	if favors.has(role):
+		return "active"
+	return "offer" if rank >= Talks.FAVORS[role].rank else ""
+
+
+func favor_progress(role: String) -> String:
+	return "%d/%d" % [favors[role].count, Talks.FAVORS[role].need] if favors.has(role) else ""
+
+
+func accept_favor(role: String, giver: Node3D) -> void:
+	favors[role] = {"count": 0, "giver": giver}
+	hud.add_feed("부탁 · %s  0/%d" % [giver.display_name(), Talks.FAVORS[role].need], Color(0.6, 0.9, 1))
+	giver._update_marker()
+
+
+func _favor_center(role: String) -> Vector3:
+	var f: Dictionary = Talks.FAVORS[role]
+	if f.has("at_door"):
+		for d in city.doors:
+			if d.role == f.at_door:
+				return d.pos
+	var g = favors[role].giver
+	return g.global_position if is_instance_valid(g) else player.global_position
+
+
+func _progress_favors(task: String, pos: Vector3) -> void:
+	for role in favors.keys():
+		var f: Dictionary = Talks.FAVORS[role]
+		var c := _favor_center(role)
+		if task != f.task or Vector2(pos.x - c.x, pos.z - c.z).length() > f.radius:
+			continue
+		favors[role].count += 1
+		var giver = favors[role].giver
+		var name: String = giver.display_name() if is_instance_valid(giver) else "동네 주민"
+		if favors[role].count < f.need:
+			hud.add_feed("부탁 · %s  %s" % [name, favor_progress(role)], Color(0.6, 0.9, 1))
+			continue
+		# 부탁 완료: 사례
+		favors.erase(role)
+		Game.flags["favor_%s_%d" % [role, Game.day]] = true
+		Game.money += f.pay
+		hud.set_money(Game.money)
+		hud.money_delta(f.pay)
+		_add_xp(f.pay)
+		if f.get("mental", false):
+			player.mental = Game.max_mental()
+			hud.set_mental(player.mental, Game.max_mental())
+		if f.get("refill", false):
+			player.refill_all()
+		hud.radio(f.thanks, name)
+		Sfx.play("fanfare", -4.0, 1.2)
+		if is_instance_valid(giver):
+			giver._update_marker()
 
 
 func order_cleared(order: Dictionary) -> void:

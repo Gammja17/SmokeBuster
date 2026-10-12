@@ -192,6 +192,15 @@ func _run() -> void:
 	bud2._wet_cd = 0.0
 	bud2.soak(0.5, Vector3.FORWARD, 1.0)
 	check(bud2.soaked_today == 1 and world.complaints == comp0, "신입한테 물: 비명만, 민원 없음")
+	# 동네 사람 부탁: 분식집 사장님 쓰레기 다섯 개
+	var vendors: Array = world.get_tree().get_nodes_in_group("coworker").filter(func(c): return c.role == "s_vendor")
+	check(not vendors.is_empty() and world.favor_status("s_vendor") == "offer" and vendors[0]._marker.visible, "분식집 사장님 부탁 있음 (노란 표시)")
+	if not vendors.is_empty():
+		world.accept_favor("s_vendor", vendors[0])
+		player.mental = 1
+		for k in 5:
+			world._complete("trash", "쓰레기 줍기", vendors[0].global_position + Vector3(2, 0, 0))
+		check(world.favor_status("s_vendor") == "done" and player.mental == game.max_mental() and not vendors[0]._marker.visible, "부탁 완료 → 떡볶이 (멘탈 회복)")
 	await frames(200)
 	check(not is_instance_valid(s) or s.state == 4, "넘어졌다가 일어나 떠난다")
 

@@ -68,8 +68,14 @@ func has_topic() -> bool:
 	return Talks.TOPICS.has(role) and not Game.flags.get("talk_" + role, false)
 
 
+func _favor() -> String:
+	## 동네 사람 부탁 상태 ("", "offer", "active", "done")
+	var w := get_parent()
+	return w.favor_status(role) if w and w.has_method("favor_status") else ""
+
+
 func _update_marker() -> void:
-	_marker.visible = has_topic()
+	_marker.visible = has_topic() or _favor() == "offer"
 
 
 func display_name() -> String:
@@ -114,11 +120,22 @@ func talk() -> void:
 	if world == null or not world.get("dialogue"):
 		return
 	var convo: Array
+	var who: String = DATA[role].name
 	if has_topic():
 		Game.flags["talk_" + role] = true
-		convo = Talks.TOPICS[role]
+		convo = Talks.TOPICS[role].duplicate()
 	else:
-		convo = [{"who": DATA[role].name, "text": DATA[role].lines.pick_random()}]
+		convo = [{"who": who, "text": DATA[role].lines.pick_random()}]
+	match _favor():
+		"offer":
+			var f: Dictionary = Talks.FAVORS[role]
+			convo.append({"who": who, "text": f.ask, "anim": "explain"})
+			convo.append({"choices": [
+				["맡겨 주세요!", [{"who": who, "text": f.yes, "anim": DATA[role].greet}, {"do": world.accept_favor.bind(role, self)}]],
+				["오늘은 좀 바빠서요.", [{"who": who, "text": "그래요... 시간 나면 부탁해요."}]],
+			]})
+		"active":
+			convo = [{"who": who, "text": "부탁한 거 %s 됐네요. 조금만 더 부탁해요!" % world.favor_progress(role)}]
 	world.dialogue.start(convo, self)
 	_update_marker()
 
