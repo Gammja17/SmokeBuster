@@ -1,9 +1,9 @@
 class_name Human
 extends Node3D
-## VARCO 로 만든 실사 캐릭터. 리깅된 모델 + 모두가 같이 쓰는 애니메이션 묶음.
+## VARCO 로 만든 실사 캐릭터. 리깅된 모델 + 그 몸에 맞춰 구운 애니메이션 묶음.
 ## 모델은 키 1m 로 정규화되어 나오므로 height 로 키를 맞춘다.
 
-const LIB := preload("res://assets/people/anim_lib.res")
+const LIB := preload("res://assets/people/anim_lib.res")   # 원본 경찰 리그 기준 (구운 게 없을 때만)
 
 var anim: AnimationPlayer
 var model: Node3D
@@ -19,8 +19,14 @@ static func make(model_name: String, height := 1.75) -> Human:
 	if h.anim == null:
 		h.anim = AnimationPlayer.new()
 		h.model.add_child(h.anim)
-	h.anim.add_animation_library("h", LIB)
+	h.anim.add_animation_library("h", lib(model_name))
 	return h
+
+
+## 캐릭터 뼈대에 맞춰 구운 애니 (tools/build_char_anims.gd). 없으면 공용.
+static func lib(model_name: String) -> AnimationLibrary:
+	var p := "res://assets/people/baked/%s.res" % model_name
+	return load(p) if ResourceLoader.exists(p) else LIB
 
 
 func play(name: String, blend := 0.2, speed := 1.0) -> void:
