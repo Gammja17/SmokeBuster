@@ -101,6 +101,7 @@ func _run() -> void:
 	var game = root.get_node("Game")
 	game.new_game()
 	game.flags["intro"] = true   # 첫날 소장님 대화는 건너뛴다
+	game.flags["onboard_skip"] = true   # 온보딩 없이 처음부터 다 연다 (온보딩은 맨 끝에서 따로)
 	game.owned = ["spray", "pistol", "bucket", "soaker", "hose"]
 	game.has_truck = true
 
@@ -168,6 +169,11 @@ func _run() -> void:
 	await frames(5)
 	player.equip("spray")
 	_face(player, s.global_position + Vector3.UP * 1.3)
+	var m_seen: int = game.money
+	await frames(25)
+	check(s.has_meta("seen") and game.money == m_seen + world.DISCOVER_PAY, "눈앞 사건 직접 발견 (+%d)" % (game.money - m_seen))
+	money0 = game.money
+	xp0 = game.xp
 	for i in 14:
 		player._fire_cd = 0
 		player._try_single_fire()
@@ -636,7 +642,35 @@ func _run() -> void:
 	await frames(30)
 	check(current_scene.name == "Title", "타이틀 씬")
 
+	# ---- 온보딩: 1일차는 담배만 걸어서, 2일차 출동·순찰차 키
+	game.new_game()
+	game.flags["intro"] = true
+	change_scene_to_file("res://scenes/world.tscn")
+	await frames(10)
+	var w1 = current_scene
+	check(w1.cfg.spawns == ["smoke", "trash"] and w1.shift.mission_quota == 0 and w1.shift.order.is_empty() and not w1.day.raining, "1일차: 담배·쓰레기만, 출동·지시·비 없음 (%s)" % str(w1.cfg.spawns))
+	check(not w1.car_ok() and w1.favor_status("s_vendor") == "", "1일차: 순찰차·부탁 없음")
+	w1._start()
+	await create_timer(0.9).timeout
+	await _skip_dialogue()
+	w1.exit_interior()
+	w1._mission_t = 0.0
+	await frames(10)
+	check(w1.mission.is_empty() and w1.buddy.active, "1일차: 출동 무전 없이 신입이랑 걸어서 순찰")
+	game.day = 2
+	change_scene_to_file("res://scenes/world.tscn")
+	await frames(10)
+	var w2 = current_scene
+	var mech: Array = w2.get_tree().get_nodes_in_group("coworker").filter(func(c): return c.role == "mechanic")
+	check(not w2.car_ok() and w2.shift.mission_quota == 1 and "litter" in w2.cfg.spawns, "2일차: 출동·무단투기 시작, 키는 아직")
+	check(not mech.is_empty() and mech[0].has_topic(), "2일차: 정비 담당 노란 표시 (키 주려고)")
+	game.flags["talk_mechanic"] = true
+	check(w2.car_ok(), "정비 담당한테 키 받으면 순찰차")
+	game.day = 4
+	check(game.unlocked("orders") and game.unlocked("thief"), "4일차: 지시·소매치기까지 다 열림")
+
 	game.new_game()
 	game.flags["intro"] = true   # 첫날 소장님 대화는 건너뛴다
+	game.flags["onboard_skip"] = true   # 온보딩 없이 처음부터 다 연다 (온보딩은 맨 끝에서 따로)
 	print("RESULT fails=%d" % fails)
 	quit(fails)

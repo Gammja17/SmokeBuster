@@ -65,6 +65,8 @@ func _ready() -> void:
 
 
 func has_topic() -> bool:
+	if Talks.TOPIC_UNLOCK.has(role) and not Game.unlocked(Talks.TOPIC_UNLOCK[role]):
+		return false
 	return Talks.TOPICS.has(role) and not Game.flags.get("talk_" + role, false)
 
 

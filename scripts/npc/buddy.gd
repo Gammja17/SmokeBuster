@@ -259,7 +259,7 @@ func _spot() -> void:
 			continue
 		if n.has_method("is_active_incident") and not n.is_active_incident():
 			continue
-		if n.get("done") == true:
+		if n.get("done") == true or n.has_meta("seen"):
 			continue
 		var d: float = n.global_position.distance_to(player.global_position)
 		# 담배는 신입도 냄새로만 안다
@@ -271,6 +271,7 @@ func _spot() -> void:
 	if best == null:
 		return
 	_pointed[best.get_instance_id()] = true
+	world.mark_seen(best, false)   # 신입이 알려 준 것도 지도에 뜬다
 	var task: String = best.task() if best.has_method("task") else ""
 	if not SPOT.has(task):
 		return

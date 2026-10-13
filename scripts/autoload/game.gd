@@ -70,6 +70,20 @@ var ending_seen := false
 var flags := {}                    # 한 번 들은 대화/안내 (다시 안 나오게)
 
 
+## 온보딩: 처음 며칠은 일을 하나씩 연다 (그날 아침 사람이 대화로 알려 준다)
+## 1일차 담배·쓰레기만 → 2일차 순찰차·출동·무단투기·노상방뇨 → 3일차 불법업소·비 → 4일차 나머지 전부
+const UNLOCK_DAY := {
+	"car": 2, "missions": 2, "litter": 2, "pee": 2,
+	"shop": 3, "rain": 3,
+	"events": 4, "clues": 4, "favors": 4, "orders": 4, "thief": 4, "teen": 4,
+}
+
+
+func unlocked(feature: String) -> bool:
+	## onboard_skip: 테스트나 예전 세이브는 처음부터 다 열려 있다
+	return day >= UNLOCK_DAY.get(feature, 1) or flags.get("onboard_skip", false)
+
+
 func flag(key: String) -> bool:
 	## 처음이면 false 를 돌려주고 표시해 둔다
 	if flags.get(key, false):
@@ -216,6 +230,13 @@ func patrol_config(r: int) -> Dictionary:
 	if r >= 2:
 		spawns.append_array(["teen_drink", "bully", "drunk"])
 		weights = {"normal": 1.0, "runner": 0.6, "angry": 0.5, "group": 0.35}
+	# 온보딩: 아직 안 연 일은 뺀다
+	for f in ["litter", "pee", "thief", "shop"]:
+		if not unlocked(f):
+			spawns.erase(f)
+	if not unlocked("teen"):
+		for f in ["jaywalk", "teen_smoke", "teen_drink", "bully"]:
+			spawns.erase(f)
 	var zone := zone_for_rank(r)
 	return {
 		"spawns": spawns,
@@ -223,8 +244,8 @@ func patrol_config(r: int) -> Dictionary:
 		"zone": zone,
 		"incidents": min(6 + r * 2, 14),        # 동시에 진행 중인 사건 수 목표
 		"pedestrians": [9, 14, 20, 26, 32][zone],
-		"shops": [0, 1, 2, 3, 4][zone],
-		"events": r >= 1,
+		"shops": [1, 1, 2, 3, 4][zone] if unlocked("shop") else 0,
+		"events": r >= 1 and unlocked("events"),
 		"boss": r >= 3,
 	}
 

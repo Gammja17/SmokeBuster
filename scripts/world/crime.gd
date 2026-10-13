@@ -38,7 +38,7 @@ func on_catch(task: String, pos: Vector3, npc: Node = null) -> void:
 		return
 	var i := Game.district_of(pos)
 	Game.add_clean(i, 0.4 if task == "trash" else 1.6)
-	if task == "trash" or Game.raided[i] or Game.clues[i] >= Game.CLUES_NEEDED:
+	if task == "trash" or Game.raided[i] or Game.clues[i] >= Game.CLUES_NEEDED or not Game.unlocked("clues"):
 		return
 	var chance := 1.0 if task in CLUE_ALWAYS or (npc and npc.kind == "boss") else 0.18
 	if randf() < chance:

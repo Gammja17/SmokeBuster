@@ -65,7 +65,8 @@ func _draw() -> void:
 			_dot(xf, k, n.global_position, Color(0.85, 0.85, 0.85, 0.55), 2.5)
 	var blink := 0.6 + 0.4 * sin(Time.get_ticks_msec() * 0.01)
 	for n in get_tree().get_nodes_in_group("incident"):
-		if not n.is_active_incident() or preload("res://scripts/ui/indicators.gd").hidden_smoker(n):
+		var ind := preload("res://scripts/ui/indicators.gd")
+		if not n.is_active_incident() or ind.hidden_smoker(n) or not ind.known(n):
 			continue
 		var big: bool = n is Npc and n.kind == "boss"
 		_icon(xf, k, n.global_position, Color(1, 0.45, 0.2, blink), 7.5 if big else 5.0, false, true)

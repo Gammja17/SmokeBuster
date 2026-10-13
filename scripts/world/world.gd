@@ -253,6 +253,8 @@ func phone_call(who: String) -> Array:
 	## 폰으로 전화. [누가, 대답]
 	match who:
 		"ops":
+			if not Game.unlocked("missions"):
+				return ["상황실 요원", "오늘은 첫날이잖아요~ 출동은 내일부터!"]
 			if not mission.is_empty():
 				return ["상황실 요원", "지금 출동 중이잖아요! 그거부터 끝내요."]
 			if inside != "":
@@ -260,6 +262,8 @@ func phone_call(who: String) -> Array:
 			_mission_t = 0.5
 			return ["상황실 요원", "마침 신고 하나 들어왔어요! 바로 보낼게요."]
 		"mech":
+			if not car_ok():
+				return ["정비 담당", "키도 안 받아 갔으면서 무슨 차야~ 차고로 와."]
 			if Game.money < 50:
 				return ["정비 담당", "공짜는 없어 신입~ 50원 들고 와."]
 			if inside != "" or vehicle != null:
@@ -356,6 +360,7 @@ func _process(delta: float) -> void:
 		_update_mission(delta)
 		return
 	_update_spawns(delta)
+	_tick("discover", delta, 0.25, _discover)
 	_update_events(delta)
 	_update_boss_smoke()
 	_update_mission(delta)
@@ -844,7 +849,7 @@ func _complete(task: String, label: String, pos := Vector3.ZERO, reward := -1, s
 # ---------------------------------------------------------------- 동네 사람 부탁
 
 func favor_status(role: String) -> String:
-	if not Talks.FAVORS.has(role):
+	if not Talks.FAVORS.has(role) or not Game.unlocked("favors"):
 		return ""
 	if Game.flags.get("favor_%s_%d" % [role, Game.day], false):
 		return "done"
@@ -901,6 +906,49 @@ func _progress_favors(task: String, pos: Vector3) -> void:
 		Sfx.play("fanfare", -4.0, 1.2)
 		if is_instance_valid(giver):
 			giver._update_marker()
+
+
+const DISCOVER_RANGE := 26.0
+const DISCOVER_PAY := 10
+
+
+func _discover() -> void:
+	## 돌아다니다 눈으로 직접 본 사건은 "발견!" (조금 보상, 그때부터 지도에 표시)
+	var cam := get_viewport().get_camera_3d()
+	if cam == null or vehicle != null and vehicle.speed > 9.0:
+		return
+	var space := get_world_3d().direct_space_state
+	var size := get_viewport().get_visible_rect().size
+	for n in get_tree().get_nodes_in_group("incident"):
+		if n.has_meta("seen") or not n.has_method("is_active_incident") or not n.is_active_incident():
+			continue
+		var wp: Vector3 = n.incident_pos()
+		if wp.distance_to(cam.global_position) > DISCOVER_RANGE or cam.is_position_behind(wp):
+			continue
+		var sp := cam.unproject_position(wp)
+		if sp.x < 0 or sp.y < 0 or sp.x > size.x or sp.y > size.y:
+			continue
+		# 벽에 가려 있으면 못 본 것
+		var q := PhysicsRayQueryParameters3D.create(cam.global_position, wp, 1, [player.get_rid()])
+		var hit := space.intersect_ray(q)
+		if not hit.is_empty() and hit.position.distance_to(wp) > 1.5:
+			continue
+		mark_seen(n, true)
+
+
+func mark_seen(n: Node, by_eye: bool) -> void:
+	if n.has_meta("seen"):
+		return
+	n.set_meta("seen", true)
+	if not by_eye:
+		return
+	var task: String = n.task() if n.has_method("task") else ""
+	var label: String = Game.TASKS[task].short if Game.TASKS.has(task) else "사건"
+	hud.announce("발견! " + label, Color(1, 0.75, 0.35))
+	Game.money += DISCOVER_PAY
+	hud.set_money(Game.money)
+	_add_xp(DISCOVER_PAY)
+	Sfx.play("select", -6.0, 1.4)
 
 
 func order_cleared(order: Dictionary) -> void:
@@ -1096,6 +1144,10 @@ func _toggle_vehicle() -> void:
 		return
 	if player.camera_mode or not player.input_enabled:
 		return
+	if not car_ok():
+		hud.add_feed("순찰차 키는 정비 담당한테 (밖 차고)" if Game.unlocked("car") else "아직 차는 못 타요. 오늘은 걸어서 순찰!", Color(1, 0.8, 0.5))
+		Sfx.play("error", -6.0)
+		return
 	for v in get_tree().get_nodes_in_group("vehicle"):
 		if v.can_enter(player):
 			_enter(v)
@@ -1105,6 +1157,11 @@ func _toggle_vehicle() -> void:
 		if t.global_position.distance_to(player.global_position) < 3.4:
 			_hijack(t)
 			return
+
+
+func car_ok() -> bool:
+	## 순찰차 키: 2일차에 정비 담당한테 받는다 (말 안 걸고 넘어가도 3일차엔 그냥 준다)
+	return Game.flags.get("onboard_skip", false) or (Game.unlocked("car") and (Game.flags.get("talk_mechanic", false) or Game.day >= 3))
 
 
 func _enter(v: Vehicle) -> void:
@@ -1606,7 +1663,7 @@ var _mission_t := 20.0
 
 
 func _update_mission(delta: float) -> void:
-	if mission.is_empty() and inside != "":
+	if mission.is_empty() and (inside != "" or not Game.unlocked("missions")):
 		return
 	if mission.is_empty():
 		_mission_t -= delta
@@ -1637,7 +1694,9 @@ func _start_mission() -> void:
 	var options := []
 	for k in MISSIONS:
 		if rank >= MISSIONS[k].rank and (k != "school" or city.in_zone(_school_pos())):
-			options.append(k)
+			# 처음 며칠은 쉬운 출동만
+			if Game.unlocked("events") or k in ["smoke", "trash"]:
+				options.append(k)
 	var type: String = force_mission_type if force_mission_type != "" else options.pick_random()
 	var info: Dictionary = MISSIONS[type]
 	var targets: Array = []
@@ -1716,6 +1775,9 @@ func _start_mission() -> void:
 					targets.append(n)
 			if targets.is_empty():
 				return
+	for t in targets:
+		if is_instance_valid(t):
+			t.set_meta("seen", true)   # 무전으로 알려 준 현장
 	var reward := int(info.reward * (1.3 if Game.upgrades.ops > 0 else 1.0))
 	mission = {
 		"type": type, "title": info.title, "place": _place_name(pos), "pos": pos,

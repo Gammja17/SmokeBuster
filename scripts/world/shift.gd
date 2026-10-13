@@ -46,10 +46,17 @@ func start(w: Node, d: DayCycle) -> void:
 	var r := Game.rank()
 	quota = 8 + r * 3
 	mission_quota = 2 if r < 3 else 3
+	# 온보딩: 첫날은 가볍게 (출동 없음), 출동은 처음 며칠 하나만
+	if not Game.unlocked("missions"):
+		quota = 3
+		mission_quota = 0
+	elif not Game.unlocked("events"):
+		quota = 5
+		mission_quota = 1
 	clean_start = Game.clean.duplicate()
 	day.hour = START_HOUR
 	# 첫날은 맑게, 그 뒤로는 셋에 하나꼴로 비
-	day.raining = Game.day > 1 and randf() < 0.35
+	day.raining = Game.unlocked("rain") and Game.day > 1 and randf() < 0.35
 	day.rain = 1.0 if day.raining else 0.0
 	_rain_tomorrow = randf() < 0.35
 	day.hour_passed.connect(_on_hour)
@@ -57,8 +64,10 @@ func start(w: Node, d: DayCycle) -> void:
 
 
 func _pick_order(r: int) -> Dictionary:
-	## 첫날은 흡연 단속. 그 뒤로는 계급에 맞는 것 중 어제와 다른 것
-	if Game.day <= 1:
+	## 특별 지시는 4일차부터 (테스트는 첫날 흡연 단속). 그 뒤로는 계급에 맞는 것 중 어제와 다른 것
+	if not Game.unlocked("orders"):
+		return {}
+	if Game.day <= 1 or Game.day == Game.UNLOCK_DAY.orders:
 		return ORDERS[0]
 	var last: String = Game.flags.get("last_order", "")
 	var ok := ORDERS.filter(func(o): return o.rank <= r and o.id != last)

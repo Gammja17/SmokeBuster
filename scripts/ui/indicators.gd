@@ -10,6 +10,11 @@ var _smelled := {}        # 냄새 알림을 이미 띄운 흡연자
 var _smell_msg_t := 0.0
 
 
+static func known(n: Node) -> bool:
+	## 직접 봤거나(발견) 누가 알려 준 사건만 지도/화살표에 나온다. 골초왕은 처음부터
+	return n.has_meta("seen") or (n is Npc and n.kind == "boss")
+
+
 static func hidden_smoker(n: Node) -> bool:
 	## 냄새로 찾아야 하는 사람 (골초왕은 워낙 커서 지도에 나온다)
 	return n is Npc and n.kind != "boss" and n.has_cigarette()
@@ -34,7 +39,7 @@ func _draw() -> void:
 	_draw_smell(cam, rect, center)
 	_draw_car(w, cam, rect, center)
 	for n in get_tree().get_nodes_in_group("incident"):
-		if not n.is_active_incident() or hidden_smoker(n):
+		if not n.is_active_incident() or hidden_smoker(n) or not known(n):
 			continue
 		var wp: Vector3 = n.incident_pos()
 		var dist := wp.distance_to(player.global_position)
