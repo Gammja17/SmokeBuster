@@ -264,12 +264,11 @@ func _build_smoke_den(r: Node3D) -> Dictionary:
 	var w := 18.0
 	var d := 13.0
 	_room(r, w, d, Mats.flat(Color(0.25, 0.17, 0.12), 0.8), Mats.pbr("brick", 3.0, Color(0.5, 0.4, 0.38)), Color(0.18, 0.1, 0.1))
-	var sofa := Mats.flat(Color(0.45, 0.1, 0.12), 0.7)
 	var table := Mats.flat(Color(0.15, 0.1, 0.08), 0.5)
 	var spots: Array = []
 	for i in 4:
 		var c := Vector3(-6.0 + (i % 2) * 12.0, 0, -3.5 + (i / 2) * 5.0)
-		_box(r, Vector3(2.6, 0.45, 0.8), c + Vector3(0, 0.23, -1.0), sofa)
+		_furn(r, "sofa", c + Vector3(0, 0, -1.0), 0.0, 0.9, true)
 		_box(r, Vector3(1.4, 0.55, 0.8), c + Vector3(0, 0.28, 0.2), table, false)
 		spots.append(r.position + c + Vector3(-0.8, 0.1, -0.5))
 		spots.append(r.position + c + Vector3(0.8, 0.1, 0.9))
