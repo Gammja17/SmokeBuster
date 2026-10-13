@@ -563,7 +563,7 @@ func _park(c: Vector2) -> void:
 
 
 func _tree(parent: Node3D, p: Vector3) -> void:
-	_proc_tree(parent, p, rng.randf_range(1.2, 1.6))
+	_varco_tree(parent, p, "pine" if rng.randf() < 0.4 else "cherry", rng.randf_range(5.5, 7.5))
 	var body := StaticBody3D.new()
 	body.position = p + Vector3(0, 1.5, 0)
 	var shape := CollisionShape3D.new()
@@ -630,7 +630,7 @@ func _quad_angle(q: Vector2) -> float:
 func _planter_tree(p: Vector3) -> void:
 	_box(Vector3(0.9, 0.35, 0.9), p + Vector3(0, 0.17, 0), Color(0.45, 0.42, 0.4), true)
 	_box(Vector3(0.75, 0.05, 0.75), p + Vector3(0, 0.36, 0), Color(0.3, 0.22, 0.15), false)
-	_proc_tree(root, p + Vector3(0, 0.35, 0), rng.randf_range(0.9, 1.1))
+	_varco_tree(root, p + Vector3(0, 0.35, 0), "cherry", rng.randf_range(4.2, 5.0))
 
 
 func _bus_stop(p: Vector3, ang: float) -> void:
@@ -741,9 +741,29 @@ func _parked_cars() -> void:
 				var model: String = PARKED[rng.randi_range(0, PARKED.size() - 1)]
 				var off: float = side * 3.6
 				if not _reserved(Vector2(c + off, along)):
-					_prop("cars/" + model, Vector3(c + off, 0.02, along), 0.0 if side > 0 else 180.0, Vector3.ONE * 1.6, true)
+					_parked_car(model, Vector3(c + off, 0.02, along), 0.0 if side > 0 else 180.0)
 				if rng.randf() < 0.5 and not _reserved(Vector2(along, c + off)):
-					_prop("cars/" + PARKED[rng.randi_range(0, PARKED.size() - 1)], Vector3(along, 0.02, c + off), 90.0 if side > 0 else -90.0, Vector3.ONE * 1.6, true)
+					_parked_car(PARKED[rng.randi_range(0, PARKED.size() - 1)], Vector3(along, 0.02, c + off), 90.0 if side > 0 else -90.0)
+
+
+func _parked_car(kind: String, pos: Vector3, rot: float) -> void:
+	## 세워 둔 차 (VarcoCar). 멀면 안 그린다.
+	var n := VarcoCar.make(kind)
+	n.position = pos
+	n.rotation_degrees.y = rot
+	root.add_child(n)
+	for mi: MeshInstance3D in n.find_children("*", "MeshInstance3D", true, false):
+		mi.visibility_range_end = 90.0
+	var body := StaticBody3D.new()
+	body.position = pos
+	body.rotation_degrees.y = rot
+	var shape := CollisionShape3D.new()
+	var box := BoxShape3D.new()
+	box.size = Vector3(2.0, 1.6, 4.8)
+	shape.shape = box
+	shape.position.y = 0.8
+	body.add_child(shape)
+	root.add_child(body)
 
 
 func _reserved(p: Vector2) -> bool:
@@ -1218,36 +1238,14 @@ func _ph(parent: Node3D, name: String, pos: Vector3, rot: float, scl: float) -> 
 	return n
 
 
-func _proc_tree(parent: Node3D, p: Vector3, size := 1.0) -> void:
-	## 줄기 + 잎 덩어리 여러 개 (잎은 잔디 질감으로 우툴두툴하게)
-	var t := Node3D.new()
-	t.position = p
-	t.rotation.y = rng.randf() * TAU
-	t.scale = Vector3.ONE * size
-	parent.add_child(t)
-	var bark := Mats.flat(Color(0.33, 0.24, 0.17), 0.9)
-	var trunk := MeshInstance3D.new()
-	var tm := CylinderMesh.new()
-	tm.top_radius = 0.1
-	tm.bottom_radius = 0.17
-	tm.height = 2.6
-	tm.radial_segments = 8
-	trunk.mesh = tm
-	trunk.material_override = bark
-	trunk.position.y = 1.3
-	t.add_child(trunk)
-	var leaf := Mats.pbr("grass", 1.2, [Color(0.55, 0.85, 0.45), Color(0.45, 0.75, 0.35), Color(0.6, 0.8, 0.4)][rng.randi() % 3])
-	for i in 7:
-		var c := MeshInstance3D.new()
-		var sm := SphereMesh.new()
-		var r := rng.randf_range(0.7, 1.15)
-		sm.radius = r
-		sm.height = r * 1.7
-		sm.radial_segments = 10
-		sm.rings = 6
-		c.mesh = sm
-		c.material_override = leaf
-		var a := TAU * i / 7.0 + rng.randf_range(-0.3, 0.3)
-		var rad := 0.0 if i == 0 else rng.randf_range(0.55, 0.95)
-		c.position = Vector3(cos(a) * rad, (3.6 if i == 0 else rng.randf_range(2.6, 3.4)), sin(a) * rad)
-		t.add_child(c)
+func _varco_tree(parent: Node3D, p: Vector3, kind: String, height: float) -> void:
+	## VARCO 나무 (assets/trees). 크기 1 로 정규화되어 나오므로 키를 맞추고 밑동을 바닥에 둔다.
+	var m: Node3D = load("res://assets/trees/%s.glb" % kind).instantiate()
+	var a := _model_aabb("trees/" + kind)
+	var s := height / a.size.y
+	m.scale = Vector3.ONE * s
+	m.rotation.y = rng.randf() * TAU
+	m.position = p - Vector3(0, a.position.y * s, 0)
+	parent.add_child(m)
+	for mi: MeshInstance3D in m.find_children("*", "MeshInstance3D", true, false):
+		mi.visibility_range_end = 140.0
