@@ -52,7 +52,7 @@ func _draw() -> void:
 		dir = dir.normalized()
 		# 사각형 테두리와 만나는 점
 		var t: float = min(abs(rect.size.x / 2 / dir.x) if dir.x != 0 else INF, abs(rect.size.y / 2 / dir.y) if dir.y != 0 else INF)
-		var pos := center + dir * t
+		var pos := _avoid_hud(center + dir * t)
 		var a := 1.0 - dist / RANGE * 0.6
 		var col := Color(1, 0.55, 0.25, a)
 		var tip := pos + dir * 16
@@ -90,12 +90,12 @@ func _draw_smell(cam: Camera3D, rect: Rect2, center: Vector2) -> void:
 	var t: float = min(abs(rect.size.x / 2 / dir.x) if dir.x != 0 else INF, abs(rect.size.y / 2 / dir.y) if dir.y != 0 else INF)
 	var edge := center + dir * (t + 40.0)
 	var now := Time.get_ticks_msec() * 0.001
-	var a := (0.12 if on_screen else 0.28) * (0.35 + strength)
-	for k in 7:
-		var ph := now * 0.6 + k * 0.9
+	var a := (0.2 if on_screen else 0.5) * (0.4 + strength)
+	for k in 9:
+		var ph := now * 0.6 + k * 0.7
 		var drift := fmod(ph, 1.0)
-		var p := edge - dir * (drift * 110.0) + dir.orthogonal() * sin(ph * 2.3 + k) * 38.0
-		draw_circle(p, 26.0 + drift * 34.0, Color(0.78, 0.74, 0.66, a * (1.0 - drift)))
+		var p := edge - dir * (drift * 150.0) + dir.orthogonal() * sin(ph * 2.3 + k) * 50.0
+		draw_circle(p, 34.0 + drift * 46.0, Color(0.72, 0.66, 0.52, a * (1.0 - drift)))
 	if _smell_msg_t > 0.0:
 		var f := get_theme_default_font()
 		var msg := "어우, 담배 냄새..." if strength < 0.6 else "냄새 진하다... 이 근처다!"
@@ -144,7 +144,7 @@ func _draw_car(w: Node, cam: Camera3D, rect: Rect2, center: Vector2) -> void:
 		dir = -dir
 	dir = dir.normalized() if dir.length() > 1.0 else Vector2.DOWN
 	var t: float = min(abs(rect.size.x / 2 / dir.x) if dir.x != 0 else INF, abs(rect.size.y / 2 / dir.y) if dir.y != 0 else INF)
-	var pos := center + dir * t
+	var pos := _avoid_hud(center + dir * t)
 	draw_rect(Rect2(pos - Vector2(9, 9), Vector2(18, 18)), Color(0, 0, 0, 0.7))
 	draw_rect(Rect2(pos - Vector2(7, 7), Vector2(14, 14)), col)
 	draw_string(f, pos - dir * 44 - Vector2(45, -6), label, HORIZONTAL_ALIGNMENT_CENTER, 90, 16, col)
@@ -173,10 +173,20 @@ func _draw_mission(w: Node, cam: Camera3D, rect: Rect2, center: Vector2) -> void
 		dir = -dir
 	dir = dir.normalized() if dir.length() > 1.0 else Vector2.DOWN
 	var t2: float = min(abs(rect.size.x / 2 / dir.x) if dir.x != 0 else INF, abs(rect.size.y / 2 / dir.y) if dir.y != 0 else INF)
-	var pos := center + dir * t2
+	var pos := _avoid_hud(center + dir * t2)
 	var o := dir.orthogonal()
 	draw_colored_polygon(PackedVector2Array([pos + dir * 40, pos - dir * 14 + o * 30, pos - dir * 14 - o * 30]), dark)
 	draw_colored_polygon(PackedVector2Array([pos + dir * 32, pos - dir * 8 + o * 23, pos - dir * 8 - o * 23]), col)
 	var lbl := "출동 %dm" % dist
 	draw_string_outline(f, pos - dir * 62 - Vector2(60, -8), lbl, HORIZONTAL_ALIGNMENT_CENTER, 120, 22, 7, dark)
 	draw_string(f, pos - dir * 62 - Vector2(60, -8), lbl, HORIZONTAL_ALIGNMENT_CENTER, 120, 22, Color(0.6, 0.85, 1))
+
+
+func _avoid_hud(pos: Vector2) -> Vector2:
+	## 왼쪽 아래 미니맵, 왼쪽 위 단말기와 겹치면 비켜 그린다
+	var vs := get_viewport_rect().size
+	if pos.x < 360.0 and pos.y > vs.y - 270.0:
+		pos.y = vs.y - 270.0
+	if pos.x < 420.0 and pos.y < 300.0:
+		pos.x = 420.0
+	return pos

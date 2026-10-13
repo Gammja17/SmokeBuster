@@ -330,7 +330,7 @@ func _fire_drops(w: Dictionary, count: int) -> void:
 		var t := minf(dist / speed, 1.2)
 		base_dir = (base_dir * speed + Vector3.UP * 0.5 * w.gravity * t).normalized()
 	var spread: float = deg_to_rad(w.spread)
-	var thick := 0.06 if w.mode == "pump" else (0.13 if current == "hose" else 0.08)
+	var thick := 0.04 if w.mode == "pump" else (0.13 if current == "hose" else 0.08)
 	for i in count:
 		var d := base_dir.rotated(camera.global_basis.x, randf_range(-spread, spread)).rotated(camera.global_basis.y, randf_range(-spread, spread))
 		var v := d * speed * randf_range(0.9, 1.05) + Vector3(velocity.x, 0, velocity.z) * 0.3

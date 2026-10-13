@@ -31,7 +31,7 @@ var _wet_spots: Array = []   # [위치, 반지름, 마를 시각] 사람이 미�
 func _ready() -> void:
 	add_to_group("water_system")
 	var water_mat := StandardMaterial3D.new()
-	water_mat.albedo_color = Color(0.55, 0.82, 1.0, 0.7)
+	water_mat.albedo_color = Color(0.6, 0.85, 1.0, 0.5)
 	water_mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
 	water_mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
 	water_mat.emission_enabled = true
@@ -242,6 +242,9 @@ func _draw() -> void:
 		var xf := Transform3D()
 		if _radius[i] > 0.0:
 			xf.basis = Basis().scaled(Vector3.ONE * 0.7)
+		elif _life[i] > 2.45:
+			# 막 나온 물방울은 카메라 코앞이라 화면을 덮는다 → 조금 날아간 뒤부터 그린다
+			xf.basis = Basis().scaled(Vector3.ONE * 0.001)
 		elif speed > 0.01:
 			var z := v / speed
 			var x := z.cross(Vector3.UP)
