@@ -213,21 +213,17 @@ func _build_store(r: Node3D) -> Dictionary:
 	var w := 12.0
 	var d := 10.0
 	_room(r, w, d, Mats.pbr("tiles", 0.8, Color(0.96, 0.96, 0.96)), Mats.flat(Color(0.94, 0.95, 0.93), 0.8), Color(0.65, 0.68, 0.7))
-	var shelf := Mats.flat(Color(0.85, 0.86, 0.88), 0.5, 0.3)
-	var colors := [Color(0.9, 0.3, 0.25), Color(0.25, 0.55, 0.9), Color(0.95, 0.8, 0.2), Color(0.3, 0.75, 0.4), Color(0.95, 0.55, 0.2)]
+	# 진열대 세 줄 (한 줄에 두 개, 앞뒤로 물건)
 	for row in 3:
 		var x := -3.5 + row * 2.6
-		_box(r, Vector3(0.9, 1.6, 5.0), Vector3(x, 0.8, -1.0), shelf)
-		for k in 10:
-			_box(r, Vector3(0.95, 0.22, 0.4), Vector3(x, 0.45 + (k % 3) * 0.5, -3.2 + (k / 3) * 1.4), Mats.flat(colors[(k + row) % colors.size()], 0.6), false)
-	# 음료 냉장고 (빛나는 문)
-	var fridge := Mats.flat(Color(0.75, 0.88, 1.0), 0.1, 0.3)
-	fridge.emission_enabled = true
-	fridge.emission = Color(0.8, 0.92, 1.0)
-	fridge.emission_energy_multiplier = 0.8
-	_box(r, Vector3(5.0, 2.2, 0.6), Vector3(1.5, 1.1, -4.6), fridge)
-	# 계산대
-	_box(r, Vector3(2.8, 1.0, 0.8), Vector3(4.3, 0.5, 2.6), Mats.flat(Color(0.2, 0.55, 0.35), 0.5))
+		for z in [-2.2, 0.2]:
+			_furn(r, "store_shelf", Vector3(x, 0, z), PI / 2, 1.6, true)
+	# 음료 냉장고 셋 (문이 매장 쪽)
+	for i in 3:
+		_furn(r, "drink_fridge", Vector3(0.1 + i * 1.42, 0, -4.6), 0.0, 2.2, true)
+	_light(r, Vector3(1.5, 1.6, -3.9), Color(0.85, 0.93, 1.0), 0.8, 3.5)
+	# 계산대 (손님은 안쪽, 알바는 문 쪽)
+	_furn(r, "checkout", Vector3(4.3, 0, 2.6), PI, 1.0, true)
 	_label(r, "24시 편의점", Vector3(0, 2.9, -4.25), 80, Color(0.4, 0.9, 0.5))
 	for x in [-3.0, 3.0]:
 		_light(r, Vector3(x, H - 0.3, 0), Color(1, 1, 1), 1.9, 8.0)
