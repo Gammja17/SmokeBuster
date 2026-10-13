@@ -362,7 +362,7 @@ func _build_garage(r: Node3D) -> Dictionary:
 	var spots: Array = []
 	for i in 6:
 		var x := -9.0 + i * 3.6
-		_box(r, Vector3(0.5, 0.9, 1.8), Vector3(x, 0.45, -6.5), Mats.flat([Color(0.8, 0.15, 0.1), Color(0.1, 0.1, 0.1), Color(0.2, 0.4, 0.9)][i % 3], 0.4, 0.4))
+		_furn(r, "motorcycle", Vector3(x, 0, -6.5), PI if i % 2 else 0.0, 1.15, true)
 		_box(r, Vector3(0.12, 0.02, 4.5), Vector3(x + 1.8, 0.01, -5.5), Mats.flat(Color(0.95, 0.95, 0.9), 0.8), false)
 		spots.append(r.position + Vector3(x + 0.9, 0.1, -4.6))
 	for k in 4:
