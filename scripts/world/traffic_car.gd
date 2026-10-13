@@ -45,10 +45,9 @@ func setup(p_half: float, p_clockwise: bool, start_index: int, p_player: Node3D)
 func _ready() -> void:
 	sync_to_physics = false
 	model_name = "police" if police else MODELS.pick_random()
-	_model = load("res://assets/cars/%s.glb" % model_name).instantiate()
+	_model = VarcoCar.make(model_name)
 	if not police and not drunk:
 		add_to_group("traffic")
-	_model.scale = Vector3.ONE * 1.6
 	_model.rotation.y = PI
 	add_child(_model)
 	for mi in _model.find_children("*", "MeshInstance3D", true, false):

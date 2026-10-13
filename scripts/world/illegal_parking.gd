@@ -15,8 +15,7 @@ var _model: Node3D
 func _ready() -> void:
 	add_to_group("incident")
 	collision_layer = 1
-	_model = load("res://assets/cars/%s.glb" % MODELS.pick_random()).instantiate()
-	_model.scale = Vector3.ONE * 1.6
+	_model = VarcoCar.make(MODELS.pick_random())
 	_model.rotation.y = PI
 	add_child(_model)
 	var col := CollisionShape3D.new()
