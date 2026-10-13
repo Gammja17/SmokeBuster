@@ -239,9 +239,15 @@ func _build_hospital(r: Node3D) -> Dictionary:
 	var d := 10.0
 	_room(r, w, d, Mats.pbr("tiles", 1.0, Color(0.9, 0.97, 0.95)), Mats.flat(Color(0.95, 0.97, 0.97), 0.85), Color(0.65, 0.7, 0.72))
 	_box(r, Vector3(4.0, 1.1, 0.8), Vector3(0, 0.55, -2.5), Mats.flat(Color(0.85, 0.9, 0.92), 0.4))
+	_furn(r, "monitor", Vector3(0.8, 1.1, -2.6), PI, 0.6, false, false)
+	# 대기 소파 두 줄 (접수 쪽을 본다)
 	for row in 2:
-		for k in 5:
-			_box(r, Vector3(0.6, 0.45, 0.6), Vector3(-4.0 + k * 0.7, 0.23, 1.0 + row * 1.6), Mats.flat(Color(0.3, 0.6, 0.75), 0.6))
+		_furn(r, "sofa", Vector3(-2.6, 0, 1.0 + row * 1.6), PI, 0.9, true)
+	# 병상 둘 (머리가 오른쪽 벽)
+	for z in [-3.3, -0.9]:
+		_furn(r, "hospital_bed", Vector3(5.85, 0, z), -PI / 2, 0.9, true)
+	_furn(r, "plant", Vector3(-6.4, 0, -4.4), 0.0, 1.6, true)
+	_furn(r, "water_cooler", Vector3(-6.5, 0, -2.0), PI / 2, 1.3, true)
 	_label(r, "+", Vector3(0, 2.6, -4.7), 220, Color(1, 0.25, 0.25))
 	_label(r, "접수", Vector3(0, 1.6, -2.05), 56, Color(0.2, 0.3, 0.4))
 	for x in [-4.0, 0.0, 4.0]:
