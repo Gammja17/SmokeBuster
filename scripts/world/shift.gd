@@ -129,7 +129,10 @@ func _on_hour(h: int) -> void:
 		25:
 			world.hud.radio("퇴근 한 시간 전이에요.")
 		26:
-			end_shift()
+			if ended:
+				show_report()        # 비번으로 놀다가 새벽 2시 → 집으로
+			else:
+				end_shift()
 
 
 func can_clock_out() -> bool:
@@ -151,11 +154,22 @@ func grade() -> String:
 	return "C"
 
 
-func end_shift() -> void:
+var report_data := {}
+
+
+func show_report() -> void:
+	## 비번 끝 (파출소 소파에서 하루 마치기, 또는 새벽 2시)
+	day.running = false
+	world.report.show_report(report_data)
+
+
+func end_shift(show := true) -> void:
+	## 근무 끝: 성적 매기고 저장. show=false 면 퇴근 후 비번으로 동네에서 놀다가 나중에 성적표
 	if ended:
 		return
 	ended = true
-	day.running = false
+	if show:
+		day.running = false
 	var g := grade()
 	var pay := int((200 + Game.rank() * 150) * GRADE_PAY[g])
 	Game.money += pay
@@ -185,7 +199,9 @@ func end_shift() -> void:
 			Game.add_clean(i, -4.0)
 	Game.day += 1
 	Game.save_game()
-	world.report.show_report(r)
+	report_data = r
+	if show:
+		world.report.show_report(r)
 
 
 func _district_text() -> String:

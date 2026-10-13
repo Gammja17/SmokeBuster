@@ -20,6 +20,8 @@ const DATA := {
 		"우리 학생들 담배 피우면 사진 찍어서 보내주세요.", "학생한테 물 뿌리면 안 됩니다! 사진이요, 사진.", "학교 폭력 보시면 바로 신고 부탁드려요.", "요즘 애들이 참..."]},
 	"s_vendor": {"name": "분식집 사장님", "idle": "explain", "greet": "wave", "town": true, "lines": [
 		"떡볶이 한 접시 하고 가요~", "우리 가게 앞 쓰레기 좀 치워줘서 고마워요!", "저기 노래방 시끄러워서 장사가 안 돼!", "순경 양반, 배고프면 들러요!"]},
+	"f_mom": {"name": "포차 이모", "idle": "idle", "greet": "wave", "town": true, "lines": [
+		"어서 와~ 오뎅 국물 서비스!", "근무 끝나고 와야지, 근무 중엔 안 팔아!", "오늘도 고생했어 우리 순경 양반.", "단골들 여기 다 모여~ 한 잔 하고 가."]},
 	"s_shady": {"name": "업소 사장", "idle": "look_around", "greet": "wave_off", "town": true, "lines": [
 		"아이고 경관님~ 우린 합법이에요 합법.", "못 본 걸로 해주시면 안 될까요? 허허", "음악 소리 좀 키운 것뿐인데...", "다음 주에 정식 허가 나와요, 진짜로!"]},
 }
@@ -138,6 +140,16 @@ func talk() -> void:
 			]})
 		"active":
 			convo = [{"who": who, "text": "부탁한 거 %s 됐네요. 조금만 더 부탁해요!" % world.favor_progress(role)}]
+	# 정비 담당: 순찰차 색 바꾸기
+	if role == "mechanic" and not has_topic() and world.car_ok():
+		var colors := [["경찰 하양", Color(0.95, 0.95, 0.97)], ["경찰 남색", Color(0.12, 0.2, 0.45)], ["형광 연두", Color(0.6, 0.95, 0.2)],
+			["새빨강", Color(0.85, 0.1, 0.1)], ["무광 검정", Color(0.1, 0.1, 0.11)]]
+		var picks := []
+		for c in colors:
+			picks.append([c[0], [{"do": world.buy_paint.bind(c[1])}, {"who": who, "text": "짜잔~ %s! 멋지지?" % c[0], "anim": "laugh"}]])
+		picks.append(["그냥 둘게요.", []])
+		convo.append({"who": who, "text": "순찰차 색 바꿔 줄까? 100원이면 돼.", "anim": "explain"})
+		convo.append({"choices": picks})
 	world.dialogue.start(convo, self)
 	_update_marker()
 

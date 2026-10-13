@@ -34,6 +34,8 @@ var last_vehicle: Vehicle = null # 마지막에 탄 차 (내리면 지도와 화
 var phone: CanvasLayer           # 물대포폰 (B)
 var town: TownLife               # 시간대 풍경, 단골
 var _pending_car: Node3D = null
+var off_duty := false            # 퇴근 후 비번 (사건 없음, 포장마차·PC방에서 놀기)
+var venues: Venues
 var photos: Array = []           # 사진첩 (찍은 단속 사진)
 
 var playing := false
@@ -81,6 +83,9 @@ func _ready() -> void:
 	interiors = Interiors.new()
 	add_child(interiors)
 	interiors.build_all()
+	venues = Venues.new()
+	add_child(venues)
+	venues.build(self)
 	day = DayCycle.new()
 	add_child(day)
 	day.setup(self, city)
@@ -366,6 +371,11 @@ func _process(delta: float) -> void:
 		_update_day_hud()
 	if inside != "":
 		_update_mission(delta)
+		return
+	if off_duty:
+		# 비번: 행인만 다니고 사건은 안 생긴다
+		if npcs_count("ped") < int(cfg.pedestrians * (town.crowd_mult() if town else 1.0)):
+			_spawn_pedestrian(false)
 		return
 	_update_spawns(delta)
 	_tick("discover", delta, 0.25, _discover)
@@ -983,6 +993,105 @@ func mark_seen(n: Node, by_eye: bool) -> void:
 	Sfx.play("select", -6.0, 1.4)
 
 
+func _pocha() -> void:
+	## 포장마차: 퇴근 후 한잔 (멘탈 회복), 만난 적 있는 단골이 합석하면 친밀도 업
+	var who := "포차 이모"
+	if not off_duty:
+		dialogue.start([{"who": who, "text": "어허, 근무 중엔 안 팔아~ 퇴근하고 와!"}], _pocha_owner())
+		return
+	if Game.money < 30:
+		dialogue.start([{"who": who, "text": "외상은 안 돼~ 30원 들고 와요."}], _pocha_owner())
+		return
+	Game.money -= 30
+	hud.set_money(Game.money)
+	hud.money_delta(-30)
+	player.mental = Game.max_mental()
+	hud.set_mental(player.mental, Game.max_mental())
+	var convo: Array = [{"who": who, "text": ["오늘도 고생했어~ 오뎅 국물 서비스!", "떡볶이에 소주 한 잔! 캬~", "우리 순경 양반 얼굴이 폈네!"].pick_random(), "anim": "laugh"}]
+	var met: Array = TownLife.REGULARS.filter(func(r): return Game.flags.get("met_" + r.id, false))
+	if not met.is_empty():
+		var r: Dictionary = met.pick_random()
+		convo.append({"who": r.name, "text": "어, 순경님도 왔네요? 한 잔 받아요! 오늘 동네 얘기 좀 해 줄게요.", "anim": "laugh"})
+		convo.append({"do": func(): town.add_affinity(r.id, 6, "와(과) 한 잔 ♥")})
+	dialogue.start(convo, _pocha_owner())
+	Sfx.play("buy")
+
+
+func _pocha_owner() -> Node3D:
+	for c in get_tree().get_nodes_in_group("coworker"):
+		if c.get("role") == "f_mom":
+			return c
+	return player
+
+
+func _play_pc() -> void:
+	## PC방: 물총 에임 연습 (점수만큼 용돈)
+	if not off_duty:
+		hud.add_feed("근무 중에 PC방은 좀... 퇴근하고 와요", Color(1, 0.8, 0.5))
+		Sfx.play("error", -6.0)
+		return
+	if Game.money < 20:
+		hud.add_feed("돈 부족", Color(1, 0.5, 0.4))
+		return
+	Game.money -= 20
+	hud.set_money(Game.money)
+	var game_ui = load("res://ui/aim_game.tscn").instantiate()
+	add_child(game_ui)
+	get_tree().paused = true
+	Input.mouse_mode = Input.MOUSE_MODE_VISIBLE
+	game_ui.finished.connect(func(score: int):
+		var pay := score * 4
+		Game.money += pay
+		hud.set_money(Game.money)
+		hud.money_delta(pay)
+		var best: int = Game.flags.get("pc_best", 0)
+		if score > best:
+			Game.flags["pc_best"] = score
+			hud.add_feed("PC방 신기록! %d점" % score, Color(0.4, 0.95, 1.0))
+		game_ui.queue_free()
+		get_tree().paused = false
+		player.capture_mouse()
+		_capture_grace = 1.0)
+
+
+func buy_paint(color: Color) -> void:
+	if Game.money < 100:
+		hud.add_feed("돈 부족 (₩100)", Color(1, 0.5, 0.4))
+		return
+	Game.money -= 100
+	hud.set_money(Game.money)
+	hud.money_delta(-100)
+	paint_car(color)
+
+
+func paint_car(color: Color) -> void:
+	## 정비 담당: 순찰차 색 바꾸기
+	Game.flags["car_paint"] = color.to_html(false)
+	for v in get_tree().get_nodes_in_group("vehicle"):
+		if v.kind == "police":
+			v.paint(color)
+
+
+func go_off_duty() -> void:
+	## 퇴근 보고: 성적은 지금 매기고, 성적표는 소파에서 하루 마칠 때. 그때까지 동네에서 논다
+	shift.end_shift(false)
+	off_duty = true
+	if not mission.is_empty():
+		if is_instance_valid(mission.beacon):
+			mission.beacon.queue_free()
+		mission = {}
+		hud.set_mission("", "", 0, 0, 0, 0)
+	if buddy and buddy.active:
+		buddy._go_home()
+	for p in interiors.rooms.station.points:
+		if p.role == "rest":
+			p.label = "E  소파에서 하루 마치기 (성적표)"
+	refresh_doors()
+	hud.banner("퇴근!", "포장마차, PC방에서 놀다 가요 · 파출소 소파에서 하루 마치기", 3.0)
+	hud.radio("수고했어요! 포장마차 이모가 오늘 오뎅 국물 끝내준대요~", "상황실 요원")
+	Sfx.play("fanfare", -4.0)
+
+
 func persuade(n: Npc) -> void:
 	## E: 담배 피우는 사람을 말로 타이른다. 평판이 높을수록, 착한 사람일수록 잘 통한다
 	var chance: float = 0.25 + Game.reputation / 160.0 + {"normal": 0.15, "runner": -0.1, "angry": -0.25}.get(n.kind, 0.0)
@@ -1176,6 +1285,8 @@ func _add_vehicle(kind: String, pos: Vector3, yaw: float, model := "") -> Vehicl
 	v.rotation.y = yaw
 	add_child(v)
 	v.hit_npc.connect(_on_vehicle_hit.bind(v))
+	if kind == "police" and Game.flags.has("car_paint"):
+		v.paint(Color.html(Game.flags.car_paint))
 	return v
 
 
@@ -1444,15 +1555,19 @@ func _use_door(door: Dictionary) -> void:
 		"locker":
 			_open_shop()
 		"rest":
+			if off_duty:
+				shift.show_report()    # 비번: 소파에서 하루 마치기
+				return
 			player.mental = Game.max_mental()
 			hud.set_mental(player.mental, Game.max_mental())
 			player.refill_all()
 			hud.add_feed("휴식 · 멘탈, 물 회복", Color(0.6, 0.9, 1))
 			Sfx.play("refill", -4.0)
 		"desk":
-			if shift.can_clock_out():
-				exit_interior()
-				shift.end_shift()
+			if off_duty:
+				hud.add_feed("이미 퇴근했어요. 소파에서 하루 마치기", Color(0.8, 0.8, 0.8))
+			elif shift.can_clock_out():
+				go_off_duty()
 			else:
 				hud.add_feed("퇴근 불가 · 할당량 또는 22시 이후", Color(1, 0.8, 0.5))
 				Sfx.play("error", -6.0)
@@ -1484,6 +1599,12 @@ func _use_door(door: Dictionary) -> void:
 			Sfx.play("buy")
 		"school":
 			pass
+		"pcbang":
+			enter_interior("pcbang", door)
+		"pocha":
+			_pocha()
+		"pc":
+			_play_pc()
 
 
 func refresh_doors() -> void:
@@ -1711,6 +1832,8 @@ var _mission_t := 20.0
 
 
 func _update_mission(delta: float) -> void:
+	if off_duty:
+		return
 	if mission.is_empty() and (inside != "" or not Game.unlocked("missions")):
 		return
 	if mission.is_empty():

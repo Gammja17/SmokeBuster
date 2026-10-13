@@ -181,6 +181,24 @@ func _arm_hit() -> void:
 			body.apply_central_impulse((body.global_position - global_position).normalized() * 30.0 + Vector3.UP * 12.0)
 
 
+func paint(color: Color) -> void:
+	## 차 색 (모델 재질을 복사해서 색을 곱한다. 유리/바퀴처럼 어두운 건 그대로)
+	if _model == null:
+		return
+	for mi in _model.find_children("*", "MeshInstance3D", true, false):
+		var mesh: Mesh = mi.mesh
+		if mesh == null:
+			continue
+		for i in mesh.get_surface_count():
+			var base := mesh.surface_get_material(i)
+			if not base is StandardMaterial3D:
+				continue
+			var m: StandardMaterial3D = base.duplicate()
+			if m.albedo_color.get_luminance() > 0.25:
+				m.albedo_color = color
+			mi.set_surface_override_material(i, m)
+
+
 func can_enter(p: Node3D) -> bool:
 	return driver == null and global_position.distance_to(p.global_position) < 3.6 + (1.5 if kind == "firetruck" else 0.0)
 

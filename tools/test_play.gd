@@ -492,13 +492,11 @@ func _run() -> void:
 	check(world.vehicle == null, "다시 F 키로 하차")
 
 	# ---- 물리 소품이 물에 밀린다
-	var prop: RigidBody3D = null
-	for c in world.get_children():
-		if c is RigidBody3D:
-			prop = c
-			break
-	check(prop != null, "물리 소품 배치")
-	if prop:
+	var props: Array = world.get_children().filter(func(c): return c is RigidBody3D)
+	check(not props.is_empty(), "물리 소품 배치")
+	# 벽에 붙어 있으면 안 밀리니 소품 몇 개를 차례로 쏴 본다
+	var moved := 0.0
+	for prop in props.slice(0, 4):
 		var p0: Vector3 = prop.global_position
 		player.global_position = p0 + Vector3(0, 0.2, 4)
 		await frames(3)
@@ -507,7 +505,10 @@ func _run() -> void:
 		for i in 60:
 			player._fire_drops(game.WEAPONS.hose, 2)
 			await physics_frame
-		check(prop.global_position.distance_to(p0) > 0.5, "소방호스에 소품이 날아감 (%.1fm)" % prop.global_position.distance_to(p0))
+		moved = prop.global_position.distance_to(p0)
+		if moved > 0.5:
+			break
+	check(moved > 0.5, "소방호스에 소품이 날아감 (%.1fm)" % moved)
 
 	# ---- 3인칭
 	player.set_third_person(true)
@@ -701,6 +702,45 @@ func _run() -> void:
 	await frames(5)
 	check(world.report.visible and game.day == day0 + 1, "퇴근 성적표 (DAY %d)" % day0)
 	check(world.report.get_node("Row/Paper/V/Headline").text.contains("검거"), "신문 1면: 두목 검거 (%s)" % world.report.get_node("Row/Paper/V/Headline").text)
+	world.report.visible = false
+	world.get_tree().paused = false
+
+	# ---- 퇴근 후 비번: 포장마차, PC방, 소파에서 하루 마치기
+	world.go_off_duty()
+	check(world.off_duty and not world.report.visible, "퇴근 → 비번 (성적표는 소파에서)")
+	var pocha: Array = world.city.doors.filter(func(d): return d.role == "pocha")
+	var pcb: Array = world.city.doors.filter(func(d): return d.role == "pcbang")
+	check(pocha.size() == 1 and pcb.size() == 1, "파출소 근처에 포장마차와 PC방")
+	if pocha.size() == 1:
+		game.money += 200
+		player.mental = 1
+		world._use_door(pocha[0])
+		await frames(3)
+		check(player.mental == game.max_mental(), "포장마차 한잔 → 멘탈 회복")
+		await _skip_dialogue()
+	if pcb.size() == 1:
+		world._use_door(pcb[0])
+		await frames(3)
+		check(world.inside == "pcbang", "PC방 안으로")
+		var m_pc: int = game.money
+		world._play_pc()
+		await frames(3)
+		var aim = world.get_children().filter(func(c): return c.has_signal("finished") and c.name == "AimGame")
+		check(not aim.is_empty() and world.get_tree().paused, "PC방 에임 게임 시작")
+		if not aim.is_empty():
+			aim[0]._finish()
+			await frames(3)
+		check(not world.get_tree().paused and game.money >= m_pc - 20, "에임 게임 끝 → 일시정지 풀림")
+		world.exit_interior()
+		await frames(2)
+	for v in world.get_tree().get_nodes_in_group("vehicle"):
+		if v.kind == "police":
+			world.buy_paint(Color(0.85, 0.1, 0.1))
+			check(game.flags.get("car_paint", "") != "", "정비 담당: 순찰차 색 바꾸기")
+			break
+	world._use_door({"role": "rest"})
+	await frames(3)
+	check(world.report.visible, "소파에서 하루 마치기 → 성적표")
 	world.report.visible = false
 	world.get_tree().paused = false
 
