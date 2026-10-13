@@ -3,7 +3,7 @@ extends CanvasLayer
 
 signal continue_play
 
-const CREDITS := """물대포 단속반
+const CREDITS := """DO NOT SMOKE HERE
 
 
 

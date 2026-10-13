@@ -4,7 +4,7 @@ config_version=5
 
 [application]
 
-config/name="물대포 단속반"
+config/name="DO NOT SMOKE HERE"
 run/main_scene="res://scenes/title.tscn"
 config/features=PackedStringArray("4.7")
 

@@ -152,7 +152,7 @@ layout_mode = 2
 theme_override_colors/font_color = Color(1, 1, 1, 0.65)
 theme_override_fonts/font = ExtResource("2_semi")
 theme_override_font_sizes/font_size = 20
-text = "S  M  O  K  E     B  U  S  T  E  R"
+text = "물  대  포     단  속  반"
 horizontal_alignment = 1
 
 [node name="Logo" type="Label" parent="Center"]
@@ -161,8 +161,8 @@ theme_override_colors/font_color = Color(0.97, 0.96, 0.93, 1)
 theme_override_colors/font_shadow_color = Color(0, 0, 0, 0.6)
 theme_override_constants/shadow_offset_y = 6
 theme_override_fonts/font = ExtResource("1_title")
-theme_override_font_sizes/font_size = 112
-text = "물대포 단속반"
+theme_override_font_sizes/font_size = 84
+text = "DO NOT SMOKE HERE"
 horizontal_alignment = 1
 
 [node name="Gap" type="Control" parent="Center"]
