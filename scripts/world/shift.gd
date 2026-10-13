@@ -107,6 +107,8 @@ func order_bonus() -> int:
 
 
 func quota_text() -> String:
+	if mission_quota == 0:
+		return "단속 %d/%d" % [caught, quota]
 	return "단속 %d/%d   출동 %d/%d" % [caught, quota, missions_ok, mission_quota]
 
 

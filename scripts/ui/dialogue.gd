@@ -76,7 +76,16 @@ func _frame_camera(keep := false) -> void:
 	to_player = to_player.normalized()
 	var right := to_player.cross(Vector3.UP).normalized()
 	# 눈높이에서 살짝 위, 1.9m 떨어져 어깨 너머로 (얼굴이 화면 위 1/3 쯤에 오게 조금 아래를 본다)
-	var target := Transform3D(Basis(), head + to_player * 1.9 + right * 0.5 + Vector3.UP * 0.12)
+	var cam_pos := head + to_player * 1.9 + right * 0.5 + Vector3.UP * 0.12
+	# 사이에 벽이나 정류장 같은 게 있으면 그 앞으로 당긴다 (카메라가 물건 속에 박히지 않게)
+	var ex: Array[RID] = [player.get_rid()]
+	if _speaker is CollisionObject3D:
+		ex.append(_speaker.get_rid())
+	var q := PhysicsRayQueryParameters3D.create(head, cam_pos, 1 | 2, ex)
+	var hit := _speaker.get_world_3d().direct_space_state.intersect_ray(q)
+	if not hit.is_empty():
+		cam_pos = head + (hit.position - head) * 0.85
+	var target := Transform3D(Basis(), cam_pos)
 	target = target.looking_at(head - right * 0.15 - Vector3.UP * 0.32, Vector3.UP)
 	if not keep:
 		_cam.global_transform = _prev_cam.global_transform

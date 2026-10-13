@@ -101,7 +101,7 @@ func _draw_smell(cam: Camera3D, rect: Rect2, center: Vector2) -> void:
 		var drift := fmod(ph, 1.0)
 		var p := edge - dir * (drift * 150.0) + dir.orthogonal() * sin(ph * 2.3 + k) * 50.0
 		draw_circle(p, 34.0 + drift * 46.0, Color(0.72, 0.66, 0.52, a * (1.0 - drift)))
-	if _smell_msg_t > 0.0:
+	if _smell_msg_t > 0.0 and not on_screen:   # 눈에 보이면 냄새 말은 필요 없다
 		var f := get_theme_default_font()
 		var msg := "어우, 담배 냄새..." if strength < 0.6 else "냄새 진하다... 이 근처다!"
 		var w := f.get_string_size(msg, HORIZONTAL_ALIGNMENT_LEFT, -1, 22).x

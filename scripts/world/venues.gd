@@ -67,10 +67,13 @@ func _build_pocha(sl: Dictionary) -> void:
 func _build_pcbang(sl: Dictionary) -> void:
 	var it: Interiors = world.interiors
 	var n: Vector3 = sl.normal
-	# 바깥: 네온 간판
-	var sign := it._label(world, "PC방", Vector3.ZERO, 110, Color(0.4, 0.95, 1.0))
-	sign.global_position = sl.pos + n * 0.4 + Vector3.UP * 3.4
-	sign.rotation.y = atan2(n.x, n.z)
+	# 바깥: 원래 있던 "임대문의" 간판을 덮는 검은 판 + 네온 간판
+	var face := Node3D.new()
+	world.add_child(face)
+	face.global_position = sl.pos + n * 0.7
+	face.rotation.y = atan2(n.x, n.z)
+	it._box(face, Vector3(6.4, 1.3, 0.12), Vector3(0, 3.4, 0), Mats.flat(Color(0.04, 0.05, 0.08), 0.6), false)
+	var sign := it._label(face, "PC방  GAME ZONE", Vector3(0, 3.4, 0.08), 96, Color(0.4, 0.95, 1.0))
 	sign.outline_modulate = Color(0.0, 0.15, 0.3)
 	world.city.doors.append({"role": "pcbang", "pos": sl.pos + n * 0.6, "normal": n, "label": "E  PC방 들어가기", "name": "PC방"})
 	# 안
