@@ -30,6 +30,9 @@ var city := CityBuilder.new()
 var cfg := {}
 var rank := 0
 var vehicle: Vehicle = null      # 지금 타고 있는 차
+var last_vehicle: Vehicle = null # 마지막에 탄 차 (내리면 지도와 화면에 "내 차" 표시)
+var phone: CanvasLayer           # 물대포폰 (B)
+var photos: Array = []           # 사진첩 (찍은 단속 사진)
 
 var playing := false
 var complaints := 0
@@ -90,6 +93,13 @@ func _ready() -> void:
 	dialogue.player = player
 	ending = load("res://ui/ending.tscn").instantiate()
 	add_child(ending)
+	phone = load("res://ui/phone.tscn").instantiate()
+	phone.world = self
+	add_child(phone)
+	phone.closed.connect(_close_phone)
+	phone.shop_requested.connect(func():
+		phone.visible = false
+		_open_shop())
 
 	player.water = water
 	player.hydrants = city.hydrants
@@ -198,11 +208,11 @@ func _unhandled_input(event: InputEvent) -> void:
 	if event is InputEventKey and event.pressed and not event.echo and playing:
 		if event.keycode == KEY_ESCAPE and not pause.visible and not shop_layer.visible:
 			pause.open()
-		elif event.keycode == KEY_B and not pause.visible:
+		elif event.keycode == KEY_B and not pause.visible and not phone.visible:
 			if shop_layer.visible:
 				_close_shop()
-			else:
-				_open_shop()
+			elif not dialogue.active:
+				open_phone()
 		elif event.keycode == KEY_F and vehicle and not pause.visible and not shop_layer.visible:
 			# 운전 중엔 플레이어 입력이 꺼져 있어서 여기서 내린다
 			get_viewport().set_input_as_handled()
@@ -224,6 +234,81 @@ func _open_shop() -> void:
 	get_tree().paused = true
 	Input.mouse_mode = Input.MOUSE_MODE_VISIBLE
 	Sfx.play("click")
+
+
+func open_phone() -> void:
+	player.set_camera_mode(false)
+	get_tree().paused = true
+	Input.mouse_mode = Input.MOUSE_MODE_VISIBLE
+	phone.open()
+
+
+func _close_phone() -> void:
+	get_tree().paused = false
+	player.capture_mouse()
+	_capture_grace = 1.0
+
+
+func phone_call(who: String) -> Array:
+	## 폰으로 전화. [누가, 대답]
+	match who:
+		"ops":
+			if not mission.is_empty():
+				return ["상황실 요원", "지금 출동 중이잖아요! 그거부터 끝내요."]
+			if inside != "":
+				return ["상황실 요원", "밖에 나가면 바로 하나 잡아 드릴게요!"]
+			_mission_t = 0.5
+			return ["상황실 요원", "마침 신고 하나 들어왔어요! 바로 보낼게요."]
+		"mech":
+			if Game.money < 50:
+				return ["정비 담당", "공짜는 없어 신입~ 50원 들고 와."]
+			if inside != "" or vehicle != null:
+				return ["정비 담당", "밖에 있을 때 불러."]
+			var car: Node3D = hud.indicators.my_car(self)
+			if car == null:
+				return ["정비 담당", "차가 없는데? 정비고에 말해 봐."]
+			Game.money -= 50
+			hud.set_money(Game.money)
+			hud.money_delta(-50)
+			_deliver_car(car)
+			return ["정비 담당", "옆 도로에 세워 놨어! 이번엔 긁지 마라잉."]
+		"chief":
+			var o: Dictionary = shift.order
+			return ["소장님", "오늘은 '%s'일세. %s" % [o.title, o.line] if not o.is_empty() else "오늘은 자유롭게 순찰하게."]
+		"rookie":
+			if buddy.active:
+				buddy._go_home()
+				return ["신입 순경", "알겠습니다! 파출소에서 기다릴게요."]
+			buddy.sent_home = false
+			if inside == "" and playing:
+				buddy.join()
+				return ["신입 순경", "지금 갈게요 선배님!!"]
+			return ["신입 순경", "밖에 나가시면 바로 따라갈게요!"]
+	return ["", ""]
+
+
+func _deliver_car(car: Node3D) -> void:
+	## 가장 가까운 도로 위, 차선 쪽에 차를 세운다
+	var p := player.global_position
+	var best_x: float = CityBuilder.ROAD_LINES[0]
+	var best_z: float = CityBuilder.ROAD_LINES[0]
+	for r in CityBuilder.ROAD_LINES:
+		if absf(p.x - r) < absf(p.x - best_x):
+			best_x = r
+		if absf(p.z - r) < absf(p.z - best_z):
+			best_z = r
+	var pos: Vector3
+	var yaw: float
+	if absf(p.x - best_x) < absf(p.z - best_z):
+		pos = Vector3(best_x + 2.5, 0.3, p.z)     # 세로 도로 (z 방향으로 달림)
+		yaw = PI
+	else:
+		pos = Vector3(p.x, 0.3, best_z - 2.5)     # 가로 도로
+		yaw = -PI / 2
+	car.global_position = pos
+	car.rotation = Vector3(0, yaw, 0)
+	car.set("speed", 0.0)
+	car.velocity = Vector3.ZERO
 
 
 func _close_shop() -> void:
@@ -917,6 +1002,10 @@ func _on_photo(targets: Array) -> void:
 		if img and not img.is_empty():
 			img.resize(int(img.get_width() * 0.3), int(img.get_height() * 0.3), Image.INTERPOLATE_BILINEAR)
 			tex = ImageTexture.create_from_image(img)
+	if tex:
+		photos.append(tex)
+		if photos.size() > 12:
+			photos.pop_front()
 	if names.is_empty():
 		hud.show_polaroid(tex, "신고할 만한 게 안 찍혔어요", false)
 	else:
@@ -1020,6 +1109,7 @@ func _toggle_vehicle() -> void:
 
 func _enter(v: Vehicle) -> void:
 	vehicle = v
+	last_vehicle = v
 	player.set_driving(true)
 	v.enter(player)
 	hud.set_driving(true, v.kind)

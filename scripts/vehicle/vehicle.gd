@@ -5,11 +5,12 @@ extends CharacterBody3D
 
 signal hit_npc(npc: Node, speed: float)
 
+## max m/s, accel m/s², steer 꺾이는 정도, grip 미끄러졌다 돌아오는 힘 (작을수록 묵직하게 미끄러진다)
 const STATS := {
-	"police": {"model": "police", "max": 22.0, "accel": 12.0, "steer": 2.3},
-	"firetruck": {"model": "firetruck", "max": 15.0, "accel": 7.0, "steer": 1.7},
-	"civilian": {"model": "sedan", "max": 19.0, "accel": 10.0, "steer": 2.1},
-	"excavator": {"model": "", "max": 7.0, "accel": 5.0, "steer": 1.5},
+	"police": {"model": "police", "max": 15.0, "accel": 5.5, "steer": 2.0, "grip": 5.0},
+	"firetruck": {"model": "firetruck", "max": 11.0, "accel": 3.2, "steer": 1.4, "grip": 6.0},
+	"civilian": {"model": "sedan", "max": 14.0, "accel": 5.0, "steer": 1.9, "grip": 4.5},
+	"excavator": {"model": "", "max": 6.0, "accel": 3.0, "steer": 1.3, "grip": 8.0},
 }
 const MOUSE_SENS := 0.0025
 
@@ -37,6 +38,8 @@ var _bump_cd := 0.0
 var _stream: AudioStreamPlayer
 var _boom: Node3D
 var _swinging := false
+var _steer_cur := 0.0          # 핸들은 천천히 돌아간다
+var _move_dir := Vector3.ZERO  # 실제로 미끄러져 가는 방향 (차가 보는 방향을 천천히 따라간다)
 
 
 func _ready() -> void:
@@ -235,19 +238,29 @@ func _physics_process(delta: float) -> void:
 		if Input.is_key_pressed(KEY_D): steer -= 1.0
 		handbrake = Input.is_key_pressed(KEY_SPACE)
 
+	var top: float = st.max * speed_mult
+	var prev := speed
 	if throttle > 0.0:
-		speed = move_toward(speed, st.max * speed_mult, st.accel * delta * (1.0 if speed >= 0.0 else 2.0))
+		if speed < -0.3:
+			speed = move_toward(speed, 0.0, 12.0 * delta)          # 후진 중 브레이크
+		else:
+			# 빠를수록 덜 붙는다 (묵직하게 속도가 오른다)
+			speed = minf(speed + st.accel * (1.0 - 0.75 * maxf(speed, 0.0) / top) * delta, top)
 	elif throttle < 0.0:
-		speed = move_toward(speed, -st.max * 0.4, st.accel * delta * (2.0 if speed > 0.0 else 1.0))
+		if speed > 0.3:
+			speed = move_toward(speed, 0.0, 12.0 * delta)          # 브레이크
+		else:
+			speed = maxf(speed - st.accel * 0.6 * delta, -top * 0.35)
 	else:
-		speed = move_toward(speed, 0.0, 4.0 * delta)
+		speed = move_toward(speed, 0.0, (1.2 + absf(speed) * 0.06) * delta)   # 굴러가다 서서히 선다
 	if handbrake:
-		speed = move_toward(speed, 0.0, 18.0 * delta)
+		speed = move_toward(speed, 0.0, 9.0 * delta)
 
-	# 속도에 비례해서 꺾인다 (서 있으면 안 돎)
-	var turn: float = steer * st.steer * clamp(abs(speed) / 6.0, 0.0, 1.0) * sign(speed if speed != 0.0 else 1.0)
+	# 핸들은 천천히 돌고, 빠를수록 덜 꺾인다 (서 있으면 안 돎)
+	_steer_cur = move_toward(_steer_cur, steer, (3.5 if steer != 0.0 else 5.0) * delta)
+	var turn: float = _steer_cur * st.steer * clampf(absf(speed) / 5.0, 0.0, 1.0) / (1.0 + absf(speed) / 18.0) * signf(speed if speed != 0.0 else 1.0)
 	if handbrake:
-		turn *= 1.6
+		turn *= 1.5
 	rotation.y += turn * delta
 
 	if not is_on_floor():
@@ -255,14 +268,22 @@ func _physics_process(delta: float) -> void:
 	else:
 		velocity.y = -0.5
 	var fwd := -global_basis.z
-	velocity.x = fwd.x * speed
-	velocity.z = fwd.z * speed
+	fwd.y = 0
+	fwd = fwd.normalized()
+	if _move_dir == Vector3.ZERO:
+		_move_dir = fwd
+	# 접지력: 가는 방향이 차 방향을 따라잡는다. 핸드브레이크면 쭉 미끄러진다
+	_move_dir = _move_dir.lerp(fwd, clampf(st.grip * (0.3 if handbrake else 1.0) * delta, 0.0, 1.0)).normalized()
+	velocity.x = _move_dir.x * speed
+	velocity.z = _move_dir.z * speed
 	var before := speed
 	move_and_slide()
 	_handle_collisions(before)
 
-	# 차체 기울기 (꺾을 때 살짝 기운다)
-	_model.rotation.z = lerp(_model.rotation.z, -turn * 0.06, 6.0 * delta)
+	# 차체: 꺾으면 옆으로, 밟으면 뒤로, 서면 앞으로 기운다
+	var acc := (speed - prev) / maxf(delta, 0.001)
+	_model.rotation.z = lerp(_model.rotation.z, -turn * 0.09, 5.0 * delta)
+	_model.rotation.x = lerp(_model.rotation.x, clampf(-acc * 0.012, -0.07, 0.07), 6.0 * delta)   # x 가 + 면 앞이 숙여진다
 
 	_hit_people()
 	_update_lights(delta)

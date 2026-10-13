@@ -192,6 +192,17 @@ func _run() -> void:
 	bud2._wet_cd = 0.0
 	bud2.soak(0.5, Vector3.FORWARD, 1.0)
 	check(bud2.soaked_today == 1 and world.complaints == comp0, "신입한테 물: 비명만, 민원 없음")
+	# 물대포폰: 정비 담당이 차를 가져다준다
+	world.open_phone()
+	await frames(3)
+	check(world.phone.visible and world.get_tree().paused, "B: 폰 꺼내기 (일시정지)")
+	var car_far: Node3D = world.hud.indicators.my_car(world)
+	game.money += 100
+	var reply: Array = world.phone_call("mech")
+	check(car_far != null and car_far.global_position.distance_to(player.global_position) < 15.0, "폰: 정비 담당이 차를 근처 도로에 (%s)" % reply[1])
+	world.phone.close()
+	await frames(3)
+	check(not world.phone.visible and not world.get_tree().paused, "폰 넣기")
 	# 동네 사람 부탁: 분식집 사장님 쓰레기 다섯 개
 	var vendors: Array = world.get_tree().get_nodes_in_group("coworker").filter(func(c): return c.role == "s_vendor")
 	check(not vendors.is_empty() and world.favor_status("s_vendor") == "offer" and vendors[0]._marker.visible, "분식집 사장님 부탁 있음 (노란 표시)")

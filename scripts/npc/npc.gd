@@ -140,6 +140,8 @@ var _prev_state := State.WALK
 var _leave_after_down := false
 var _drip: CPUParticles3D
 var _water: Node
+var _rate := 1.0           # 사람마다 살짝 다른 몸짓 빠르기
+var _height := 1.75
 var _pause_t := 0.0         # 길 가다 잠깐 멈춤 (두리번, 폰, 수다)
 var _chat_with: Npc
 
@@ -208,12 +210,17 @@ func _ready() -> void:
 	_model = Human.make(model_name, height)
 	add_child(_model)
 	_anim = _model.anim
-	_anim.speed_scale = randf_range(0.9, 1.1)
+	_rate = randf_range(0.92, 1.08)
+	_height = height
+	_anim.speed_scale = _rate
 
+	# 젖으면 파랗게 칠하지 않고 어둡고 번들거리게 (물 먹은 옷)
 	_overlay = StandardMaterial3D.new()
-	_overlay.albedo_color = Color(0.3, 0.55, 1.0, 0.0)
+	_overlay.albedo_color = Color(0.05, 0.09, 0.15, 0.0)
 	_overlay.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
-	_overlay.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	_overlay.roughness = 0.08
+	_overlay.metallic = 0.35
+	_overlay.metallic_specular = 0.9
 	_meshes = _model.find_children("*", "MeshInstance3D", true, false)
 	for m in _meshes:
 		# 멀리 있는 사람은 그리지 않는다
@@ -262,6 +269,11 @@ func is_minor() -> bool:
 
 func is_smoker_kind() -> bool:
 	return kind in ADULT_SMOKERS
+
+
+func has_cigarette() -> bool:
+	## 담배를 물고 있다 (어른, 학생 모두) → 냄새로 찾는다
+	return _cig != null and is_instance_valid(_cig) and not done
 
 
 func is_smoking() -> bool:
@@ -793,6 +805,7 @@ func _puff_out() -> void:
 	if not is_instance_valid(self) or done or _puff == null:
 		return
 	_puff.restart()
+	_hide_first_frame(_puff)
 
 
 # ---------------------------------------------------------------- 맞을 때 반응
@@ -1162,6 +1175,9 @@ func _play(anim: String, blend := 0.2) -> void:
 	if a == _model.playing():
 		_anim.seek(0.0)
 	_model.play(a, blend)
+	# 걷기/뛰기는 이동 속도에 맞춰 재생 (발 미끄러짐 방지)
+	var spd := walk_speed if a in ["walk", "walk_f", "walk_old", "stumble"] else run_speed
+	_anim.speed_scale = _rate * Human.stride_rate(a, spd, _height)
 
 
 func _make_label(color: Color, size: int) -> Label3D:
@@ -1338,7 +1354,7 @@ func _build_bar() -> void:
 
 func _update_wet_visual() -> void:
 	var r: float = clamp(wet / need, 0.0, 1.0)
-	_overlay.albedo_color.a = r * 0.45
+	_overlay.albedo_color.a = r * 0.38
 	# 젖었을 때만 덧칠 (덧칠은 메시마다 한 번 더 그리는 비용이 든다)
 	if (r > 0.0) != _overlay_on:
 		_overlay_on = r > 0.0
@@ -1365,7 +1381,16 @@ func _make_steam() -> CPUParticles3D:
 	p.spread = 60
 	get_tree().current_scene.add_child(p)
 	get_tree().create_timer(2.0).timeout.connect(p.queue_free)
+	_hide_first_frame(p)
 	return p
+
+
+func _hide_first_frame(p: CPUParticles3D) -> void:
+	## 막 터진 파티클은 첫 프레임에 위치가 안 잡혀 검은 덩어리로 보인다 → 한 프레임 숨긴다
+	p.visible = false
+	get_tree().create_timer(0.06).timeout.connect(func():
+		if is_instance_valid(p):
+			p.visible = true)
 
 
 ## t초 뒤에 fn 실행. 이 노드가 사라지면 같이 취소된다.

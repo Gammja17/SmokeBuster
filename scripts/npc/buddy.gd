@@ -9,7 +9,7 @@ const WALK := 2.0
 const RUN := 7.6
 const SPOT_RANGE := 32.0
 const SPOT := {
-	"smoke": ["선배님! 담배 피우는 사람이요!", "저쪽에서 연기 나요!", "또 피워요, 또!"],
+	"smoke": ["선배님! 담배 냄새 나요!", "킁킁... 저쪽에서 연기 냄새요!", "또 피워요, 또!"],
 	"litter": ["방금 꽁초 버렸어요!", "쓰레기 막 버려요!"],
 	"jaywalk": ["무단횡단이에요! 사진이요, 사진!", "저 할머니 또 무단횡단..."],
 	"teen_smoke": ["학생이 담배를... 물 말고 사진이요!", "교복 입고 담배 펴요!"],
@@ -60,7 +60,7 @@ func _ready() -> void:
 	add_child(shape)
 	human = Human.make("rookie", 1.62)
 	add_child(human)
-	human.play("idle", 0.0)
+	_act("idle", 0.0)
 	_set_hidden(true)
 
 
@@ -72,9 +72,9 @@ func join() -> void:
 	add_to_group("coworker")
 	_teleport_behind()
 	_set_hidden(false)
-	human.play("salute", 0.2)
+	_act("salute", 0.2)
 	_gesture_t = 1.6
-	world.hud.radio(["선배님! 오늘도 따라다니면서 배우겠습니다!", "저도 같이 가요! 사건 보이면 바로 말씀드릴게요!"].pick_random(), "신입 순경")
+	world.hud.radio(["선배님! 오늘도 따라다니면서 배우겠습니다!", "저도 같이 가요! 사건 보이면 바로 말씀드릴게요!"].pick_random(), "신입 순경", true)
 	_set_station_rookie(false)
 
 
@@ -125,7 +125,7 @@ func display_name() -> String:
 
 
 func gesture(anim: String) -> void:
-	human.play(anim, 0.2)
+	_act(anim, 0.2)
 	_gesture_t = 2.4
 
 
@@ -150,13 +150,13 @@ func soak(_amount: float, _dir: Vector3, _knock: float) -> void:
 		return
 	_wet_cd = 4.0
 	soaked_today += 1
-	human.play("soaked" if soaked_today % 2 == 1 else "surprise", 0.1)
+	_act("soaked" if soaked_today % 2 == 1 else "surprise", 0.1)
 	_gesture_t = 1.8
 	Sfx.play_at("voice_adult", global_position + Vector3.UP * 1.5, 0.0, 1.25)
 	var line: String = WET.pick_random()
 	if soaked_today == 3:
 		line = "선배님... 저 오늘만 세 번째예요..."
-	world.hud.radio(line, "신입 순경")
+	world.hud.radio(line, "신입 순경", true)
 
 
 func wants_water() -> bool:
@@ -168,11 +168,11 @@ func on_catch(_task: String, pos: Vector3) -> void:
 	if not active or _hidden or global_position.distance_to(pos) > 22.0:
 		return
 	_face(pos)
-	human.play("cheer", 0.15)
+	_act("cheer", 0.15)
 	_gesture_t = 1.6
 	if _cheer_cd <= 0.0 and randf() < 0.35 and not world.hud.radio_busy():
 		_cheer_cd = 25.0
-		world.hud.radio(CHEER.pick_random(), "신입 순경")
+		world.hud.radio(CHEER.pick_random(), "신입 순경", true)
 
 
 # ---------------------------------------------------------------- 따라다니기
@@ -219,15 +219,23 @@ func _physics_process(delta: float) -> void:
 	move_and_slide()
 	if _gesture_t <= 0.0:
 		var hs := move.length()
-		human.play("run" if hs > 4.0 else ("walk" if hs > 0.3 else "idle"), 0.25)
+		var an := "sprint" if hs > 4.0 else ("walk" if hs > 0.3 else "idle")
+		human.play(an, 0.25)
+		human.anim.speed_scale = Human.stride_rate(an, hs, 1.62)
 		if hs > 0.3:
 			_face(global_position + move)
 		elif dist > 0.5:
 			_face(player.global_position)
 	_spot_t -= delta
 	if _spot_t <= 0.0:
-		_spot_t = randf_range(7.0, 12.0)
+		_spot_t = randf_range(14.0, 22.0)
 		_spot()
+
+
+func _act(anim_name: String, blend := 0.2) -> void:
+	## 몸짓은 원래 빠르기로
+	human.anim.speed_scale = 1.0
+	human.play(anim_name, blend)
 
 
 func _face(p: Vector3) -> void:
@@ -254,6 +262,9 @@ func _spot() -> void:
 		if n.get("done") == true:
 			continue
 		var d: float = n.global_position.distance_to(player.global_position)
+		# 담배는 신입도 냄새로만 안다
+		if n is Npc and n.has_cigarette() and d > 18.0:
+			continue
 		if d > 9.0 and d < bd:
 			bd = d
 			best = n
@@ -264,9 +275,9 @@ func _spot() -> void:
 	if not SPOT.has(task):
 		return
 	_face(best.global_position)
-	human.play("explain", 0.15)
+	_act("explain", 0.15)
 	_gesture_t = 2.0
-	world.hud.radio("%s  (%s %dm)" % [SPOT[task].pick_random(), _side(best.global_position), int(bd)], "신입 순경")
+	world.hud.radio("%s  (%s %dm)" % [SPOT[task].pick_random(), _side(best.global_position), int(bd)], "신입 순경", true)
 
 
 func _side(p: Vector3) -> String:

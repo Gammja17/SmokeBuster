@@ -237,8 +237,13 @@ func add_feed(text: String, color := Color.WHITE) -> void:
 	tw.tween_callback(l.queue_free)
 
 
-func radio(line: String, who := "상황실") -> void:
-	## 무전 한 줄 (단말기 밑에 잠깐). 여러 개면 차례로
+func radio(line: String, who := "상황실", optional := false) -> void:
+	## 무전 한 줄 (단말기 밑에 잠깐). 여러 개면 차례로.
+	## optional: 수다 같은 건 무전이 비어 있을 때만 (도배 방지). 쌓인 게 많으면 오래된 것부터 버린다
+	if optional and radio_busy():
+		return
+	if _radio_queue.size() >= 2:
+		_radio_queue.pop_front()
 	_radio_queue.append([who, line])
 	if not radio_box.visible:
 		_next_radio()
@@ -261,7 +266,7 @@ func _next_radio() -> void:
 	if _radio_tw:
 		_radio_tw.kill()
 	_radio_tw = create_tween()
-	_radio_tw.tween_interval(clampf(item[1].length() * 0.09, 2.5, 6.0))
+	_radio_tw.tween_interval(clampf(item[1].length() * 0.07, 2.0, 4.5))
 	_radio_tw.tween_property(radio_box, "modulate:a", 0.0, 0.3)
 	_radio_tw.tween_callback(_next_radio)
 

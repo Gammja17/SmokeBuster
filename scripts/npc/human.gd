@@ -41,3 +41,16 @@ func playing() -> String:
 
 func is_playing() -> bool:
 	return anim.is_playing()
+
+
+## 걷기/뛰기 애니가 키 1m 몸에서 발로 땅을 미는 속도 (m/s, tools/_stride.gd 로 잼)
+const STRIDE := {"walk": 0.51, "walk_f": 0.52, "walk_old": 0.27, "stumble": 0.55, "jog": 0.86,
+	"run": 1.73, "sprint": 2.46, "run_kid": 1.0}
+
+
+## 실제로 움직이는 속도에 맞는 재생 배속 (발이 미끄러지지 않게). 걷기/뛰기가 아니면 1
+static func stride_rate(anim_name: String, move_speed: float, height: float) -> float:
+	if not STRIDE.has(anim_name) or move_speed < 0.05:
+		return 1.0
+	return clampf(move_speed / (STRIDE[anim_name] * height), 0.6, 2.4)
+

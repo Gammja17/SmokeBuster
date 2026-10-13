@@ -324,6 +324,11 @@ func _fire_drops(w: Dictionary, count: int) -> void:
 		base_dir = -camera.global_basis.z
 	var speed := Game.weapon_stat(current, "speed")
 	var soak := Game.weapon_stat(current, "soak")
+	# 물방울은 중력으로 떨어지니 조준점에 닿도록 그만큼 위로 쏜다 (조준선 = 맞는 곳)
+	var dist := (target - muzzle).length()
+	if dist >= 2.0:
+		var t := minf(dist / speed, 1.2)
+		base_dir = (base_dir * speed + Vector3.UP * 0.5 * w.gravity * t).normalized()
 	var spread: float = deg_to_rad(w.spread)
 	var thick := 0.06 if w.mode == "pump" else (0.13 if current == "hose" else 0.08)
 	for i in count:
@@ -499,8 +504,9 @@ func _update_body(hspeed: float, sprint: bool) -> void:
 		return
 	var anim := "idle"
 	if hspeed > 0.5:
-		anim = "sprint" if sprint else ("walk" if hspeed < 5.5 else "jog")
+		anim = "sprint" if sprint else ("walk" if hspeed < 2.5 else "run")
 	_body.play(anim, 0.15)
+	_body.anim.speed_scale = Human.stride_rate(anim, hspeed, 1.78)   # 발이 안 미끄러지게
 
 
 func _check_tackle(delta: float, hspeed: float) -> void:

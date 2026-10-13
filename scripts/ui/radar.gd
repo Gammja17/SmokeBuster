@@ -65,10 +65,15 @@ func _draw() -> void:
 			_dot(xf, k, n.global_position, Color(0.85, 0.85, 0.85, 0.55), 2.5)
 	var blink := 0.6 + 0.4 * sin(Time.get_ticks_msec() * 0.01)
 	for n in get_tree().get_nodes_in_group("incident"):
-		if not n.is_active_incident():
+		if not n.is_active_incident() or preload("res://scripts/ui/indicators.gd").hidden_smoker(n):
 			continue
 		var big: bool = n is Npc and n.kind == "boss"
 		_icon(xf, k, n.global_position, Color(1, 0.45, 0.2, blink), 7.5 if big else 5.0, false, true)
+	# 내 차 (하늘색 네모, 가장자리에 붙어서라도 보인다)
+	if world.vehicle == null:
+		var car = get_parent().get_parent().indicators.my_car(world) if get_parent().get_parent().get("indicators") else null
+		if car:
+			_icon(xf, k, car.global_position, Color(0.55, 0.85, 1.0), 6.0, true, true)
 	if world.mission.size() > 0:
 		_icon(xf, k, world.mission.pos, Color(0.3, 0.65, 1, blink), 8.0, true, true)
 	# 플레이어 화살표
