@@ -398,7 +398,7 @@ func _build_penthouse(r: Node3D) -> Dictionary:
 	var spots: Array = []
 	for i in 4:
 		var c := Vector3(-6.5 + (i % 2) * 13.0, 0, -2.5 + (i / 2) * 5.0)
-		_box(r, Vector3(3.2, 0.45, 1.0), c + Vector3(0, 0.23, -1.0), Mats.flat(Color(0.55, 0.1, 0.1), 0.6))
+		_furn(r, "lounge_sofa", c + Vector3(0, 0, -1.5), 0.0, 0.9, true)
 		_box(r, Vector3(1.6, 0.5, 0.9), c + Vector3(0, 0.25, 0.3), gold, false)
 		spots.append(r.position + c + Vector3(-1.0, 0.1, -0.2))
 		spots.append(r.position + c + Vector3(1.0, 0.1, 1.2))
