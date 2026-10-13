@@ -11,17 +11,37 @@ var pocha_pos := Vector3.ZERO
 
 func build(w: Node) -> void:
 	world = w
-	var slots: Array = world.city.shop_slots.filter(func(sl): return not sl.used and world.city.in_zone(sl.pos))
-	slots.sort_custom(func(a, b): return a.pos.distance_to(world.SPAWN) < b.pos.distance_to(world.SPAWN))
-	if slots.size() < 2:
+	# 상가 자리는 불법업소·아지트·분식집이 써야 하니 건드리지 않는다. 파출소 근처 인도 자리 둘을 쓴다
+	var spots: Array = world.city.spots.filter(func(sp): return sp.kind in ["street", "corner"] and not sp.busy)
+	spots.sort_custom(func(a, b): return a.pos.distance_to(world.SPAWN) < b.pos.distance_to(world.SPAWN))
+	if spots.size() < 2:
 		return
-	# 파출소에서 가까운 두 자리 (바로 옆 자리는 너무 붙어 보이니 하나 건너서)
-	var a: Dictionary = slots[0]
-	var b: Dictionary = slots[min(2, slots.size() - 1)]
-	a.used = true
-	b.used = true
-	_build_pocha(a)
-	_build_pcbang(b)
+	var a: Dictionary = spots[0]
+	var b: Dictionary = {}
+	for sp in spots.slice(1):
+		if sp.pos.distance_to(a.pos) > 10.0:
+			b = sp
+			break
+	if b.is_empty():
+		return
+	a.busy = true
+	b.busy = true
+	_build_pocha({"pos": a.pos, "normal": _road_dir(a.pos)})
+	_build_pcbang({"pos": b.pos, "normal": _road_dir(b.pos)})
+
+
+func _road_dir(p: Vector3) -> Vector3:
+	## 가장 가까운 도로 쪽 방향 (가게 앞이 길을 보게)
+	var best := Vector3.FORWARD
+	var bd := INF
+	for r in CityBuilder.ROAD_LINES:
+		if absf(p.x - r) < bd:
+			bd = absf(p.x - r)
+			best = Vector3(signf(r - p.x), 0, 0)
+		if absf(p.z - r) < bd:
+			bd = absf(p.z - r)
+			best = Vector3(0, 0, signf(r - p.z))
+	return best
 
 
 # ---------------------------------------------------------------- 포장마차
@@ -32,7 +52,7 @@ func _build_pocha(sl: Dictionary) -> void:
 	root.name = "Pocha"
 	add_child(root)
 	var n: Vector3 = sl.normal
-	root.global_position = sl.pos + n * 3.2
+	root.global_position = sl.pos
 	root.rotation.y = atan2(n.x, n.z)
 	pocha_pos = root.global_position
 	var tarp := Mats.flat(Color(0.95, 0.42, 0.12), 0.8)
@@ -67,15 +87,27 @@ func _build_pocha(sl: Dictionary) -> void:
 func _build_pcbang(sl: Dictionary) -> void:
 	var it: Interiors = world.interiors
 	var n: Vector3 = sl.normal
-	# 바깥: 원래 있던 "임대문의" 간판을 덮는 검은 판 + 네온 간판
+	# 바깥: 지하 PC방 계단 입구 (인도 위 작은 부스 + 네온 간판)
 	var face := Node3D.new()
 	world.add_child(face)
-	face.global_position = sl.pos + n * 0.7
+	face.global_position = sl.pos
 	face.rotation.y = atan2(n.x, n.z)
-	it._box(face, Vector3(6.4, 1.3, 0.12), Vector3(0, 3.4, 0), Mats.flat(Color(0.04, 0.05, 0.08), 0.6), false)
-	var sign := it._label(face, "PC방  GAME ZONE", Vector3(0, 3.4, 0.08), 96, Color(0.4, 0.95, 1.0))
+	var dark := Mats.flat(Color(0.05, 0.06, 0.09), 0.5)
+	it._box(face, Vector3(2.4, 0.12, 2.2), Vector3(0, 2.6, 0), dark)
+	for x in [-1.15, 1.15]:
+		it._box(face, Vector3(0.1, 2.6, 2.2), Vector3(x, 1.3, 0), dark)
+	it._box(face, Vector3(2.4, 2.6, 0.1), Vector3(0, 1.3, -1.05), dark)
+	var glow := Mats.flat(Color(0.3, 0.9, 1.0), 0.3)
+	glow.emission_enabled = true
+	glow.emission = Color(0.3, 0.9, 1.0)
+	glow.emission_energy_multiplier = 2.0
+	it._box(face, Vector3(2.0, 0.6, 0.05), Vector3(0, 3.05, 1.12), dark, false)
+	it._box(face, Vector3(1.9, 0.04, 0.02), Vector3(0, 2.78, 1.15), glow, false)
+	var sign := it._label(face, "지하 PC방", Vector3(0, 3.05, 1.16), 72, Color(0.4, 0.95, 1.0))
 	sign.outline_modulate = Color(0.0, 0.15, 0.3)
-	world.city.doors.append({"role": "pcbang", "pos": sl.pos + n * 0.6, "normal": n, "label": "E  PC방 들어가기", "name": "PC방"})
+	for k in 4:
+		it._box(face, Vector3(1.9, 0.12, 0.35), Vector3(0, 0.25 - k * 0.0, -0.6 + k * 0.32) + Vector3(0, -k * 0.06, 0), Mats.flat(Color(0.35, 0.35, 0.38), 0.8), false)
+	world.city.doors.append({"role": "pcbang", "pos": sl.pos + n * 1.4, "normal": n, "label": "E  PC방 내려가기", "name": "PC방"})
 	# 안
 	var r := Node3D.new()
 	r.name = "pcbang"
