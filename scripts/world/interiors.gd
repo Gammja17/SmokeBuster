@@ -43,6 +43,48 @@ func _box(root: Node3D, size: Vector3, pos: Vector3, mat: Material, solid := tru
 	return mi
 
 
+func _furn(root: Node3D, name: String, pos: Vector3, yaw: float, size: float, by_height := false, solid := true) -> Node3D:
+	## VARCO 가구 (assets/furniture). 크기 1 로 정규화되어 나오고 앞이 +Z.
+	## size 는 폭(x) 또는 by_height 면 높이. 바닥에 세우고, solid 면 겉 상자로 충돌.
+	var m: Node3D = load("res://assets/furniture/%s.glb" % name).instantiate()
+	var a := _furn_aabb(name, m)
+	var s := size / (a.size.y if by_height else a.size.x)
+	var b := Basis(Vector3.UP, yaw)
+	var c := a.get_center()
+	m.transform = Transform3D(b.scaled(Vector3.ONE * s), pos - b * (Vector3(c.x, a.position.y, c.z) * s))
+	root.add_child(m)
+	if solid:
+		var body := StaticBody3D.new()
+		body.position = pos + Vector3(0, a.size.y * s / 2, 0)
+		body.rotation.y = yaw
+		var cs := CollisionShape3D.new()
+		var sh := BoxShape3D.new()
+		sh.size = a.size * s
+		cs.shape = sh
+		body.add_child(cs)
+		root.add_child(body)
+	return m
+
+
+var _furn_aabbs := {}
+
+
+func _furn_aabb(name: String, m: Node3D) -> AABB:
+	if not _furn_aabbs.has(name):
+		var acc := AABB()
+		var first := true
+		for mi: MeshInstance3D in m.find_children("*", "MeshInstance3D", true, false):
+			var t := Transform3D.IDENTITY
+			var n: Node = mi
+			while n != m:
+				t = (n as Node3D).transform * t
+				n = n.get_parent()
+			acc = t * mi.get_aabb() if first else acc.merge(t * mi.get_aabb())
+			first = false
+		_furn_aabbs[name] = acc
+	return _furn_aabbs[name]
+
+
 func _room(root: Node3D, w: float, d: float, floor_mat: Material, wall_mat: Material, ambient: Color) -> void:
 	## 바닥, 천장, 네 벽. 앞(+z) 벽 가운데가 출입문.
 	_box(root, Vector3(w, 0.2, d), Vector3(0, -0.1, 0), floor_mat)
@@ -108,18 +150,13 @@ func _build_station(r: Node3D) -> Dictionary:
 	var navy := Mats.flat(Color(0.12, 0.2, 0.42), 0.5)
 	var metal := Mats.flat(Color(0.55, 0.6, 0.66), 0.35, 0.6)
 	var wood := Mats.flat(Color(0.42, 0.3, 0.2), 0.7)
-	# 민원 창구
-	_box(r, Vector3(5.0, 1.1, 0.8), Vector3(-2.5, 0.55, 1.5), wood)
-	_box(r, Vector3(5.2, 0.08, 1.0), Vector3(-2.5, 1.14, 1.5), Mats.flat(Color(0.85, 0.85, 0.82), 0.4))
-	_label(r, "민원 접수", Vector3(-2.5, 0.75, 1.92), 44, Color(0.95, 0.95, 0.9))
-	# 창구 위 모니터 두 대
-	var screen := Mats.flat(Color(0.3, 0.55, 0.9), 0.2)
-	screen.emission_enabled = true
-	screen.emission = Color(0.35, 0.6, 1.0)
-	screen.emission_energy_multiplier = 1.2
+	# 민원 창구 (책상 둘, 무릎 들어가는 쪽이 안쪽)
+	for x in [-3.55, -1.45]:
+		_furn(r, "police_counter", Vector3(x, 0, 1.7), PI, 1.1, true)
+	_label(r, "민원 접수", Vector3(-2.5, 0.75, 1.95), 44, Color(0.95, 0.95, 0.9))
+	# 창구 위 모니터 두 대 (근무자 쪽을 본다)
 	for x in [-3.6, -1.4]:
-		_box(r, Vector3(0.9, 0.55, 0.05), Vector3(x, 1.55, 1.3), screen, false)
-		_box(r, Vector3(0.1, 0.3, 0.1), Vector3(x, 1.25, 1.3), Mats.flat(Color(0.1, 0.1, 0.1), 0.5), false)
+		_furn(r, "monitor", Vector3(x, 1.1, 1.35), PI, 0.7, false, false)
 	# 수배 전단: 조직 두목들
 	for i in Game.GANGS.size():
 		var gx := -2.4 + i * 1.2
@@ -128,20 +165,17 @@ func _build_station(r: Node3D) -> Dictionary:
 		wl.outline_size = 0
 	# 화분, 정수기, 태극기 대신 파출소 깃발
 	for pos in [Vector3(-7.4, 0, -4.8), Vector3(7.4, 0, 4.6)]:
-		_box(r, Vector3(0.5, 0.5, 0.5), pos + Vector3(0, 0.25, 0), Mats.flat(Color(0.55, 0.35, 0.25), 0.8))
-		_box(r, Vector3(0.8, 1.0, 0.8), pos + Vector3(0, 1.0, 0), Mats.flat(Color(0.2, 0.5, 0.25), 0.9), false)
-	_box(r, Vector3(0.4, 1.3, 0.4), Vector3(7.4, 0.65, -2.5), Mats.flat(Color(0.9, 0.92, 0.95), 0.4))
-	_box(r, Vector3(0.3, 0.45, 0.3), Vector3(7.4, 1.5, -2.5), Mats.flat(Color(0.5, 0.7, 1.0, 0.7), 0.1))
+		_furn(r, "plant", pos, 0.0, 1.7, true)
+	_furn(r, "water_cooler", Vector3(7.4, 0, -2.5), -PI / 2, 1.3, true)
 	# 업무 일지 (근무 상황판)
 	_box(r, Vector3(3.2, 1.8, 0.08), Vector3(-5.5, 1.8, -5.3), Mats.flat(Color(0.95, 0.95, 0.92), 0.8), false)
 	_label(r, "오늘의 근무", Vector3(-5.5, 2.45, -5.2), 40, Color(0.15, 0.2, 0.35))
 	# 사물함 (장비실)
-	for i in 6:
-		_box(r, Vector3(0.62, 2.1, 0.55), Vector3(4.0 + i * 0.66, 1.05, -5.1), navy)
+	for i in 4:
+		_furn(r, "locker", Vector3(4.0 + i * 0.66, 0, -5.1), 0.0, 2.0, true)
 	_label(r, "장비실", Vector3(5.6, 2.6, -4.7), 64, Color(1, 0.9, 0.5))
 	# 소파 (휴식)
-	_box(r, Vector3(3.0, 0.45, 0.9), Vector3(5.5, 0.23, 2.5), Mats.flat(Color(0.3, 0.32, 0.36), 0.8))
-	_box(r, Vector3(3.0, 0.7, 0.25), Vector3(5.5, 0.6, 2.95), Mats.flat(Color(0.3, 0.32, 0.36), 0.8))
+	_furn(r, "sofa", Vector3(5.5, 0, 2.55), PI, 0.95, true)
 	_box(r, Vector3(1.2, 0.45, 0.7), Vector3(5.5, 0.23, 1.2), wood)
 	# 유치장
 	_box(r, Vector3(3.6, 0.1, 3.0), Vector3(-6.0, 0.05, 3.2), Mats.flat(Color(0.5, 0.5, 0.5), 0.8), false)
@@ -150,11 +184,11 @@ func _build_station(r: Node3D) -> Dictionary:
 	_label(r, "유치장", Vector3(-6.0, 2.9, 1.65), 48, Color(1, 0.6, 0.5))
 	_label(r, "물대포 파출소", Vector3(0, 2.95, -5.3), 80, Color(1, 1, 1))
 	# 소장 책상 (수배 전단 앞)
-	_box(r, Vector3(2.0, 0.76, 0.9), Vector3(0, 0.38, -3.7), wood)
-	_box(r, Vector3(0.5, 0.05, 0.35), Vector3(0.5, 0.79, -3.6), Mats.flat(Color(0.9, 0.9, 0.88), 0.6), false)
+	_furn(r, "office_desk", Vector3(0, 0, -3.7), PI, 0.78, true)
+	_furn(r, "monitor", Vector3(0.35, 0.78, -3.75), PI, 0.5, false, false)
 	_box(r, Vector3(0.6, 0.1, 0.12), Vector3(-0.4, 0.81, -3.3), navy, false)
 	_label(r, "소장", Vector3(-0.4, 0.82, -3.23), 26, Color(1, 0.9, 0.5))
-	_box(r, Vector3(0.6, 1.1, 0.6), Vector3(0, 0.55, -5.0), Mats.flat(Color(0.15, 0.15, 0.18), 0.7), false)
+	_furn(r, "office_chair", Vector3(0.9, 0, -4.9), PI + 0.5, 1.15, true, false)
 	for x in [-5.0, 0.0, 5.0]:
 		_light(r, Vector3(x, H - 0.3, 0), Color(0.95, 0.97, 1.0), 1.8, 9.0)
 	return {
