@@ -32,6 +32,8 @@ var rank := 0
 var vehicle: Vehicle = null      # 지금 타고 있는 차
 var last_vehicle: Vehicle = null # 마지막에 탄 차 (내리면 지도와 화면에 "내 차" 표시)
 var phone: CanvasLayer           # 물대포폰 (B)
+var town: TownLife               # 시간대 풍경, 단골
+var _pending_car: Node3D = null
 var photos: Array = []           # 사진첩 (찍은 단속 사진)
 
 var playing := false
@@ -157,6 +159,9 @@ func _ready() -> void:
 	_spawn_coworkers()
 	_spawn_townsfolk()
 	_spawn_interior_staff()
+	town = TownLife.new()
+	add_child(town)
+	town.setup(self)
 	crime = Crime.new()
 	add_child(crime)
 	crime.setup(self)
@@ -245,6 +250,9 @@ func open_phone() -> void:
 
 func _close_phone() -> void:
 	get_tree().paused = false
+	if is_instance_valid(_pending_car):
+		_deliver_car(_pending_car)
+	_pending_car = null
 	player.capture_mouse()
 	_capture_grace = 1.0
 
@@ -274,7 +282,7 @@ func phone_call(who: String) -> Array:
 			Game.money -= 50
 			hud.set_money(Game.money)
 			hud.money_delta(-50)
-			_deliver_car(car)
+			_pending_car = car       # 폰 넣고 나면 갖다 놓는다 (일시정지 중엔 안 옮김)
 			return ["정비 담당", "옆 도로에 세워 놨어! 이번엔 긁지 마라잉."]
 		"chief":
 			var o: Dictionary = shift.order
@@ -391,7 +399,7 @@ func _update_boss_smoke() -> void:
 # ---------------------------------------------------------------- 사건 채우기
 
 func _update_spawns(delta: float) -> void:
-	if npcs_count("ped") < cfg.pedestrians:
+	if npcs_count("ped") < int(cfg.pedestrians * (town.crowd_mult() if town else 1.0)):
 		_spawn_pedestrian(false)
 	if get_tree().get_nodes_in_group("trash").size() < 12:
 		_tick("trash", delta, 3.0, func(): _spawn_trash(_near_sidewalk_point()))
@@ -598,6 +606,8 @@ func _spawn_pedestrian(anywhere: bool) -> void:
 	if idx < 0:
 		return
 	var n := _new_npc("ped")
+	if town:
+		n.force_model = town.pick_ped_model()   # 시간대에 어울리는 사람 (출근길 회사원, 밤 취객)
 	n.position = city.nav_nodes[idx] + Vector3(randf_range(-0.4, 0.4), 0, randf_range(-0.4, 0.4))
 	npcs.add_child(n)
 	n.start_walking(idx)
@@ -799,10 +809,30 @@ func _on_water_hit(target: Node, _amount: float) -> void:
 		hud.hit(false)
 
 
+## 단속 방법마다 득실: [보상 배율, 주민 평판, 화면에 뜨는 말]
+const METHODS := {
+	"water": [1.0, -0.5, ""],
+	"ambush": [1.5, 0.0, "기습!"],
+	"photo": [0.6, 2.0, "사진 신고"],
+	"talk": [0.5, 3.0, "말로 타이름"],
+	"tackle": [1.0, 1.0, "태클!"],
+	"block": [1.2, 1.5, "차로 막음!"],
+}
+
+
 func _on_npc_resolved(npc: Npc, task: String) -> void:
 	var reward: int = Game.reward_for(npc.kind) if task == "smoke" else Game.TASKS[task].reward
 	if _rush_t > 0.0 and task == "smoke":
 		reward *= 2
+	# 어떻게 잡았나에 따라 돈과 평판이 다르다 (물은 빠르고 돈 되지만 동네 인심을 잃는다)
+	var m: Array = METHODS.get(npc.resolved_by, METHODS.water)
+	if Game.TASKS[task].how in ["water", "chase"] or npc.resolved_by in ["photo", "talk"]:
+		reward = int(reward * m[0])
+		Game.add_rep(m[1])
+		if m[2] != "":
+			hud.announce(m[2], Color(0.6, 1, 0.75) if m[1] > 0.0 else Color(1, 0.8, 0.4))
+		if npc.resolved_by == "talk":
+			Game.add_clean(Game.district_of(npc.global_position), 2.0)
 	var name: String = {"runner": "도망자 검거!", "angry": "다혈질 진압!", "boss": "골초왕 퇴치!!", "thief": "소매치기 검거!"}.get(npc.kind, Game.TASKS[task].name)
 	_complete(task, name, npc.global_position, reward, npc)
 	_cheer(npc.global_position)
@@ -843,6 +873,8 @@ func _complete(task: String, label: String, pos := Vector3.ZERO, reward := -1, s
 		shift.record_catch(task, reward)
 	if big and buddy:
 		buddy.on_catch(task, pos if pos != Vector3.ZERO else player.global_position)
+	if big and town:
+		town.on_catch(pos if pos != Vector3.ZERO else player.global_position)
 	_progress_favors(task, pos if pos != Vector3.ZERO else player.global_position)
 
 
@@ -945,10 +977,23 @@ func mark_seen(n: Node, by_eye: bool) -> void:
 	var task: String = n.task() if n.has_method("task") else ""
 	var label: String = Game.TASKS[task].short if Game.TASKS.has(task) else "사건"
 	hud.announce("발견! " + label, Color(1, 0.75, 0.35))
-	Game.money += DISCOVER_PAY
+	Game.money += DISCOVER_PAY      # 발견은 용돈만 (실적은 단속해야 오른다)
 	hud.set_money(Game.money)
-	_add_xp(DISCOVER_PAY)
+	hud.money_delta(DISCOVER_PAY)
 	Sfx.play("select", -6.0, 1.4)
+
+
+func persuade(n: Npc) -> void:
+	## E: 담배 피우는 사람을 말로 타이른다. 평판이 높을수록, 착한 사람일수록 잘 통한다
+	var chance: float = 0.25 + Game.reputation / 160.0 + {"normal": 0.15, "runner": -0.1, "angry": -0.25}.get(n.kind, 0.0)
+	player.shake(0.1)
+	if randf() < clampf(chance, 0.05, 0.92):
+		n.persuaded()
+		hud.add_feed(["\"아 네네, 끌게요...\"", "\"죄송합니다~\"", "\"여기 금연이에요? 몰랐네\""].pick_random(), Color(0.7, 1, 0.8))
+	else:
+		n.persuade_failed()
+		hud.announce(["안 통한다...", "콧방귀...", "무시당함"].pick_random(), Color(1, 0.6, 0.5))
+		Sfx.play("error", -8.0)
 
 
 func order_cleared(order: Dictionary) -> void:
@@ -1070,6 +1115,9 @@ func _on_annoyed(_npc: Npc, minor: bool) -> void:
 	hud.set_money(Game.money)
 	hud.set_complaints(complaints, 0)
 	hud.money_delta(-20)
+	Game.add_rep(-3.0)
+	if town:
+		town.on_soaked(_npc)
 	if minor and not Game.flag("talk_minor_water"):
 		hud.radio("학생한테 물 뿌리면 안 돼요! 우클릭으로 사진 찍어서 학교에 넘겨요.", "소장님")
 	Sfx.play("error", -4.0)

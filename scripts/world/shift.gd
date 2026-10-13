@@ -163,7 +163,7 @@ func end_shift() -> void:
 		Game.best_grade = g
 	var r := {
 		"day": Game.day, "grade": g, "pay": pay,
-		"stats": "단속 %d / %d\n출동 성공 %d · 실패 %d\n%s\n민원 %d건\n오늘 번 돈 ₩%d" % [caught, quota, missions_ok, missions_fail, order_text(), complaints, earned],
+		"stats": "단속 %d / %d\n출동 성공 %d · 실패 %d\n%s\n민원 %d건 · 주민 평판 %d\n오늘 번 돈 ₩%d" % [caught, quota, missions_ok, missions_fail, order_text(), complaints, int(Game.reputation), earned],
 		"districts": _district_text(),
 		"weather": "비" if _rain_tomorrow else "맑음",
 	}

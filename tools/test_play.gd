@@ -163,13 +163,13 @@ func _run() -> void:
 	var money0: int = game.money
 	var xp0: int = game.xp
 	var order0: int = world.shift.order_count
+	var m_seen: int = game.money
 	var s = world._new_npc("normal")
 	_place_front(player, s, 3.0)
 	world.npcs.add_child(s)
 	await frames(5)
 	player.equip("spray")
 	_face(player, s.global_position + Vector3.UP * 1.3)
-	var m_seen: int = game.money
 	await frames(25)
 	check(s.has_meta("seen") and game.money == m_seen + world.DISCOVER_PAY, "눈앞 사건 직접 발견 (+%d)" % (game.money - m_seen))
 	money0 = game.money
@@ -198,6 +198,71 @@ func _run() -> void:
 	bud2._wet_cd = 0.0
 	bud2.soak(0.5, Vector3.FORWARD, 1.0)
 	check(bud2.soaked_today == 1 and world.complaints == comp0, "신입한테 물: 비명만, 민원 없음")
+	# 단골: 말 걸면 인사, 친해지면 근처 사건 제보, 물 맞히면 실망
+	world.town._ensure_regulars()
+	await frames(3)
+	var park = world.town.regulars.get("park")
+	check(world.town.regulars.size() == 5 and park != null and park.is_in_group("coworker"), "이름 있는 단골 5명 (%d)" % world.town.regulars.size())
+	if park:
+		park.talk()
+		await frames(3)
+		check(world.dialogue.active and game.flags.get("met_park", false) and world.town.affinity("park") > 0, "단골과 첫인사 (친밀도 %d)" % world.town.affinity("park"))
+		await _skip_dialogue()
+		game.regulars["park"] = 40
+		game.flags.erase("regular_park_%d" % game.day)
+		var tipped = world._new_npc("normal")
+		tipped.position = park.global_position + Vector3(20, 0.05, 0)
+		world.npcs.add_child(tipped)
+		await frames(5)
+		park.talk()
+		await frames(3)
+		check(tipped.has_meta("seen"), "친한 단골이 사건 제보 → 지도에 표시")
+		await _skip_dialogue()
+		tipped.queue_free()
+		var a0: int = world.town.affinity("park")
+		world.town.on_soaked(park)
+		check(world.town.affinity("park") < a0, "단골한테 물 → 실망")
+	# 단속 방법: 사진 신고(평판↑), 말로 타이르기, 등 뒤 기습(보상↑)
+	var rep0: float = game.reputation
+	var ph = world._new_npc("normal")
+	_place_front(player, ph, 5.0)
+	world.npcs.add_child(ph)
+	await frames(30)
+	_face(player, ph.incident_pos())
+	player.set_camera_mode(true)
+	await frames(30)
+	player._photo_cd = 0
+	player.snap_photo()
+	await frames(10)
+	player.set_camera_mode(false)
+	check(ph.done and ph.resolved_by == "photo" and game.reputation > rep0, "어른 흡연자 사진 신고 → 평판 %d→%d" % [int(rep0), int(game.reputation)])
+	game.reputation = 100.0
+	var tk = world._new_npc("normal")
+	_place_front(player, tk, 1.6)
+	world.npcs.add_child(tk)
+	await frames(30)
+	for k in 6:
+		if tk.done:
+			break
+		tk._persuade_cd = 0.0
+		player._try_pickup()
+		await frames(3)
+	check(tk.done and tk.resolved_by == "talk", "E 로 말로 타이르기 성공")
+	var am = world._new_npc("normal")
+	_place_front(player, am, 3.0)
+	am.rotation.y = player.rotation.y      # 등을 보이고 서 있다
+	world.npcs.add_child(am)
+	await frames(30)
+	am.rotation.y = player.rotation.y
+	player.equip("soaker")
+	_face(player, am.global_position + Vector3.UP * 1.2)
+	for i in 80:
+		if am.done:
+			break
+		player._fire_drops(game.WEAPONS.soaker, 1)
+		await physics_frame
+	check(am.done and am.resolved_by == "ambush", "등 뒤에서 몰래 쏘면 기습 (%s)" % am.resolved_by)
+	player.equip("spray")
 	# 물대포폰: 정비 담당이 차를 가져다준다
 	world.open_phone()
 	await frames(3)
@@ -205,9 +270,9 @@ func _run() -> void:
 	var car_far: Node3D = world.hud.indicators.my_car(world)
 	game.money += 100
 	var reply: Array = world.phone_call("mech")
-	check(car_far != null and car_far.global_position.distance_to(player.global_position) < 15.0, "폰: 정비 담당이 차를 근처 도로에 (%s)" % reply[1])
 	world.phone.close()
 	await frames(3)
+	check(car_far != null and car_far.global_position.distance_to(player.global_position) < 15.0, "폰: 정비 담당이 차를 근처 도로에 (%s)" % reply[1])
 	check(not world.phone.visible and not world.get_tree().paused, "폰 넣기")
 	# 동네 사람 부탁: 분식집 사장님 쓰레기 다섯 개
 	var vendors: Array = world.get_tree().get_nodes_in_group("coworker").filter(func(c): return c.role == "s_vendor")
@@ -243,6 +308,11 @@ func _run() -> void:
 	player.set_camera_mode(false)
 
 	# ---- 승진하면 그 자리에서 구역이 넓어진다
+	# 앞 테스트에서 쌓인 실적은 지우고 순경 1구역부터
+	game.xp = 0
+	world.rank = 0
+	world.cfg = game.patrol_config(0)
+	world.city.apply_zone(game.ZONES[0].rect)
 	var zone_before: Rect2 = world.city.zone
 	world._add_xp(game.RANK_XP[1] - game.xp + 1)
 	await frames(5)
@@ -373,7 +443,10 @@ func _run() -> void:
 	check(game.xp > xp_b + 300, "가방 돌려주기 보상 (+%d)" % (game.xp - xp_b))
 
 	# ---- 싸움, 낙서, 노상방뇨, 불법주차
-	world._spawn_fight()
+	for k in 5:
+		if world._active("fight") >= 2:
+			break
+		world._spawn_fight()   # 빈 자리가 없으면 실패하니 몇 번 더
 	world._spawn_wall_npc("tagger")
 	world._spawn_wall_npc("pee")
 	world._spawn_parking()

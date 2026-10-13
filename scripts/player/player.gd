@@ -426,7 +426,19 @@ func _door_first() -> bool:
 	return Vector2(door.pos.x - global_position.x, door.pos.z - global_position.z).length() < cw.global_position.distance_to(global_position)
 
 
+func _nearest_smoker() -> Node3D:
+	## 말로 타이를 수 있는 가까운 흡연자
+	for n in get_tree().get_nodes_in_group("smoker"):
+		if n.has_method("can_persuade") and n.can_persuade() and n.global_position.distance_to(global_position) < 2.4:
+			return n
+	return null
+
+
 func _try_pickup() -> void:
+	var sm := _nearest_smoker()
+	if sm and _nearest_trash() == null:
+		get_parent().persuade(sm)
+		return
 	var t := _nearest_trash()
 	var cw := _nearest_coworker()
 	if t == null and cw and not _door_first():
@@ -447,6 +459,8 @@ func _update_prompt() -> void:
 	var text := ""
 	if camera_mode:
 		text = ""
+	elif _nearest_smoker() and not _nearest_trash():
+		text = "E  말로 타이르기 (평판 %d)" % int(Game.reputation)
 	elif _nearest_trash():
 		text = "E  가방 주워 돌려주기" if _nearest_trash().is_in_group("bag") else "E  쓰레기 줍기"
 	elif _nearest_coworker() and not _door_first():

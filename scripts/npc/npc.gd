@@ -140,6 +140,11 @@ var _prev_state := State.WALK
 var _leave_after_down := false
 var _drip: CPUParticles3D
 var _water: Node
+var resolved_by := "water" # 어떻게 해결됐나: water, ambush(몰래 기습), photo, talk(타이르기), tackle, block(차로 막음)
+var _ambush := false
+var _persuade_cd := 0.0
+var regular := ""          # 이름 있는 단골이면 id (TownLife). E 로 말을 걸 수 있다
+var role := ""             # 동료 목록과 같은 이름표 (단골은 비워 둔다)
 var _rate := 1.0           # 사람마다 살짝 다른 몸짓 빠르기
 var _height := 1.75
 var _pause_t := 0.0         # 길 가다 잠깐 멈춤 (두리번, 폰, 수다)
@@ -155,6 +160,8 @@ func setup(p_kind: String, p_city: CityBuilder, p_player: Node3D) -> void:
 func _ready() -> void:
 	add_to_group("npc")
 	add_to_group("soakable")
+	if regular != "":
+		add_to_group("coworker")
 	collision_layer = 2
 	collision_mask = 1
 	match kind:
@@ -271,6 +278,56 @@ func is_smoker_kind() -> bool:
 	return kind in ADULT_SMOKERS
 
 
+# ---------------------------------------------------------------- 단골 (말 걸기)
+
+func display_name() -> String:
+	return TownLife.info(regular).get("name", "주민")
+
+
+func talk() -> void:
+	var w := get_tree().current_scene
+	if w and w.get("town"):
+		w.town.talk(self)
+
+
+func gesture(anim: String) -> void:
+	_play(anim, 0.2)
+	_later(2.4, func():
+		if state == State.WALK:
+			_play("walk" if _pause_t <= 0.0 else "idle"))
+
+
+func _stop_smoking() -> void:
+	if _smoke:
+		_smoke.emitting = false
+	if _cig:
+		_cig.queue_free()
+		_cig = null
+
+
+func can_persuade() -> bool:
+	return has_cigarette() and kind != "boss" and state == State.SMOKING and _persuade_cd <= 0.0
+
+
+func persuaded() -> void:
+	## 말로 타일렀더니 순순히 끈다
+	resolved_by = "talk"
+	_stop_smoking()
+	_play("emote-yes", 0.2)
+	Sfx.play_at("voice_adult", global_position + Vector3.UP * 1.5, -4.0, _voice_pitch)
+	_resolve(1.2, false)
+
+
+func persuade_failed() -> void:
+	## 안 통했다: 비웃거나 도망
+	_persuade_cd = 8.0
+	_play("emote-no", 0.1)
+	if kind == "runner":
+		_start_flee()
+	elif kind == "angry":
+		_set_state(State.CHARGE)
+
+
 func has_cigarette() -> bool:
 	## 담배를 물고 있다 (어른, 학생 모두) → 냄새로 찾는다
 	return _cig != null and is_instance_valid(_cig) and not done
@@ -314,6 +371,9 @@ func incident_pos() -> Vector3:
 func photo_task() -> String:
 	if not is_active_incident():
 		return ""
+	# 어른 흡연자도 사진으로 신고할 수 있다 (돈은 덜, 평판은 오른다)
+	if kind in ["normal", "runner", "angry"] and has_cigarette():
+		return "smoke"
 	return task() if Game.TASKS[task()].how == "photo" else ""
 
 
@@ -360,6 +420,11 @@ func occupy(spot: Dictionary) -> void:
 # ---------------------------------------------------------------- 물 맞기
 
 func soak(amount: float, dir: Vector3, knock: float) -> void:
+	if wet <= 0.0 and not done and state in [State.SMOKING, State.HANGOUT]:
+		# 처음 맞을 때 등 뒤에서였으면 기습 (눈치 못 챘다). 돌아보기 전에 판정
+		var to_p := player.global_position - global_position
+		to_p.y = 0
+		_ambush = to_p.length() > 0.1 and (-global_basis.z).dot(to_p.normalized()) < -0.25
 	_hit_react(amount, dir, knock)
 	if state == State.LEAVING or done:
 		return
@@ -381,6 +446,7 @@ func soak(amount: float, dir: Vector3, knock: float) -> void:
 	wet += amount
 	_update_wet_visual()
 	if wet >= need:
+		resolved_by = "ambush" if _ambush else "water"
 		_finish_water()
 		return
 	_escalate_lines()
@@ -452,6 +518,12 @@ func on_photographed() -> void:
 	if done:
 		return
 	match kind:
+		"normal", "runner", "angry":
+			# 찰칵: 머쓱하게 담배 끄고 간다
+			resolved_by = "photo"
+			_stop_smoking()
+			_play("emote-no", 0.1)
+			_resolve(1.0, false)
 		"jaywalker":
 			say(LINES.jaywalk.pick_random(), Color(1, 0.95, 0.5))
 			_resolve(0.0, false)
@@ -539,6 +611,7 @@ func _physics_process(delta: float) -> void:
 	_busy_t -= delta
 	_down_cd -= delta
 	_slip_cd -= delta
+	_persuade_cd -= delta
 	if _shield_t > 0.0:
 		_shield_t -= delta
 		if _shield_t <= 0.0 and state != State.DOWN:
@@ -974,6 +1047,7 @@ func _done_line() -> String:
 func caught(by: String, dir: Vector3) -> void:
 	if done:
 		return
+	resolved_by = by
 	Popups.text(self, global_position + Vector3.UP * _head_y(), "태클!" if by == "tackle" else "쾅!", Color(1, 0.8, 0.3), 96)
 	Sfx.play_at("voice_scream", global_position + Vector3.UP * 1.5, 0.0, _voice_pitch)
 	Sfx.play_at("kick", global_position, 4.0)
@@ -1058,6 +1132,12 @@ func _thief_step() -> Vector3:
 		_target = city.nav_nodes[best]
 		if randf() < 0.3:
 			say(LINES.thief.pick_random(), Color(1, 0.6, 0.6))
+	# 세워 둔 차에 길이 막히면 잡힌다 (차로 막기)
+	if _stolen:
+		for v in get_tree().get_nodes_in_group("vehicle"):
+			if v.global_position.distance_to(global_position) < 3.2 and absf(v.speed) < 3.0 and v.driver != null:
+				caught("block", (global_position - v.global_position).normalized())
+				return Vector3.ZERO
 	var to := _target - global_position
 	to.y = 0
 	return to.normalized() * run_speed

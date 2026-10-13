@@ -113,6 +113,7 @@ func _call(who: String) -> void:
 func _memo() -> void:
 	_open_page("오늘 할 일")
 	var sh = world.shift
+	_text("주민 평판 %d / 100" % int(Game.reputation), Color(0.6, 1, 0.75))
 	_text(sh.quota_text())
 	if not sh.order.is_empty():
 		_text(sh.order_text(), Color(1, 0.831, 0) if not sh.order_cleared else Color(0.5, 1, 0.6))
@@ -129,6 +130,10 @@ func _memo() -> void:
 		_text("맡은 부탁 없음. 노란 표시 있는 동네 사람한테 말 걸어 봐요.", Color(0.65, 0.7, 0.75))
 	if world.mission.size() > 0:
 		_text("출동 중 · %s (%s)" % [world.mission.title, world.mission.place], Color(0.6, 0.85, 1))
+	_text("단골", Color(1, 0.75, 0.8))
+	for r in TownLife.REGULARS:
+		var met: bool = Game.flags.get("met_" + r.id, false)
+		_text("%s  %s" % [r.name, world.town.hearts(r.id)] if met else "??? (아직 못 만남)", Color(1, 0.85, 0.9) if met else Color(0.55, 0.6, 0.65))
 
 
 func _photos() -> void:

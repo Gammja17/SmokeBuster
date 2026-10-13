@@ -68,6 +68,12 @@ var clues := [0, 0, 0, 0, 0]                  # 구역별 조직 단서 (CLUES_N
 var raided := [false, false, false, false, false]   # 구역별 두목 검거 여부
 var ending_seen := false
 var flags := {}                    # 한 번 들은 대화/안내 (다시 안 나오게)
+var regulars := {}                 # 단골 친밀도 id -> 0~100
+var reputation := 50.0             # 주민 평판 0~100 (말로 타이르기 성공률, 동네 사람 반응)
+
+
+func add_rep(amount: float) -> void:
+	reputation = clampf(reputation + amount, 0.0, 100.0)
 
 
 ## 온보딩: 처음 며칠은 일을 하나씩 연다 (그날 아침 사람이 대화로 알려 준다)
@@ -293,6 +299,8 @@ func new_game() -> void:
 	ending_seen = false
 	best_grade = ""
 	flags = {}
+	regulars = {}
+	reputation = 50.0
 	save_game()
 
 
@@ -307,7 +315,7 @@ func save_game() -> void:
 	f.store_string(JSON.stringify({
 		"money": money, "xp": xp, "owned": owned, "upgrades": upgrades,
 		"has_truck": has_truck, "has_excavator": has_excavator, "total_caught": total_caught,
-		"day": day, "clean": clean, "clues": clues, "raided": raided, "best_grade": best_grade, "ending_seen": ending_seen, "flags": flags,
+		"day": day, "clean": clean, "clues": clues, "raided": raided, "best_grade": best_grade, "ending_seen": ending_seen, "flags": flags, "regulars": regulars, "reputation": reputation,
 	}))
 
 
@@ -337,3 +345,5 @@ func load_game() -> void:
 	best_grade = str(data.get("best_grade", ""))
 	ending_seen = bool(data.get("ending_seen", false))
 	flags = data.get("flags", {})
+	regulars = data.get("regulars", {})
+	reputation = float(data.get("reputation", 50.0))
