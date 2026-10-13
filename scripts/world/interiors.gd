@@ -333,15 +333,10 @@ func _build_casino(r: Node3D) -> Dictionary:
 	var w := 20.0
 	var d := 14.0
 	_room(r, w, d, Mats.flat(Color(0.35, 0.08, 0.08), 0.9), Mats.pbr("concrete", 4.0, Color(0.4, 0.4, 0.42)), Color(0.12, 0.12, 0.1))
-	var felt := Mats.flat(Color(0.1, 0.45, 0.2), 0.9)
-	var rim := Mats.flat(Color(0.3, 0.18, 0.1), 0.5)
 	var spots: Array = []
 	for i in 4:
 		var c := Vector3(-5.5 + (i % 2) * 11.0, 0, -3.5 + (i / 2) * 5.5)
-		_box(r, Vector3(3.2, 0.85, 1.8), c + Vector3(0, 0.42, 0), rim)
-		_box(r, Vector3(3.0, 0.04, 1.6), c + Vector3(0, 0.87, 0), felt, false)
-		for k in 4:
-			_box(r, Vector3(0.12, 0.08, 0.12), c + Vector3(-1.0 + k * 0.6, 0.93, 0.2 * (k % 2)), Mats.flat([Color(1, 0.2, 0.2), Color(0.2, 0.4, 1), Color(1, 1, 1)][k % 3], 0.4), false)
+		_furn(r, "casino_table", c, 0.0, 0.95, true)
 		var lamp := _light(r, c + Vector3(0, 2.3, 0), Color(1, 0.85, 0.55), 2.4, 5.5)
 		lamp.shadow_enabled = false
 		_box(r, Vector3(1.2, 0.25, 0.6), c + Vector3(0, 2.5, 0), Mats.flat(Color(0.1, 0.25, 0.12), 0.5), false)
